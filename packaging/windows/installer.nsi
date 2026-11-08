@@ -194,6 +194,11 @@ Section
   IfErrors old_uninstall_failed
   StrCmp $0 0 uninstall_ok old_uninstall_failed
   old_uninstall_failed:
+  !ifdef TEST_INSTALL_DIR
+    FileOpen $8 "${TEST_INSTALL_DIR}.failure" w
+    FileWrite $8 "uninstaller result=$0$\r$\n"
+    FileClose $8
+  !endif
   Call RestorePrevious
   SetErrorLevel 2
   Abort

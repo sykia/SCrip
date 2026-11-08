@@ -80,7 +80,8 @@ try {
         $upgrade.Refresh()
         if ($upgrade.HasExited) {
             $trace = if (Test-Path "${install}.trace") { Get-Content "${install}.trace" -Raw } else { '<no trace>' }
-            throw "Upgrade exited too early ($($upgrade.ExitCode)); marker=$(Test-Path $marker), exe=$(Test-Path (Join-Path $install 'SCrip.exe')), pause=$(Test-Path "${install}.__SCrip_test_pause"). Trace: $trace"
+            $failure = if (Test-Path "${install}.failure") { Get-Content "${install}.failure" -Raw } else { '<no failure detail>' }
+            throw "Upgrade exited too early ($($upgrade.ExitCode)); marker=$(Test-Path $marker), exe=$(Test-Path (Join-Path $install 'SCrip.exe')), pause=$(Test-Path "${install}.__SCrip_test_pause"). Failure: $failure Trace: $trace"
         }
         if ((Test-Path $marker) -and !(Test-Path (Join-Path $install 'SCrip.exe'))) { break }
         Start-Sleep -Milliseconds 100
