@@ -29,6 +29,7 @@ void mediaAction(JNIEnv *, jclass, jint action, jlong position) {
         case 5: controller->pausePlayback(); break;
         case 6: controller->stopPlayback(); break;
         case 7: controller->like(controller->state().value("current").toMap()); break;
+        case 8: controller->pausePlayback(); break; // Пауза из-за системного фокуса.
         }
     }, Qt::QueuedConnection);
 }

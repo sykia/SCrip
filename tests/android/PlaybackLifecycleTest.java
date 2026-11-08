@@ -59,6 +59,21 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             bridge.getMethod("preparePlayback").invoke(null);
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);
+            Object playbackService = field(service, null, "instance");
+            Method focus = service.getDeclaredMethod("handleAudioFocusChange", int.class); focus.setAccessible(true);
+            focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT);
+            require((Boolean) field(service, playbackService, "resumeAfterFocus"), "Не сохранён намеренный resume");
+            focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_GAIN);
+            require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Resume не погашен после возврата фокуса");
+            focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_GAIN);
+            require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Повторный gain запланировал второй resume");
+            focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT);
+            service.getDeclaredMethod("cancelFocusResume").setAccessible(true);
+            Method cancel = service.getDeclaredMethod("cancelFocusResume"); cancel.setAccessible(true); cancel.invoke(playbackService);
+            focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_GAIN);
+            require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Ручная остановка не отменила resume");
+            focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS);
+            require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Постоянная потеря оставила resume");
             // Уводим настоящее Qt-приложение с экрана, не закрывая его.
             runOnMainSync(() -> activity.moveTaskToBack(true));
             snapshot(true, false, false, true);

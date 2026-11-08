@@ -18,7 +18,14 @@ public class PlaybackService extends Service {
     private static final String LIKE = "org.scrip.app.LIKE";
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
-    private boolean hasFocus, resumeAfterFocus;
+    private boolean hasFocus, resumeAfterFocus, focusPaused, destroyed;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable focusTimeout = () -> {
+        if (!resumeAfterFocus) return;
+        resumeAfterFocus = false; focusPaused = false;
+        MediaBridge.dispatch(this, 5, 0);
+        publish();
+    };
     private String metadataKey = "";
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { MediaBridge.dispatch(context, 5, 0); }
@@ -30,15 +37,7 @@ public class PlaybackService extends Service {
         audioManager = getSystemService(AudioManager.class);
         focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-            .setOnAudioFocusChangeListener(change -> {
-                if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-                    resumeAfterFocus = change != AudioManager.AUDIOFOCUS_LOSS && MediaBridge.active;
-                    hasFocus = change != AudioManager.AUDIOFOCUS_LOSS;
-                    MediaBridge.dispatch(this, 5, 0);
-                } else if (change == AudioManager.AUDIOFOCUS_GAIN && resumeAfterFocus) {
-                    resumeAfterFocus = false; hasFocus = true; MediaBridge.dispatch(this, 4, 0);
-                }
-            }, MediaBridge.MAIN).build();
+            .setOnAudioFocusChangeListener(this::handleAudioFocusChange, MediaBridge.MAIN).build();
         IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(noisy, filter, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(noisy, filter);
@@ -46,8 +45,8 @@ public class PlaybackService extends Service {
         session.setSessionActivity(MediaBridge.openApp(this));
         session.setCallback(new MediaSession.Callback() {
             @Override public void onPlay() { MediaBridge.dispatch(PlaybackService.this, 4, 0); }
-            @Override public void onPause() { MediaBridge.dispatch(PlaybackService.this, 5, 0); }
-            @Override public void onStop() { MediaBridge.dispatch(PlaybackService.this, 6, 0); }
+            @Override public void onPause() { cancelFocusResume(); MediaBridge.dispatch(PlaybackService.this, 5, 0); }
+            @Override public void onStop() { cancelFocusResume(); MediaBridge.dispatch(PlaybackService.this, 6, 0); }
             @Override public void onCustomAction(String action, Bundle extras) {
                 if (LIKE.equals(action)) MediaBridge.dispatch(PlaybackService.this, 7, 0);
             }
@@ -56,6 +55,24 @@ public class PlaybackService extends Service {
             @Override public void onSeekTo(long position) { MediaBridge.dispatch(PlaybackService.this, 3, position); }
         }, MediaBridge.MAIN);
         session.setActive(true);
+    }
+    void handleAudioFocusChange(int change) {
+                if (destroyed) return;
+                if (change == AudioManager.AUDIOFOCUS_LOSS) {
+                    handler.removeCallbacks(focusTimeout); resumeAfterFocus = false; focusPaused = false; hasFocus = false;
+                    MediaBridge.dispatch(this, 5, 0); publish();
+                } else if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+                    if (!focusPaused) resumeAfterFocus = MediaBridge.playing && MediaBridge.active;
+                    focusPaused = true; hasFocus = false;
+                    if (resumeAfterFocus) { handler.removeCallbacks(focusTimeout); handler.postDelayed(focusTimeout, 120000); }
+                    MediaBridge.dispatch(this, 8, 0); publish();
+                } else if (change == AudioManager.AUDIOFOCUS_GAIN) {
+                    hasFocus = true;
+                    if (resumeAfterFocus && focusPaused && MediaBridge.ready && MediaBridge.hasTrack) {
+                        handler.removeCallbacks(focusTimeout); resumeAfterFocus = false; focusPaused = false;
+                        MediaBridge.dispatch(this, 4, 0);
+                    }
+                }
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (!MediaBridge.ready) { stopSelf(); return START_NOT_STICKY; }
@@ -105,27 +122,43 @@ public class PlaybackService extends Service {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
             else startForeground(NOTIFICATION, notification);
             foreground = true;
-            if (!wakeLock.isHeld()) wakeLock.acquire();
+            if (!wakeLock.isHeld() && MediaBridge.playing && !MediaBridge.buffering) wakeLock.acquire();
             if (!hasFocus) {
                 hasFocus = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
-                if (!hasFocus) MediaBridge.dispatch(this, 5, 0);
+                if (!hasFocus) { resumeAfterFocus = false; focusPaused = false; MediaBridge.dispatch(this, 5, 0); }
             }
         } else {
             if (foreground) { stopForeground(STOP_FOREGROUND_DETACH); foreground = false; }
             if (wakeLock.isHeld()) wakeLock.release();
-            if (hasFocus && !resumeAfterFocus) { audioManager.abandonAudioFocusRequest(focusRequest); hasFocus = false; }
+            if (resumeAfterFocus) {
+                if (wakeLock.isHeld()) wakeLock.release();
+                foreground = true;
+                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                else startForeground(NOTIFICATION, notification);
+            } else if (hasFocus) { audioManager.abandonAudioFocusRequest(focusRequest); hasFocus = false; }
+            else if (foreground) { stopForeground(STOP_FOREGROUND_DETACH); foreground = false; }
             getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
         }
         if (!MediaBridge.hasTrack && !active) stopSelf();
     }
     @Override public void onDestroy() {
-        instance = null;
-        unregisterReceiver(noisy);
+        destroyed = true; handler.removeCallbacksAndMessages(null); resumeAfterFocus = focusPaused = false;
+        if (instance == this) instance = null;
+        try { unregisterReceiver(noisy); } catch (IllegalArgumentException ignored) {}
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
-        if (audioManager != null) audioManager.abandonAudioFocusRequest(focusRequest);
+        if (audioManager != null && focusRequest != null) audioManager.abandonAudioFocusRequest(focusRequest);
         if (session != null) { session.setActive(false); session.release(); }
         getSystemService(NotificationManager.class).cancel(NOTIFICATION);
-        MediaBridge.playing = false; MusicWidget.refresh(this); super.onDestroy();
+        if (MediaBridge.ready) {
+            MediaBridge.playing = MediaBridge.active = MediaBridge.buffering = MediaBridge.preparing = false;
+            MediaBridge.dispatch(this, 6, 0);
+        } else {
+            MediaBridge.playing = MediaBridge.active = MediaBridge.buffering = MediaBridge.preparing = MediaBridge.hasTrack = false;
+        }
+        MusicWidget.refresh(this); super.onDestroy();
+    }
+    private void cancelFocusResume() {
+        handler.removeCallbacks(focusTimeout); resumeAfterFocus = focusPaused = false;
     }
     @Override public IBinder onBind(Intent intent) { return null; }
 }

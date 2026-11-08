@@ -13,6 +13,8 @@ public final class MediaBridge {
     static final Handler MAIN = new Handler(Looper.getMainLooper());
     static Context context;
     static volatile boolean ready;
+    private static volatile boolean shuttingDown;
+    private static volatile int lifecycle;
     static volatile boolean preparing;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
     static boolean playing, active, buffering, hasTrack, liked;
@@ -23,7 +25,7 @@ public final class MediaBridge {
     private static native void nativeAction(int action, long position);
 
     public static void initialize(Context ctx) {
-        context = ctx.getApplicationContext(); ready = true;
+        context = ctx.getApplicationContext(); shuttingDown = false; ++lifecycle; ready = true;
     }
     /** Start the foreground service while the activity is still visible, before Qt starts decoding audio. */
     public static void preparePlayback() {
@@ -38,7 +40,7 @@ public final class MediaBridge {
         });
     }
     public static void shutdown() {
-        ready = false;
+        ready = false; shuttingDown = true; ++lifecycle;
         MAIN.post(() -> {
             playing = active = buffering = hasTrack = preparing = false;
             if (context != null) {
@@ -69,7 +71,7 @@ public final class MediaBridge {
                 }
                 save(); MusicWidget.refresh(context);
                 preparing = false;
-                if (active && PlaybackService.instance == null) {
+                if (active && !shuttingDown && PlaybackService.instance == null) {
                     try { context.startForegroundService(new Intent(context, PlaybackService.class)); }
                     catch (IllegalStateException | SecurityException error) { Log.w("SCripMedia", "Не удалось запустить фоновый плеер", error); }
                 } else if (PlaybackService.instance != null) PlaybackService.instance.publish();
@@ -100,6 +102,7 @@ public final class MediaBridge {
             if (launch != null) { launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); ctx.startActivity(launch); }
         }
     }
+    static int generation() { return lifecycle; }
     static PendingIntent openApp(Context ctx) {
         Intent launch = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         return PendingIntent.getActivity(ctx, 20, launch, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
