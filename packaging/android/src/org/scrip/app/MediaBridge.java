@@ -15,7 +15,7 @@ public final class MediaBridge {
     static volatile boolean ready;
     static volatile boolean preparing;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
-    static boolean playing;
+    static boolean playing, active, buffering, hasTrack;
     static long position, duration;
     static Bitmap cover;
     private static String savedKey = "";
@@ -28,21 +28,19 @@ public final class MediaBridge {
     /** Start the foreground service while the activity is still visible, before Qt starts decoding audio. */
     public static void preparePlayback() {
         if (!ready || context == null) return;
-        preparing = true;
         MAIN.post(() -> {
+            if (!ready) return;
+            preparing = true;
+            // Существующая служба остаётся foreground на всём переходе.
+            if (PlaybackService.instance != null) return;
             try { context.startForegroundService(new Intent(context, PlaybackService.class)); }
             catch (IllegalStateException | SecurityException error) { Log.w("SCripMedia", "Не удалось подготовить фоновое воспроизведение", error); }
         });
-        MAIN.postDelayed(() -> {
-            if (!preparing || PlaybackService.instance == null) return;
-            preparing = false;
-            context.stopService(new Intent(context, PlaybackService.class));
-        }, 30000);
     }
     public static void shutdown() {
         ready = false;
         MAIN.post(() -> {
-            playing = false;
+            playing = active = buffering = hasTrack = preparing = false;
             if (context != null) {
                 context.stopService(new Intent(context, PlaybackService.class));
                 save(); MusicWidget.refresh(context);
@@ -58,7 +56,9 @@ public final class MediaBridge {
                 title = nextTitle.isEmpty() ? "SCrip" : nextTitle;
                 artist = nextTitle.isEmpty() ? "Включи музыку в приложении" : data.optString("artist");
                 playing = data.optBoolean("playing");
-                boolean buffering = data.optBoolean("buffering");
+                buffering = data.optBoolean("buffering");
+                active = data.optBoolean("active");
+                hasTrack = data.optBoolean("hasTrack");
                 position = Math.max(0, data.optLong("position"));
                 duration = Math.max(0, data.optLong("duration"));
                 String nextArtwork = data.optString("artwork");
@@ -67,12 +67,11 @@ public final class MediaBridge {
                     cover = artwork.isEmpty() ? null : BitmapFactory.decodeFile(artwork);
                 }
                 save(); MusicWidget.refresh(context);
-                if (playing) preparing = false;
-                else if (!buffering) preparing = false;
-                if (playing && PlaybackService.instance == null) {
+                preparing = false;
+                if (active && PlaybackService.instance == null) {
                     try { context.startForegroundService(new Intent(context, PlaybackService.class)); }
                     catch (IllegalStateException | SecurityException error) { Log.w("SCripMedia", "Не удалось запустить фоновый плеер", error); }
-                } else if (PlaybackService.instance != null && (!preparing || playing)) PlaybackService.instance.publish();
+                } else if (PlaybackService.instance != null) PlaybackService.instance.publish();
             } catch (org.json.JSONException error) { Log.w("SCripMedia", "Некорректное состояние плеера", error); }
         });
     }

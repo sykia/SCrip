@@ -149,6 +149,30 @@ private slots:
         sc.enqueue({{"urn","soundcloud:tracks:2"}}); QCOMPARE(sc.state()["queue"].toList().size(), 2);
         sc.removeQueue(0); QCOMPARE(sc.state()["queue"].toList().size(), 1);
     }
+    void pauseAndStopDuringTrackLoading() {
+        Network net; net.responses = {guest(), {200, "{}", 150}};
+        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.play({{"urn", "soundcloud:tracks:1"}});
+        QVERIFY(sc.state()["playbackActive"].toBool());
+        QVERIFY(sc.state()["buffering"].toBool());
+        sc.pausePlayback(); QVERIFY(!sc.state()["playbackActive"].toBool());
+        sc.resumePlayback(); QVERIFY(sc.state()["playbackActive"].toBool());
+        sc.stopPlayback();
+        QTest::qWait(200); // Поздний ответ не должен оживить остановленную сессию.
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QVERIFY(!sc.state()["buffering"].toBool());
+        QVERIFY(sc.state()["current"].toMap().isEmpty());
+        QVERIFY(sc.state()["error"].toString().isEmpty());
+    }
+    void streamFailureEndsPlaybackSession() {
+        Network net; net.responses = {guest(), {503, "{}"}};
+        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.play({{"urn", "soundcloud:tracks:1"}});
+        QVERIFY(sc.state()["playbackActive"].toBool());
+        QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QVERIFY(!sc.state()["buffering"].toBool());
+    }
     void movingQueuePreservesCurrentAndSetsNext() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
         QTRY_VERIFY(sc.state()["connected"].toBool());

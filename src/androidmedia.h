@@ -17,5 +17,6 @@ private:
     SoundCloud *m_soundcloud;
     QNetworkAccessManager *m_network;
     QTimer m_timer;
-    QString m_track, m_artworkUrl, m_artworkPath, m_lastState;
+    QString m_artworkUrl, m_artworkPath, m_lastState;
+    bool m_playbackActive = false, m_publishPending = false;
 };

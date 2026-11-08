@@ -11,10 +11,11 @@ from check_licenses import check, digest
 import json
 
 
-def audit(assets, materials):
+def audit(assets, materials, platforms=None):
     patterns = {'Windows': '*-Windows-x64.exe', 'Linux-DEB': '*.deb',
                 'Linux-Arch': '*.pkg.tar.zst', 'Android': '*.apk'}
-    for platform, pattern in patterns.items():
+    for platform in platforms or patterns:
+        pattern = patterns[platform]
         files = list(assets.glob(pattern))
         if len(files) != 1:
             raise ValueError(f'{platform}: требуется ровно один пакет {pattern}')
@@ -46,9 +47,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--assets', type=Path, required=True)
     parser.add_argument('--materials', type=Path, required=True)
+    parser.add_argument("--platform", action="append", choices=["Windows", "Linux-DEB", "Linux-Arch", "Android"])
     args = parser.parse_args()
     try:
-        audit(args.assets, args.materials)
+        audit(args.assets, args.materials, args.platform)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print('Аудит пакетов не пройден: ' + str(error), file=sys.stderr)
         sys.exit(1)

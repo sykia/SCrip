@@ -29,8 +29,8 @@ public class MusicWidget extends AppWidgetProvider {
         view.setTextViewText(R.id.widget_remaining, "−" + time(MediaBridge.duration - MediaBridge.position));
         view.setProgressBar(R.id.widget_progress, 1000, MediaBridge.duration > 0 ? (int)Math.min(1000, MediaBridge.position * 1000 / MediaBridge.duration) : 0, false);
         view.setImageViewBitmap(R.id.widget_cover, MediaBridge.roundedCover(context));
-        view.setImageViewResource(R.id.widget_play, MediaBridge.playing ? R.drawable.widget_pause : R.drawable.widget_play);
-        view.setContentDescription(R.id.widget_play, MediaBridge.playing ? "Пауза" : "Воспроизвести");
+        view.setImageViewResource(R.id.widget_play, MediaBridge.active ? R.drawable.widget_pause : R.drawable.widget_play);
+        view.setContentDescription(R.id.widget_play, MediaBridge.active ? "Пауза" : "Воспроизвести");
         view.setOnClickPendingIntent(R.id.widget_info, MediaBridge.openApp(context));
         view.setOnClickPendingIntent(R.id.widget_previous, MediaBridge.control(context, 1));
         view.setOnClickPendingIntent(R.id.widget_play, MediaBridge.control(context, 0));

@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
       - run: sudo apt-get update && sudo apt-get install -y p7zip-full libarchive-tools
       - name: Скачать материалы соответствующего релиза
         env:
@@ -32,12 +34,19 @@ jobs:
           set -eu
           args=()
           if [ -n "$TAG" ]; then args+=("$TAG"); fi
-          mkdir -p build/compliance build/release-assets
+          mkdir -p build/release-assets
           gh release download "${args[@]}" --repo "$GITHUB_REPOSITORY" --dir build/release-assets
-          cp build/release-assets/compliance.tar.gz build/compliance.tar.gz
-          python - <<'PY'
-          import tarfile
-          with tarfile.open('build/compliance.tar.gz') as archive:
-              archive.extractall('build/compliance', filter='data')
-          PY
-          python scripts/audit_release.py --assets build/release-assets --materials build/compliance
+          if [ -z "$TAG" ]; then TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName); fi
+          release_dir="licensing/releases/${TAG#v}"
+          if [ -f "$release_dir/release.json" ]; then
+            python scripts/prepare_release_materials.py --release-dir "$release_dir" --output build/compliance --bundle build/base-compliance.tar.gz
+            mapfile -t platforms < <(python -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["platforms"]))' "$release_dir/release.json")
+            platform_args=()
+            for platform in "${platforms[@]}"; do platform_args+=(--platform "$platform"); done
+            python scripts/audit_release.py --assets build/release-assets --materials build/compliance "${platform_args[@]}"
+          else
+            mkdir -p build/compliance
+            cp build/release-assets/compliance.tar.gz build/compliance.tar.gz
+            python -c 'import tarfile; tarfile.open("build/compliance.tar.gz").extractall("build/compliance", filter="data")'
+            python scripts/audit_release.py --assets build/release-assets --materials build/compliance
+          fi

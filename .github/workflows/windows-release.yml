@@ -19,6 +19,12 @@ jobs:
           $selector = @(if ($env:TAG) { $env:TAG })
           $release = gh release view @selector --repo $env:GITHUB_REPOSITORY --json assets,tagName | ConvertFrom-Json
           $asset = @($release.assets | Where-Object name -like '*-Windows-x64.exe')
+          if ($asset.Count -eq 0) {
+            $version = $release.tagName -replace '^v', ''
+            $descriptor = "https://raw.githubusercontent.com/$env:GITHUB_REPOSITORY/$($release.tagName)/licensing/releases/$version/release.json"
+            $scope = Invoke-RestMethod -Uri $descriptor
+            if ($scope.platforms -notcontains 'Windows') { Write-Host 'Выпуск не содержит Windows; проверка установщика не применяется.'; return }
+          }
           if ($asset.Count -ne 1) { throw 'Ожидался один установщик Windows' }
           gh release download $release.tagName --repo $env:GITHUB_REPOSITORY --pattern $asset[0].name --dir $env:RUNNER_TEMP
           $exe = Join-Path $env:RUNNER_TEMP $asset[0].name

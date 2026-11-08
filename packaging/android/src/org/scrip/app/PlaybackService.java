@@ -15,6 +15,7 @@ public class PlaybackService extends Service {
     private boolean foreground;
     private static final String CHANNEL = "scrip_playback";
     private static final int NOTIFICATION = 44;
+    private static final String STOP = "org.scrip.app.STOP";
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
     private boolean hasFocus, resumeAfterFocus;
@@ -31,7 +32,7 @@ public class PlaybackService extends Service {
             .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
             .setOnAudioFocusChangeListener(change -> {
                 if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-                    resumeAfterFocus = change != AudioManager.AUDIOFOCUS_LOSS && MediaBridge.playing;
+                    resumeAfterFocus = change != AudioManager.AUDIOFOCUS_LOSS && MediaBridge.active;
                     hasFocus = change != AudioManager.AUDIOFOCUS_LOSS;
                     MediaBridge.dispatch(this, 5, 0);
                 } else if (change == AudioManager.AUDIOFOCUS_GAIN && resumeAfterFocus) {
@@ -46,7 +47,10 @@ public class PlaybackService extends Service {
         session.setCallback(new MediaSession.Callback() {
             @Override public void onPlay() { MediaBridge.dispatch(PlaybackService.this, 4, 0); }
             @Override public void onPause() { MediaBridge.dispatch(PlaybackService.this, 5, 0); }
-            @Override public void onStop() { MediaBridge.dispatch(PlaybackService.this, 5, 0); }
+            @Override public void onStop() { MediaBridge.dispatch(PlaybackService.this, 6, 0); }
+            @Override public void onCustomAction(String action, Bundle extras) {
+                if (STOP.equals(action)) MediaBridge.dispatch(PlaybackService.this, 6, 0);
+            }
             @Override public void onSkipToNext() { MediaBridge.dispatch(PlaybackService.this, 2, 0); }
             @Override public void onSkipToPrevious() { MediaBridge.dispatch(PlaybackService.this, 1, 0); }
             @Override public void onSeekTo(long position) { MediaBridge.dispatch(PlaybackService.this, 3, position); }
@@ -55,18 +59,15 @@ public class PlaybackService extends Service {
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (!MediaBridge.ready) { stopSelf(); return START_NOT_STICKY; }
-        // The service can be created just before audio starts. Publish a foreground
-        // notification immediately so Android never treats the Qt process as idle.
-        if (!MediaBridge.playing) {
-            Notification pending = new Notification.Builder(this, CHANNEL)
-                .setSmallIcon(R.drawable.widget_notification).setContentTitle("SCrip")
-                .setContentText("Подготовка воспроизведения…").setOngoing(true)
-                .setContentIntent(MediaBridge.openApp(this)).build();
-            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, pending, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-            else startForeground(NOTIFICATION, pending);
-            foreground = true;
-            return START_NOT_STICKY;
-        }
+        // Даже если загрузка успела завершиться ошибкой до onStartCommand,
+        // сначала выполняем обязательство startForegroundService перед Android.
+        Notification pending = new Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.widget_notification).setContentTitle("SCrip")
+            .setContentText("Подготовка воспроизведения…").setOngoing(true)
+            .setContentIntent(MediaBridge.openApp(this)).build();
+        if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, pending, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        else startForeground(NOTIFICATION, pending);
+        foreground = true;
         publish(); return START_NOT_STICKY;
     }
     void publish() {
@@ -81,18 +82,24 @@ public class PlaybackService extends Service {
             session.setMetadata(metadata.build());
         }
         long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO | PlaybackState.ACTION_STOP;
+        final boolean active = MediaBridge.active || MediaBridge.preparing;
+        final int state = !MediaBridge.hasTrack ? PlaybackState.STATE_STOPPED
+            : active && (!MediaBridge.playing || MediaBridge.buffering) ? PlaybackState.STATE_BUFFERING
+            : MediaBridge.playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
         session.setPlaybackState(new PlaybackState.Builder().setActions(actions)
-            .setState(MediaBridge.playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, MediaBridge.position, MediaBridge.playing ? 1f : 0f, SystemClock.elapsedRealtime()).build());
+            .addCustomAction(STOP, "Остановить", android.R.drawable.ic_menu_close_clear_cancel)
+            .setState(state, MediaBridge.position, state == PlaybackState.STATE_PLAYING ? 1f : 0f, SystemClock.elapsedRealtime()).build());
         Notification notification = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.widget_notification).setContentTitle(MediaBridge.title).setContentText(MediaBridge.artist)
             .setLargeIcon(MediaBridge.cover).setContentIntent(MediaBridge.openApp(this))
             .setVisibility(Notification.VISIBILITY_PUBLIC).setOnlyAlertOnce(true).setShowWhen(false)
-            .setCategory(Notification.CATEGORY_TRANSPORT).setOngoing(MediaBridge.playing)
+            .setCategory(Notification.CATEGORY_TRANSPORT).setOngoing(active)
             .addAction(new Notification.Action.Builder(R.drawable.widget_previous, "Предыдущий", MediaBridge.control(this, 1)).build())
-            .addAction(new Notification.Action.Builder(MediaBridge.playing ? R.drawable.widget_pause : R.drawable.widget_play, MediaBridge.playing ? "Пауза" : "Воспроизвести", MediaBridge.control(this, 0)).build())
+            .addAction(new Notification.Action.Builder(active ? R.drawable.widget_pause : R.drawable.widget_play, active ? "Пауза" : "Воспроизвести", MediaBridge.control(this, 0)).build())
             .addAction(new Notification.Action.Builder(R.drawable.widget_next, "Следующий", MediaBridge.control(this, 2)).build())
+            .addAction(new Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, "Остановить", MediaBridge.control(this, 6)).build())
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0, 1, 2)).build();
-        if (MediaBridge.playing) {
+        if (active) {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
             else startForeground(NOTIFICATION, notification);
             foreground = true;
@@ -107,7 +114,7 @@ public class PlaybackService extends Service {
             if (hasFocus && !resumeAfterFocus) { audioManager.abandonAudioFocusRequest(focusRequest); hasFocus = false; }
             getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
         }
-        if ("SCrip".equals(MediaBridge.title) && !MediaBridge.playing) stopSelf();
+        if (!MediaBridge.hasTrack && !active) stopSelf();
     }
     @Override public void onDestroy() {
         instance = null;

@@ -25,8 +25,9 @@ void mediaAction(JNIEnv *, jclass, jint action, jlong position) {
         case 1: controller->previous(); break;
         case 2: controller->next(); break;
         case 3: controller->seek(position); break;
-        case 4: if (!controller->state().value("playing").toBool()) controller->togglePlayback(); break;
-        case 5: if (controller->state().value("playing").toBool()) controller->togglePlayback(); break;
+        case 4: controller->resumePlayback(); break;
+        case 5: controller->pausePlayback(); break;
+        case 6: controller->stopPlayback(); break;
         }
     }, Qt::QueuedConnection);
 }
@@ -42,14 +43,14 @@ AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwor
     // Позиция обновляется не чаще раза в секунду; кнопки и смена трека — сразу.
     connect(soundcloud, &SoundCloud::changed, this, [this] {
         const auto s = m_soundcloud->state();
-        const QString current = s.value("current").toMap().value("urn").toString();
-        const QString key = current + QString::number(s.value("playing").toBool());
-        if (key != m_track) {
-            const bool changedTrack = !current.isEmpty() && !m_track.startsWith(current);
-            m_track = key;
-            if (changedTrack)
-                QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "preparePlayback", "()V");
-            publish();
+        const bool active = s.value("playbackActive").toBool();
+        if (active && !m_playbackActive)
+            QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "preparePlayback", "()V");
+        m_playbackActive = active;
+        // Снимок после всей смены трека: промежуточный stop() не означает паузу.
+        if (!m_publishPending) {
+            m_publishPending = true;
+            QTimer::singleShot(0, this, [this] { m_publishPending = false; publish(); });
         }
     });
     m_timer.setInterval(1000);
@@ -92,6 +93,7 @@ void AndroidMedia::publish() {
     const QJsonObject data{{"title", track.value("title").toString()}, {"artist", user.value("username").toString()},
         {"artwork", m_artworkPath}, {"playing", state.value("playing").toBool()},
         {"buffering", state.value("buffering").toBool()},
+        {"active", state.value("playbackActive").toBool()}, {"hasTrack", !track.isEmpty()},
         {"position", state.value("position").toLongLong()}, {"duration", state.value("duration").toLongLong()}};
     const auto json = QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact));
     if (json == m_lastState) return;
