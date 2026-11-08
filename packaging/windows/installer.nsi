@@ -71,7 +71,9 @@ Function .onInit
   ClearErrors
   ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$2" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
   IfErrors recovery_failed
-  IntCmp $0 8 recovery_failed recovery_done recovery_failed
+  !insertmacro TestTrace "recovery_copy_exit=$0"
+  IntCmp $0 8 recovery_failed recovery_recovered recovery_failed
+  recovery_recovered:
   Delete "$3"
   RMDir /r "$2"
   CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
@@ -82,6 +84,7 @@ Function .onInit
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
+  Goto recovery_done
   recovery_done:
   Goto recovery_end
   recovery_failed:
