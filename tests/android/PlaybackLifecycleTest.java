@@ -1,7 +1,9 @@
 package org.scrip.test;
 
 import android.app.*;
+import android.appwidget.AppWidgetManager;
 import android.content.*;
+import android.graphics.*;
 import android.media.session.*;
 import android.os.*;
 import java.lang.reflect.*;
@@ -16,6 +18,41 @@ public final class PlaybackLifecycleTest extends Instrumentation {
     }
     private void require(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
+    }
+    private String argument(String key, String fallback) {
+        String value = testArguments == null ? null : testArguments.getString(key);
+        return value == null ? fallback : value;
+    }
+    private Bitmap previewArtwork() {
+        Bitmap bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        paint.setShader(new LinearGradient(0, 0, 128, 128, new int[]{0xff173b43, 0xff548c91, 0xffe58c9a}, null, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, 128, 128, paint);
+        paint.setShader(null); paint.setColor(0x88eaa4ae); paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(16);
+        Path wave = new Path(); wave.moveTo(-12, 76); wave.cubicTo(24, 25, 50, 114, 84, 61); wave.cubicTo(104, 32, 123, 42, 145, 8);
+        canvas.drawPath(wave, paint);
+        return bitmap;
+    }
+    private void configureWidgetSize(Context context, Class<?> widget) throws Exception {
+        String requested = argument("previewCompact", "false");
+        boolean compact = Boolean.parseBoolean(requested);
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, widget));
+        for (int id : ids) {
+            Bundle options = manager.getAppWidgetOptions(id);
+            int width = compact ? 250 : 360, height = compact ? 110 : 180;
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, width);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, width);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, height);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, height);
+            if (Build.VERSION.SDK_INT >= 31) {
+                java.util.ArrayList<android.util.SizeF> sizes = new java.util.ArrayList<>();
+                sizes.add(new android.util.SizeF(width, height));
+                options.putParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, sizes);
+            }
+            manager.updateAppWidgetOptions(id, options);
+        }
     }
     private void snapshot(boolean active, boolean playing, boolean buffering, boolean hasTrack) throws Exception {
         String json = "{\"title\":\"Lifecycle test\",\"artist\":\"SCrip\",\"active\":" + active
@@ -48,6 +85,26 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             if (testArguments != null && testArguments.containsKey("previewStyle"))
                 previewStyle = Integer.parseInt(testArguments.getString("previewStyle"));
             if (previewStyle >= 0) {
+                Class<?> widget = ctx.getClassLoader().loadClass("org.scrip.app.MusicWidget");
+                String previewTitle = argument("previewTitle", "");
+                Field title = bridge.getDeclaredField("title"); title.setAccessible(true);
+                Field artist = bridge.getDeclaredField("artist"); artist.setAccessible(true);
+                Field hasTrack = bridge.getDeclaredField("hasTrack"); hasTrack.setAccessible(true);
+                Field playing = bridge.getDeclaredField("playing"); playing.setAccessible(true);
+                Field liked = bridge.getDeclaredField("liked"); liked.setAccessible(true);
+                title.set(null, previewTitle.isEmpty() ? "SCrip" : previewTitle);
+                artist.set(null, argument("previewArtist", "Включи музыку в приложении"));
+                hasTrack.setBoolean(null, !previewTitle.isEmpty());
+                playing.setBoolean(null, !previewTitle.isEmpty());
+                liked.setBoolean(null, !previewTitle.isEmpty());
+                Field cover = bridge.getDeclaredField("cover"); cover.setAccessible(true);
+                Field blurred = bridge.getDeclaredField("blurredCover"); blurred.setAccessible(true);
+                Field rounded = bridge.getDeclaredField("roundedCover"); rounded.setAccessible(true);
+                boolean withArtwork = Boolean.parseBoolean(argument("previewCover", "false"));
+                Bitmap art = withArtwork ? previewArtwork() : null;
+                cover.set(null, art); blurred.set(null, art); rounded.set(null, null);
+                Field accent = bridge.getDeclaredField("widgetAccent"); accent.setAccessible(true); accent.setInt(null, 0xffeaa2ae);
+                configureWidgetSize(ctx, widget);
                 bridge.getMethod("setWidgetStyle", int.class).invoke(null, previewStyle);
                 waitForIdleSync(); SystemClock.sleep(250); waitForIdleSync();
                 result.putString("stream", "STYLE: " + previewStyle + "\n");

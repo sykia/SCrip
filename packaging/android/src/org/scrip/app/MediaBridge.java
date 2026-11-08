@@ -86,7 +86,7 @@ public final class MediaBridge {
                             Bitmap decoded = BitmapFactory.decodeFile(key, options);
                             if (decoded == null) return;
                             Bitmap square = centerCrop(decoded, 128);
-                            Bitmap blur = boxBlur(centerCrop(decoded, 48), 5);
+                            Bitmap blur = boxBlur(centerCrop(decoded, 128), 12);
                             MAIN.post(() -> {
                                 if (!key.equals(artwork)) return;
                                 cover = square; roundedCover = rounded(square); blurredCover = blur; widgetAccent = accent(blur);
@@ -128,7 +128,7 @@ public final class MediaBridge {
                 Bitmap decoded = BitmapFactory.decodeFile(key);
                 if (decoded == null) return;
                 Bitmap square = centerCrop(decoded, 128);
-                Bitmap blur = boxBlur(centerCrop(decoded, 48), 5);
+                Bitmap blur = boxBlur(centerCrop(decoded, 128), 12);
                 MAIN.post(() -> { if (!key.equals(artwork)) return; cover = square; roundedCover = rounded(square); blurredCover = blur; widgetAccent = accent(blur); MusicWidget.refresh(context); });
             });
         }
@@ -194,11 +194,21 @@ public final class MediaBridge {
         return result;
     }
     private static Bitmap boxBlur(Bitmap source, int radius) {
-        int w = source.getWidth(), h = source.getHeight(); int[] pixels = new int[w * h]; source.getPixels(pixels, 0, w, 0, 0, w, h);
-        int[] out = new int[pixels.length];
+        int w = source.getWidth(), h = source.getHeight();
+        int[] pixels = new int[w * h], horizontal = new int[w * h], out = new int[w * h];
+        source.getPixels(pixels, 0, w, 0, 0, w, h);
         for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
             int a=0,r=0,g=0,b=0,n=0;
-            for (int yy=Math.max(0,y-radius); yy<=Math.min(h-1,y+radius); ++yy) for (int xx=Math.max(0,x-radius); xx<=Math.min(w-1,x+radius); ++xx) { int c=pixels[yy*w+xx]; a+=Color.alpha(c); r+=Color.red(c); g+=Color.green(c); b+=Color.blue(c); ++n; }
+            for (int xx=Math.max(0,x-radius); xx<=Math.min(w-1,x+radius); ++xx) {
+                int c=pixels[y*w+xx]; a+=Color.alpha(c); r+=Color.red(c); g+=Color.green(c); b+=Color.blue(c); ++n;
+            }
+            horizontal[y*w+x]=Color.argb(a/n,r/n,g/n,b/n);
+        }
+        for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
+            int a=0,r=0,g=0,b=0,n=0;
+            for (int yy=Math.max(0,y-radius); yy<=Math.min(h-1,y+radius); ++yy) {
+                int c=horizontal[yy*w+x]; a+=Color.alpha(c); r+=Color.red(c); g+=Color.green(c); b+=Color.blue(c); ++n;
+            }
             out[y*w+x]=Color.argb(a/n,r/n,g/n,b/n);
         }
         source.recycle(); Bitmap result=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888); result.setPixels(out,0,w,0,0,w,h); return result;
