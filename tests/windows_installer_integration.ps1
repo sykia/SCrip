@@ -47,6 +47,8 @@ try {
     Assert ($LASTEXITCODE -eq 0) 'Initial install failed.'
     if (!(Test-Path (Join-Path $install 'Uninstall.exe'))) {
         Get-ChildItem -LiteralPath $work -Force | Format-Table FullName, Length | Out-String | Write-Host
+        $trace = "$install.trace"
+        if (Test-Path $trace) { Get-Content -LiteralPath $trace -Raw | Write-Host }
         throw 'Installer did not use the isolated test directory.'
     }
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'

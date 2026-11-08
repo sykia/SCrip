@@ -5,6 +5,13 @@ ManifestDPIAware true
 !include "MUI2.nsh"
 !include "x64.nsh"
 !define UNKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCrip"
+!macro TestTrace MESSAGE
+  !ifdef TEST_INSTALL_DIR
+    FileOpen $9 "${TEST_INSTALL_DIR}.trace" a
+    FileWrite $9 "${MESSAGE}|$INSTDIR$\r$\n"
+    FileClose $9
+  !endif
+!macroend
 
 Name "SCrip"
 OutFile "${OUTPUT}"
@@ -39,6 +46,7 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "SCrip"
 !insertmacro MUI_LANGUAGE "Russian"
 
 Function .onInit
+  !insertmacro TestTrace "onInit"
   ${IfNot} ${RunningX64}
     MessageBox MB_OK|MB_ICONSTOP "Для SCrip требуется 64-разрядная Windows."
     Abort
@@ -150,6 +158,7 @@ FunctionEnd
 !macroend
 
 Section
+  !insertmacro TestTrace "section"
   !insertmacro CheckClosed
   StrCpy $BackupDir "$INSTDIR.__SCrip_backup"
   StrCpy $StageDir "$INSTDIR.__SCrip_stage"
@@ -162,6 +171,7 @@ Section
   CreateDirectory "$BackupDir"
   Goto begin_transaction
   preexisting_backup:
+  !insertmacro TestTrace "preexisting_backup"
   SetErrorLevel 2
   Abort
   begin_transaction:
@@ -244,6 +254,7 @@ Section
   SetErrorLevel 2
   Abort
   preexisting_stage:
+  !insertmacro TestTrace "preexisting_stage"
   SetErrorLevel 2
   Abort
   install_shortcuts:
