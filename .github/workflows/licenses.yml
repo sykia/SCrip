@@ -45,11 +45,11 @@ jobs:
         shell: bash
         run: |
           set -eu
+          if [ -z "$TAG" ]; then TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName); fi
           args=()
           if [ -n "$TAG" ]; then args+=("$TAG"); fi
           mkdir -p build/release-assets
           gh release download "${args[@]}" --repo "$GITHUB_REPOSITORY" --dir build/release-assets
-          if [ -z "$TAG" ]; then TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName); fi
           release_dir="licensing/releases/${TAG#v}"
           if [ -f "$release_dir/release.json" ]; then
             python scripts/prepare_release_materials.py --release-dir "$release_dir" --output build/compliance --bundle build/base-compliance.tar.gz
