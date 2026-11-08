@@ -59,7 +59,9 @@ Var RecoveryReady
 Var HadPrevious
 
 Function RecoverInterruptedUpdate
+  !insertmacro TestTrace "recover_fn"
   IfFileExists "$Marker" 0 recovery_done
+  !insertmacro TestTrace "recover_marker_found"
   FileOpen $4 "$Marker" r
   IfErrors recovery_restore
   FileRead $4 $5
@@ -77,6 +79,7 @@ Function RecoverInterruptedUpdate
   ClearErrors
   ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
   IfErrors recovery_failed
+  !insertmacro TestTrace "recover_robocopy_started"
   IntCmp $0 8 recovery_failed recovery_recovered recovery_failed
   recovery_recovered:
   RMDir /r "$StageDir"
@@ -93,6 +96,7 @@ Function RecoverInterruptedUpdate
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   Goto recovery_done
   recovery_failed:
+  !insertmacro TestTrace "recover_failed"
   SetErrorLevel 3
   MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию SCrip. Файлы восстановления сохранены в $BackupDir."
   Abort
