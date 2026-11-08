@@ -227,8 +227,10 @@ Section
   !ifdef TEST_PAUSE_AFTER_UNINSTALL
     IfFileExists "$INSTDIR.__SCrip_test_pause" 0 test_pause_done
     !insertmacro TestTrace "test_pause_entered"
-    Sleep 30000
-    Delete "$INSTDIR.__SCrip_test_pause"
+    test_pause_wait:
+    IfFileExists "$INSTDIR.__SCrip_test_pause" 0 test_pause_done
+    Sleep 100
+    Goto test_pause_wait
     test_pause_done:
   !endif
   Goto copy_staged
