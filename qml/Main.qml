@@ -820,8 +820,13 @@ Window {
             FormBlock {
                 width: Math.min(parent.width, 480); heading: "SCrip"
                 Txt { text: "Версия " + Qt.application.version; color: app.muted }
-                Txt { text: app.api.updateChecking ? "Проверяем обновления…" : app.api.updateError || (app.api.updateAvailable ? "Доступна версия " + app.api.latestVersion : app.api.updateResult || "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.api.updateAvailable ? app.accent : app.muted; width: parent.width; wrapMode: Text.WordWrap }
-                Tool { text: app.api.updateAvailable ? "Установить обновление" : "Проверить обновления"; enabled: !app.api.updateChecking; onClicked: sc.checkForUpdates(true) }
+                Txt { text: app.api.updateError || app.api.updateResult || (app.api.updateAvailable ? "Доступна версия " + app.api.latestVersion : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.api.updateAvailable ? app.accent : app.muted; width: parent.width; wrapMode: Text.WordWrap }
+                Txt { visible: !!app.api.updateDownloading; text: app.api.updateTotal > 0 ? (Number(app.api.updateDownloaded / 1048576).toFixed(1) + " МБ / " + Number(app.api.updateTotal / 1048576).toFixed(1) + " МБ · " + Math.floor(100 * app.api.updateDownloaded / app.api.updateTotal) + "%") : (app.api.updateDownloaded + " байт скачано"); color: app.muted }
+                ProgressBar { visible: !!app.api.updateDownloading; width: parent.width; indeterminate: !(app.api.updateTotal > 0); from: 0; to: 100; value: app.api.updateTotal > 0 ? 100 * app.api.updateDownloaded / app.api.updateTotal : 0 }
+                Tool { text: "Проверить обновления"; visible: !app.api.updateChecking && !app.api.updateDownloading && !app.api.updateInstalling && !app.api.updateReady; enabled: !app.api.updateChecking; onClicked: sc.checkForUpdates(true) }
+                Tool { text: "Скачать обновление"; visible: !!app.api.updateAvailable && !app.api.updateDownloading && !app.api.updateReady && !app.api.updateInstalling; onClicked: sc.downloadUpdate() }
+                Tool { text: "Отмена"; visible: !!app.api.updateDownloading; onClicked: sc.cancelUpdateDownload() }
+                Tool { text: "Установить сейчас"; visible: !!app.api.updateReady && !app.api.updateInstalling; onClicked: sc.installUpdate() }
                 Txt { text: "Независимый клиент SoundCloud"; color: app.muted }
             }
         }

@@ -182,7 +182,7 @@ Column {
         id: clearDataDialog
         parent: Overlay.overlay; anchors.centerIn: parent; width: Math.min(380, parent.width - 24); height: 120
         modal: true; title: "Очистить данные плагина"; standardButtons: Dialog.Ok | Dialog.Cancel
-        contentItem: Label { text: "Удалить все настройки и собственные данные плагина «" + root.removalId + "»?"; textFormat: Text.PlainText; wrapMode: Text.Wrap; padding: 16 }
+        contentItem: Label { text: "Удалить пользовательские данные плагина «" + root.removalId + "» и настройки удалённых параметров? Текущие настройки плагина останутся."; textFormat: Text.PlainText; wrapMode: Text.Wrap; padding: 16 }
         onAccepted: root.showResult(root.manager.clearData(root.removalId))
     }
     Label { text: "Пока нет установленных плагинов"; visible: !!root.manager && !root.manager.installed.length; color: root.muted }

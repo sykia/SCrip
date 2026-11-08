@@ -8,6 +8,8 @@
 #include <QVariantAnimation>
 #include <QTcpServer>
 #include <QTimer>
+#include <QSaveFile>
+#include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QUrlQuery>
@@ -62,6 +64,9 @@ public:
     Q_INVOKABLE void openExternal(const QString &url);
     Q_INVOKABLE void copyText(const QString &text);
     Q_INVOKABLE void checkForUpdates(bool manual = true);
+    Q_INVOKABLE void downloadUpdate();
+    Q_INVOKABLE void cancelUpdateDownload();
+    Q_INVOKABLE void installUpdate();
     Q_INVOKABLE void clearError();
     Q_INVOKABLE void setRepeat(bool enabled);
     Q_INVOKABLE void setShuffle(bool enabled);
@@ -125,4 +130,11 @@ private:
     QList<std::function<void()>> m_waiting;
     bool m_forceNext = false;
     QVariantList m_queue;
+    QNetworkReply *m_updateReply = nullptr;
+    QSaveFile *m_updateFile = nullptr;
+    QCryptographicHash *m_updateHash = nullptr;
+    QTimer m_updateProgressTimer;
+    QJsonObject m_updateAsset;
+    QString m_updateDigest, m_updatePath;
+    qint64 m_updateExpectedSize = -1, m_updateReceived = 0;
 };

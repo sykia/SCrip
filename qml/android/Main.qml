@@ -327,7 +327,13 @@ ApplicationWindow {
                     CheckBox { text: "Плавный переход между треками (3 секунды)"; checked: !!app.api.crossfade; Layout.fillWidth: true; onToggled: sc.setCrossfade(checked) }
                     Caption { text: "SCrip"; font.bold: true; font.pixelSize: 19 }
                     Caption { text: "Версия " + Qt.application.version + (app.api.updateAvailable ? " · доступна " + app.api.latestVersion : ""); color: app.api.updateAvailable ? app.accent : app.muted; font.pixelSize: 13 }
-                    Action { text: app.api.updateAvailable ? "Установить обновление" : app.api.updateChecking ? "Проверяем обновления…" : "Проверить обновления"; enabled: !app.api.updateChecking; Layout.fillWidth: true; onClicked: { sc.checkForUpdates() } }
+                    Caption { text: app.api.updateError || app.api.updateResult || (app.api.updateChecking ? "Проверяем обновления…" : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Caption { visible: !!app.api.updateDownloading; text: app.api.updateTotal > 0 ? (Number(app.api.updateDownloaded / 1048576).toFixed(1) + " МБ / " + Number(app.api.updateTotal / 1048576).toFixed(1) + " МБ · " + Math.floor(100 * app.api.updateDownloaded / app.api.updateTotal) + "%") : (app.api.updateDownloaded + " байт скачано"); color: app.muted; Layout.fillWidth: true }
+                    ProgressBar { visible: !!app.api.updateDownloading; Layout.fillWidth: true; indeterminate: !(app.api.updateTotal > 0); from: 0; to: 100; value: app.api.updateTotal > 0 ? 100 * app.api.updateDownloaded / app.api.updateTotal : 0 }
+                    Action { text: "Проверить обновления"; visible: !app.api.updateChecking && !app.api.updateDownloading && !app.api.updateInstalling && !app.api.updateReady; enabled: !app.api.updateChecking; Layout.fillWidth: true; onClicked: sc.checkForUpdates(true) }
+                    Action { text: "Скачать обновление"; visible: !!app.api.updateAvailable && !app.api.updateDownloading && !app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.downloadUpdate() }
+                    Action { text: "Отмена"; visible: !!app.api.updateDownloading; Layout.fillWidth: true; onClicked: sc.cancelUpdateDownload() }
+                    Action { text: "Установить сейчас"; visible: !!app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.installUpdate() }
                     Caption { text: "Оформление"; font.bold: true; font.pixelSize: 19 }
                     Row {
                         spacing: 14
