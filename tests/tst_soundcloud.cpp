@@ -379,16 +379,18 @@ private slots:
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1); QTest::qWait(150);
         QCOMPARE(sc.state()["tracks"].toList()[0].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
     }
-    void independentRequestErrorsKeepCatalogBusy() {
+    void independentRequestErrorsDoNotChangePlayerBuffering() {
         for (const auto &response : {Response{500, "{}"}, Response{200, "{invalid"}}) {
             Network net; net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}]}", 100}, response};
             SoundCloud sc(nullptr, &net, secrets);
             sc.set("configured", false); sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
-            sc.browse("tracks", "loading"); sc.profile();
+            sc.set("buffering", true); sc.browse("tracks", "loading"); sc.profile();
             QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
             QVERIFY(sc.state()["busy"].toBool());
+            QVERIFY(sc.state()["buffering"].toBool());
             QTRY_VERIFY(!sc.state()["busy"].toBool());
             QCOMPARE(sc.state()["tracks"].toList().size(), 1);
+            QVERIFY(sc.state()["buffering"].toBool());
         }
     }
     void stalePageFailureDoesNotChangeCurrentPagination() {

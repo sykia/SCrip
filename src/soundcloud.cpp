@@ -292,7 +292,6 @@ void SoundCloud::request(const QString &path, Callback done, const QByteArray &m
             int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             if (status == 401 && retry && !m_refresh.isEmpty()) { m_expires = 0; request(path, done, method, body, false, failed); return; }
             if (reply->error() != QNetworkReply::NoError || status >= 300) {
-                if (!failed) set("buffering", false);
                 const QString message = status == 429 ? "SoundCloud ограничил запросы. Повторите позже." : status == 403 ? "SoundCloud ограничил доступ к этому действию или треку." : status == 401 ? "Сессия истекла. Подключитесь заново." : QString("Не удалось выполнить запрос (HTTP %1). Проверьте сеть и повторите.").arg(status);
                 if (failed) failed(message); else fail(message);
                 return;
