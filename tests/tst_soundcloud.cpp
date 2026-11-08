@@ -9,6 +9,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QQuickItem>
 #include <QDesktopServices>
 #include <QSettings>
 #include <QTcpSocket>
@@ -913,6 +914,8 @@ private slots:
         QCOMPARE(window->property("section").toInt(), 5);
         window->setProperty("section", 0);
         window->setWidth(1320); window->setHeight(820);
+        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
+        preferences->setProperty("gridView", false);
         net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Тестовый трек с длинным названием для проверки вёрстки\",\"duration\":185000,\"user\":{\"username\":\"Исполнитель\"}},{\"urn\":\"soundcloud:tracks:2\",\"title\":\"Второй трек\",\"duration\":220000,\"access\":\"preview\"}]}"}};
         sc.browse("tracks", "Тест интерфейса"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2);
         QCOMPARE(window->property("api").toMap()["tracks"].toList(), sc.state()["tracks"].toList());
@@ -924,7 +927,7 @@ private slots:
         sc.browse("tracks", "scroll"); QTRY_COMPARE(sc.state()["tracks"].toList().size(),32);
         QTest::qWait(100);
         auto *scroll = window->findChild<QObject *>("libraryScroll"); QVERIFY(scroll);
-        QWheelEvent wheel(QPointF(600,400),QPointF(600,400),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        QWheelEvent wheel(QPointF(600,100),QPointF(600,100),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
         QCoreApplication::sendEvent(window,&wheel);
         QTRY_VERIFY(scroll->property("contentY").toReal()>0);
         QVERIFY(scroll->property("contentY").toReal()<=scroll->property("contentHeight").toReal()-scroll->property("height").toReal());
@@ -934,7 +937,6 @@ private slots:
         scroll->setProperty("contentY", scroll->property("contentHeight").toReal() - scroll->property("height").toReal());
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 33);
         net.responses = {{200, "[]"}};
-        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
         preferences->setProperty("gridView", false);
         preferences->setProperty("autoLoad", true);
         auto *trackView = window->findChild<QObject *>("trackListView"); QVERIFY(trackView);
@@ -975,6 +977,81 @@ private slots:
                 QTRY_COMPARE(lastTitle.toString(), QString("Виртуальный трек 5000"));
             }
         }
+        preferences->setProperty("gridView", true);
+        auto *gridView = window->findChild<QObject *>("coverGridView"); QVERIFY(gridView);
+        auto gridTracksJson = [](int count, bool more = false, int offset = 0) {
+            QJsonArray items;
+            for (int i = 0; i < count; ++i)
+                items.append(QJsonObject{{"urn", QString("soundcloud:tracks:grid-%1").arg(offset + i)},
+                                         {"title", QString("Карточка %1").arg(offset + i)}, {"access", "blocked"},
+                                         {"user", QJsonObject{{"username", "Исполнитель"}, {"urn", "soundcloud:users:1"}}}});
+            QJsonObject page{{"collection", items}};
+            if (more) page["next_href"] = "https://api.soundcloud.com/tracks?cursor=grid-next";
+            return QJsonDocument(page).toJson();
+        };
+        for (int size : listSizes) {
+            net.responses = {{200, gridTracksJson(size, size == 5000)}};
+            sc.browse("tracks", QString("grid-%1").arg(size));
+            QTRY_COMPARE(sc.state()["tracks"].toList().size(), size);
+            QTRY_VERIFY(!sc.state()["busy"].toBool());
+            QTRY_VERIFY(gridView->property("activeDelegateCount").toInt() <= 40);
+            if (size == 0) QCOMPARE(gridView->property("activeDelegateCount").toInt(), 0);
+            if (size == 1) QCOMPARE(gridView->property("height").toReal(), gridView->property("tileHeight").toReal());
+            if (size == 5000) {
+                QCOMPARE(gridView->property("count").toInt(), 5000);
+                QVariant title;
+                QVERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 0)));
+                QCOMPARE(title.toString(), QString("Карточка 0"));
+                const int wideColumns = gridView->property("columns").toInt();
+                window->setWidth(760); QCoreApplication::processEvents();
+                QVERIFY(gridView->property("columns").toInt() < wideColumns);
+                window->setWidth(1320); QCoreApplication::processEvents();
+                net.responses = {{200, gridTracksJson(1, false, 5000)}};
+                auto *pageScroll = window->findChild<QObject *>("libraryScroll"); QVERIFY(pageScroll);
+                pageScroll->setProperty("contentY", 0);
+                QQuickItem *gridItem = qobject_cast<QQuickItem *>(gridView); QVERIFY(gridItem);
+                const QPointF gridPoint = gridItem->mapToScene(QPointF(gridItem->width() / 2, gridItem->height() / 2));
+                QTest::mouseMove(window, gridPoint.toPoint());
+                QWheelEvent gridWheel(gridPoint, gridPoint, QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+                QCoreApplication::sendEvent(window, &gridWheel);
+                QTRY_VERIFY(gridView->property("contentY").toReal() > 0);
+                const qreal end = gridView->property("contentHeight").toReal() - gridView->property("height").toReal();
+                const int reusedBeforeScroll = gridView->property("reusedDelegateCount").toInt();
+                gridView->setProperty("contentY", end);
+                QTRY_VERIFY(gridView->property("contentY").toReal() >= end - 1);
+                QTRY_VERIFY(gridView->property("reusedDelegateCount").toInt() > reusedBeforeScroll);
+                QTRY_VERIFY(gridView->property("activeDelegateCount").toInt() > 0);
+                QVERIFY(gridView->property("activeDelegateCount").toInt() <= 40);
+                QVERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 4999)));
+                QCOMPARE(title.toString(), QString("Карточка 4999"));
+                QQuickItem *lastTile = nullptr;
+                QVERIFY(QMetaObject::invokeMethod(gridView, "itemAtIndex", Q_RETURN_ARG(QQuickItem *, lastTile), Q_ARG(int, 4999)));
+                QVERIFY(lastTile);
+                QVERIFY(QMetaObject::invokeMethod(lastTile, "playTrack"));
+                QTRY_COMPARE(sc.state()["current"].toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
+                QVERIFY(QMetaObject::invokeMethod(lastTile, "enqueueTrack"));
+                QTRY_COMPARE(sc.state()["queue"].toList().last().toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
+                QTRY_COMPARE(sc.state()["tracks"].toList().size(), 5001);
+                QTRY_VERIFY(!sc.state()["hasMore"].toBool());
+                const qreal appendedEnd = gridView->property("contentHeight").toReal() - gridView->property("height").toReal();
+                gridView->setProperty("contentY", appendedEnd);
+                QVERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 5000)));
+                QCOMPARE(title.toString(), QString("Карточка 5000"));
+            }
+        }
+        preferences->setProperty("gridView", false); QCoreApplication::processEvents(); QTest::qWait(120);
+        QVERIFY(window->findChild<QObject *>("trackListView"));
+        preferences->setProperty("gridView", true); QCoreApplication::processEvents(); QTest::qWait(120);
+        QVERIFY(window->findChild<QObject *>("coverGridView"));
+        QTRY_VERIFY(!sc.state()["busy"].toBool());
+        QTest::qWait(250);
+        window->setProperty("section", 4); QTest::qWait(250);
+        net.responses = {{200, gridTracksJson(3)}};
+        window->setProperty("query", "virtual-return");
+        window->setProperty("section", 0);
+        QTRY_VERIFY(!sc.state()["busy"].toBool());
+        QTRY_COMPARE(sc.state()["tracks"].toList().size(), 3);
+        QVERIFY(window->findChild<QObject *>("coverGridView"));
         net.responses = {{200, "[]"}};
         window->setProperty("section", 3); QTest::qWait(400);
         QVERIFY(window->grabWindow().save("ui-profile.png"));

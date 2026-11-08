@@ -319,9 +319,12 @@ Window {
                 boundsBehavior: Flickable.StopAtBounds
                 flickDeceleration: 1500; maximumFlickVelocity: 3600
                 property real wheelTarget: 0
-                property bool trackListHovered: false
+                property bool virtualCollectionHovered: false
                 function maybeLoad() {
                     if (prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
+                }
+                function maybeLoadVirtual(position, viewportSize, totalSize) {
+                    if (totalSize > viewportSize && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && position + viewportSize >= totalSize - 240) sc.more()
                 }
                 onContentYChanged: autoLoadTimer.restart()
                 onContentHeightChanged: autoLoadTimer.restart()
@@ -332,7 +335,7 @@ Window {
                 onMovementStarted: wheelMotion.stop()
                 NumberAnimation { id: wheelMotion; target: contentScroll; property: "contentY"; duration: Math.min(150, app.motion); easing.type: Easing.OutCubic }
                 WheelHandler {
-                    enabled: !contentScroll.trackListHovered
+                    enabled: !contentScroll.virtualCollectionHovered
                     acceptedDevices: PointerDevice.Mouse
                     onWheel: event => {
                         if (event.pixelDelta.y !== 0 || event.angleDelta.y === 0) { event.accepted = false; return }
@@ -648,51 +651,78 @@ Window {
     }
     Component {
         id: coverGrid
-        Grid {
-            id: grid
-            columns: Math.max(2, Math.floor((width + 24) / 184)); spacing: 24
-            Repeater {
-                model: app.api.tracks
-                delegate: Item {
-                    id: tile
-                    required property var modelData
-                    required property int index
-                    readonly property bool playlist: (modelData.urn || "").indexOf("soundcloud:playlists:") === 0
-                    width: (grid.width - (grid.columns - 1) * grid.spacing) / grid.columns
-                    height: width + 48
-                    property bool entered: !prefs.motion
-                    readonly property bool inViewport: collectionLoader.y + y < contentScroll.contentY + contentScroll.height && collectionLoader.y + y + height > contentScroll.contentY
-                    onInViewportChanged: { if (inViewport) entered = true }
-                    Component.onCompleted: { if (inViewport) entered = true }
-                    opacity: entered || !prefs.motion ? 1 : 0
-                    transform: Translate { y: tile.entered || !prefs.motion ? 0 : 12; Behavior on y { NumberAnimation { duration: prefs.motion ? app.motion + 80 : 0; easing.type: Easing.OutCubic } } }
-                    Behavior on opacity { NumberAnimation { duration: prefs.motion ? app.motion + 80 : 0; easing.type: Easing.OutCubic } }
-                    HoverHandler { id: tileHover }
-                    Rectangle {
-                        id: artwork; width: parent.width; height: width; radius: app.artworkRadius; color: "#f1eded"; border.color: "#eeeaec"; clip: true
-                        Glyph { anchors.centerIn: parent; width: 40; height: 40; name: tile.playlist ? "grid" : "music"; ink: "#c6b6bf" }
-                        Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(tile.modelData); }
-                        TapHandler { onTapped: sc.play(tile.modelData) }
-                        Rectangle { anchors.fill: parent; radius: parent.radius; color: "transparent"; border.color: "#14000000" }
-                        Rectangle {
-                            visible: !tile.playlist
-                            anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 8
-                            width: 30; height: 30; radius: 15; color: "white"
-                            LikeButton { anchors.fill: parent; round: true; track: tile.modelData }
-                        }
-                        Rectangle {
-                            visible: tileHover.hovered; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 9
-                            width: 32; height: 32; radius: 16; color: "#f5ffffff"
-                            Tool { anchors.fill: parent; round: true; symbol: tile.playlist ? "arrow" : "play"; text: tile.playlist ? "Открыть плейлист" : "Слушать"; onClicked: sc.play(tile.modelData) }
-                        }
-                        Rectangle {
-                            visible: tileHover.hovered && !tile.playlist; x: 9; y: 9; width: 27; height: 27; radius: 14; color: "#f5ffffff"
-                            Tool { anchors.fill: parent; round: true; symbol: "plus"; text: "Добавить в очередь"; onClicked: sc.enqueue(tile.modelData) }
-                        }
-                    }
-                    Txt { x: 0; y: artwork.height + 8; width: parent.width; text: tile.modelData.title || "Без названия"; font.pixelSize: 13 }
-                    Txt { x: 0; y: artwork.height + 25; width: parent.width; text: tile.modelData.user?.username || (tile.playlist ? (tile.modelData.track_count || 0) + " треков" : "SoundCloud"); color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!tile.modelData.user?.urn; onTapped: app.openProfile(tile.modelData.user) } }
+        GridView {
+            id: virtualCoverGrid
+            objectName: "coverGridView"
+            width: parent.width
+            property int columns: Math.max(2, Math.floor((width + 24) / 184))
+            property real tileWidth: (width - (columns - 1) * 24) / columns
+            property real tileHeight: tileWidth + 48
+            cellWidth: tileWidth + 24
+            cellHeight: tileHeight + 24
+            height: Math.min(count > 0 ? Math.ceil(count / columns) * cellHeight - 24 : 0, Math.max(58, contentScroll.height - y - 110))
+            clip: true
+            cacheBuffer: Math.max(cellHeight * 2, height / 2)
+            reuseItems: true
+            boundsBehavior: Flickable.StopAtBounds
+            model: app.api.tracks
+            property int activeDelegateCount: 0
+            property int reusedDelegateCount: 0
+            function trackTitleAt(index) {
+                const item = itemAtIndex(index)
+                return item ? item.modelData.title : ""
+            }
+            onContentYChanged: contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
+            onContentHeightChanged: contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
+            HoverHandler { onHoveredChanged: contentScroll.virtualCollectionHovered = hovered }
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            delegate: Item {
+                id: tile
+                required property var modelData
+                required property int index
+                readonly property bool playlist: (modelData.urn || "").indexOf("soundcloud:playlists:") === 0
+                width: virtualCoverGrid.tileWidth
+                height: virtualCoverGrid.tileHeight
+                function playTrack() { sc.play(modelData) }
+                function enqueueTrack() { sc.enqueue(modelData) }
+                property bool entered: !prefs.motion
+                readonly property bool inViewport: y < virtualCoverGrid.contentY + virtualCoverGrid.height && y + height > virtualCoverGrid.contentY
+                onInViewportChanged: { if (inViewport) entered = true }
+                Component.onCompleted: { virtualCoverGrid.activeDelegateCount++; if (inViewport) entered = true }
+                Component.onDestruction: virtualCoverGrid.activeDelegateCount--
+                GridView.onReused: {
+                    virtualCoverGrid.reusedDelegateCount++
+                    entered = !prefs.motion
+                    Qt.callLater(function() { if (tile.inViewport) tile.entered = true })
                 }
+                opacity: entered || !prefs.motion ? 1 : 0
+                transform: Translate { y: tile.entered || !prefs.motion ? 0 : 12; Behavior on y { NumberAnimation { duration: prefs.motion ? app.motion + 80 : 0; easing.type: Easing.OutCubic } } }
+                Behavior on opacity { NumberAnimation { duration: prefs.motion ? app.motion + 80 : 0; easing.type: Easing.OutCubic } }
+                HoverHandler { id: tileHover }
+                Rectangle {
+                    id: artwork; width: parent.width; height: width; radius: app.artworkRadius; color: "#f1eded"; border.color: "#eeeaec"; clip: true
+                    Glyph { anchors.centerIn: parent; width: 40; height: 40; name: tile.playlist ? "grid" : "music"; ink: "#c6b6bf" }
+                    Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(tile.modelData); }
+                    TapHandler { onTapped: tile.playTrack() }
+                    Rectangle { anchors.fill: parent; radius: parent.radius; color: "transparent"; border.color: "#14000000" }
+                    Rectangle {
+                        visible: !tile.playlist
+                        anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 8
+                        width: 30; height: 30; radius: 15; color: "white"
+                        LikeButton { anchors.fill: parent; round: true; track: tile.modelData }
+                    }
+                    Rectangle {
+                        visible: tileHover.hovered; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 9
+                        width: 32; height: 32; radius: 16; color: "#f5ffffff"
+                        Tool { anchors.fill: parent; round: true; symbol: tile.playlist ? "arrow" : "play"; text: tile.playlist ? "Открыть плейлист" : "Слушать"; onClicked: tile.playTrack() }
+                    }
+                    Rectangle {
+                        visible: tileHover.hovered && !tile.playlist; x: 9; y: 9; width: 27; height: 27; radius: 14; color: "#f5ffffff"
+                        Tool { anchors.fill: parent; round: true; symbol: "plus"; text: "Добавить в очередь"; onClicked: tile.enqueueTrack() }
+                    }
+                }
+                Txt { x: 0; y: artwork.height + 8; width: parent.width; text: tile.modelData.title || "Без названия"; font.pixelSize: 13 }
+                Txt { x: 0; y: artwork.height + 25; width: parent.width; text: tile.modelData.user?.username || (tile.playlist ? (tile.modelData.track_count || 0) + " треков" : "SoundCloud"); color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!tile.modelData.user?.urn; onTapped: app.openProfile(tile.modelData.user) } }
             }
         }
     }
@@ -715,11 +745,11 @@ Window {
                 return item ? item.modelData.title : ""
             }
             function maybeLoad() {
-                if (contentHeight > height && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
+                contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
             }
             onContentYChanged: maybeLoad()
             onContentHeightChanged: maybeLoad()
-            HoverHandler { onHoveredChanged: contentScroll.trackListHovered = hovered }
+            HoverHandler { onHoveredChanged: contentScroll.virtualCollectionHovered = hovered }
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
             delegate: Rectangle {
                 id: row
