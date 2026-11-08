@@ -230,9 +230,6 @@ Section
   SetErrorLevel 2
   Abort
   uninstall_ok:
-  ; An aborted NSIS uninstaller may still report exit code zero. Do not proceed
-  ; unless its primary application file was actually removed.
-  IfFileExists "$INSTDIR\SCrip.exe" old_uninstall_failed
   !ifdef TEST_PAUSE_AFTER_UNINSTALL
     IfFileExists "$INSTDIR.__SCrip_test_pause" 0 test_pause_done
     !insertmacro TestTrace "test_pause_entered"
