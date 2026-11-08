@@ -128,8 +128,8 @@ try {
     } finally { Stop-Process -Id $runningApp.Id -Force -ErrorAction SilentlyContinue }
     Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-two') 'Locked-executable failure damaged the installed version.'
 
-    & (Join-Path $install 'Uninstall.exe') '/S'
-    Assert ($LASTEXITCODE -eq 0) 'Uninstall failed.'
+    $uninstall = Start-Process -FilePath (Join-Path $install 'Uninstall.exe') -ArgumentList @('/S', "_?=$install") -PassThru -Wait
+    Assert ($uninstall.ExitCode -eq 0) 'Uninstall failed.'
     Assert (!(Test-Path (Join-Path $install 'SCrip.exe'))) 'Uninstall left the application executable behind.'
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'Uninstall removed an unrelated user file.'
     Assert ((Get-Content $settings -Raw).Trim() -eq 'keep user settings') 'Uninstall removed user settings.'
