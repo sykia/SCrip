@@ -63,6 +63,7 @@ FunctionEnd
   check_closed_retry:
   nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "if (Get-Process -Name SCrip -ErrorAction SilentlyContinue) { exit 42 } else { exit 0 }"'
   Pop $0
+  !insertmacro TestTrace "process_check=$0"
   StrCmp $0 "0" check_closed_done check_closed_prompt
   check_closed_prompt:
   IfSilent check_closed_abort

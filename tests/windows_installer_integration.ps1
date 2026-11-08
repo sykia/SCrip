@@ -123,6 +123,7 @@ try {
         $runningApp.Refresh()
         Assert (!$runningApp.HasExited) 'The locked-EXE fixture process exited early.'
         & $output2 '/S'
+        if (Test-Path "${install}.trace") { Write-Host 'Busy-check trace:'; Get-Content -LiteralPath "${install}.trace" -Raw | Write-Host }
         Assert ($LASTEXITCODE -ne 0) 'Setup unexpectedly succeeded while SCrip.exe was locked.'
     } finally { Stop-Process -Id $runningApp.Id -Force -ErrorAction SilentlyContinue }
     Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-two') 'Locked-executable failure damaged the installed version.'
