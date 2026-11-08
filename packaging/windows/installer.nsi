@@ -4,6 +4,7 @@ RequestExecutionLevel user
 ManifestDPIAware true
 !include "MUI2.nsh"
 !include "x64.nsh"
+!define UNKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCrip"
 
 Name "SCrip"
 OutFile "${OUTPUT}"
@@ -38,7 +39,85 @@ Function .onInit
     MessageBox MB_OK|MB_ICONSTOP "Для SCrip требуется 64-разрядная Windows."
     Abort
   ${EndIf}
-  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\SCrip"
+  StrCpy $2 "$INSTDIR.__SCrip_backup"
+  StrCpy $3 "$INSTDIR.__SCrip_marker"
+  IfFileExists "$3" 0 recovery_done
+  FileOpen $4 "$3" r
+  IfErrors recovery_restore
+  FileRead $4 $5
+  FileClose $4
+  StrCmp $5 "COMMIT$\r$\n" recovery_committed recovery_restore
+  recovery_committed:
+  RMDir /r "$INSTDIR.__SCrip_stage"
+  RMDir /r "$2"
+  IfFileExists "$2\*.*" recovery_failed
+  Delete "$3"
+  Goto recovery_done
+  recovery_restore:
+  ; A prior setup was interrupted after taking its recovery copy.
+  IfFileExists "$2\*.*" 0 recovery_failed
+  ExecWait '"$SYSDIR\robocopy.exe" "$2" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  IntCmp $0 8 recovery_failed recovery_done recovery_failed
+  Delete "$3"
+  RMDir /r "$2"
+  CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
+  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
+  WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
+  recovery_done:
+  Goto recovery_end
+  recovery_failed:
+  MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию SCrip. Файлы восстановления сохранены в $2."
+  Abort
+  recovery_end:
+FunctionEnd
+
+Var BackupDir
+Var StageDir
+Var Marker
+Var RecoveryReady
+Var HadPrevious
+
+Function RestorePrevious
+  StrCmp $RecoveryReady 1 0 restore_done
+  ExecWait '"$SYSDIR\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  IntCmp $0 8 restore_failed restore_cleanup restore_failed
+  restore_failed:
+  SetErrorLevel 3
+  MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию. Резервная копия сохранена в $BackupDir."
+  Abort
+  restore_cleanup:
+  RMDir /r "$BackupDir"
+  IfFileExists "$BackupDir\*.*" restore_cleanup_pending
+  Delete "$Marker"
+  RMDir /r "$StageDir"
+  StrCpy $RecoveryReady 0
+  StrCmp $HadPrevious 1 0 restore_done
+  CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
+  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
+  WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
+  Goto restore_done
+  restore_cleanup_pending:
+  RMDir /r "$StageDir"
+  StrCpy $RecoveryReady 0
+  restore_done:
+FunctionEnd
+
+Function .onInstFailed
+  Call RestorePrevious
+FunctionEnd
+
+Function .onUserAbort
+  Call RestorePrevious
 FunctionEnd
 
 !macro CheckClosed
@@ -66,23 +145,102 @@ FunctionEnd
   done:
 !macroend
 
-!define UNKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCrip"
 Section
   !insertmacro CheckClosed
-  ; Старый деинсталлятор знает точный список файлов предыдущей версии.
-  ; Он удалит только файлы приложения и оставит неизвестные файлы нетронутыми.
-  IfFileExists "$INSTDIR\Uninstall.exe" 0 install_files
-  ClearErrors
-  ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
-  IfErrors upgrade_failed
-  StrCmp $0 0 install_files upgrade_failed
-  upgrade_failed:
+  StrCpy $BackupDir "$INSTDIR.__SCrip_backup"
+  StrCpy $StageDir "$INSTDIR.__SCrip_stage"
+  StrCpy $Marker "$INSTDIR.__SCrip_marker"
+  StrCpy $RecoveryReady 0
+  StrCpy $HadPrevious 0
+  IfFileExists "$Marker" preexisting_backup
+  ; Never remove an unmarked sibling directory: it may contain user data.
+  IfFileExists "$BackupDir\*.*" preexisting_backup
+  CreateDirectory "$BackupDir"
+  IfFileExists "$BackupDir\*.*" preexisting_backup
+  Goto begin_transaction
+  preexisting_backup:
   SetErrorLevel 2
   Abort
-  install_files:
-  SetOutPath "$INSTDIR"
+  begin_transaction:
+  ; A nonempty stage without a transaction marker is not ours to delete.
+  IfFileExists "$StageDir\*.*" preexisting_stage
+  CreateDirectory "$StageDir"
+  SetOutPath "$StageDir"
   File /r "${PAYLOAD}\*"
+  IfErrors staging_failed
+  ; Keep an exact copy until the new payload and metadata are installed.
+  IfFileExists "$INSTDIR\*.*" 0 no_previous_files
+  ExecWait '"$SYSDIR\robocopy.exe" "$INSTDIR" "$BackupDir" /E /COPY:DAT /R:1 /W:1' $0
+  IntCmp $0 8 backup_failed backup_ready backup_failed
+  backup_failed:
+  RMDir /r "$StageDir"
+  RMDir /r "$BackupDir"
+  SetErrorLevel 2
+  Abort
+  backup_ready:
+  FileOpen $4 "$Marker" w
+  IfErrors marker_failed
+  FileWrite $4 "SCrip update in progress$\r$\n"
+  FileClose $4
+  StrCpy $RecoveryReady 1
+  StrCpy $HadPrevious 1
+  Goto remove_previous
+  no_previous_files:
+  StrCpy $RecoveryReady 1
+  remove_previous:
+  IfFileExists "$INSTDIR\Uninstall.exe" 0 copy_staged
+  ClearErrors
+  ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
+  IfErrors old_uninstall_failed
+  StrCmp $0 0 uninstall_ok old_uninstall_failed
+  old_uninstall_failed:
+  Call RestorePrevious
+  SetErrorLevel 2
+  Abort
+  uninstall_ok:
+  !ifdef TEST_PAUSE_AFTER_UNINSTALL
+    IfFileExists "$INSTDIR.__SCrip_test_pause" 0 test_pause_done
+    Sleep 30000
+    Delete "$INSTDIR.__SCrip_test_pause"
+    test_pause_done:
+  !endif
+  Goto copy_staged
+  copy_staged:
+  ExecWait '"$SYSDIR\robocopy.exe" "$StageDir" "$INSTDIR" /E /COPY:DAT /R:1 /W:1' $0
+  IntCmp $0 8 new_copy_failed write_new_uninstaller new_copy_failed
+  new_copy_failed:
+  Call RestorePrevious
+  SetErrorLevel 2
+  Abort
+  write_new_uninstaller:
+  SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
+  IfErrors new_copy_failed
+  FileOpen $4 "$Marker" w
+  IfErrors new_copy_failed
+  FileWrite $4 "COMMIT$\r$\n"
+  FileClose $4
+  RMDir /r "$StageDir"
+  RMDir /r "$BackupDir"
+  IfFileExists "$BackupDir\*.*" commit_cleanup_pending
+  Delete "$Marker"
+  commit_cleanup_pending:
+  StrCpy $RecoveryReady 0
+  Goto install_shortcuts
+  marker_failed:
+  RMDir /r "$StageDir"
+  RMDir /r "$BackupDir"
+  SetErrorLevel 2
+  Abort
+  staging_failed:
+  RMDir /r "$StageDir"
+  SetErrorLevel 2
+  Abort
+  preexisting_stage:
+  SetErrorLevel 2
+  Abort
+  install_shortcuts:
+  SetOutPath "$INSTDIR"
   CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
