@@ -140,33 +140,7 @@ Function .onInstFailed
   Call RestorePrevious
 FunctionEnd
 
-!macro CheckClosed
-  IfFileExists "$INSTDIR\SCrip.exe" 0 done
-  StrCpy $1 0
-  retry:
-  ClearErrors
-  System::Call 'KERNEL32::CreateFile(t "$INSTDIR\SCrip.exe", i 0x40000000, i 1, p 0, i 3, i 0x80, p 0) p.r0'
-  IntPtrCmp $0 -1 locked done done
-  System::Call 'KERNEL32::CloseHandle(p r0)'
-  Goto done
-  locked:
-  IfSilent silent_wait
-  Goto prompt
-  silent_wait:
-  IntOp $1 $1 + 1
-  IntCmp $1 10 cancel
-  Sleep 1000
-  Goto retry
-  prompt:
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Закройте SCrip, затем нажмите «Повторить»." IDRETRY retry
-  cancel:
-  SetErrorLevel 2
-  Abort
-  done:
-!macroend
-
 Section
-  !insertmacro CheckClosed
   StrCpy $BackupDir "$INSTDIR.__SCrip_backup"
   StrCpy $StageDir "$INSTDIR.__SCrip_stage"
   StrCpy $Marker "$INSTDIR.__SCrip_marker"
@@ -291,7 +265,6 @@ Section
 SectionEnd
 
 Section "Uninstall"
-  !insertmacro CheckClosed
   !include "${FILELIST}"
   Delete "$DESKTOP\SCrip.lnk"
   Delete "$SMPROGRAMS\SCrip.lnk"
