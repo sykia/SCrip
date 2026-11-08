@@ -1,0 +1,49 @@
+{
+  "artifact_sha256": "039c95705617249453c83a24cb8adbc63ac560ec8c52b130f615889cd9a24eb2",
+  "files": {
+    "usr/bin/scrip": {
+      "sha256": "3393a84c9b813fe9a5d6a0a7c376621f8eac133ac64f3dff7193eaccc375824f",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/applications/scrip.desktop": {
+      "sha256": "77aadc05556fe3334fd1496c4a10ee6edfe664f3f8dcf7de982b996754b34386",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/doc/scrip/THIRD_PARTY_NOTICES.md": {
+      "sha256": "d191a51532dff66b32ec44f67483916b0c880ceb3376610d7d815f4745fd016a",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/doc/scrip/TRADEMARKS.md": {
+      "sha256": "8d09c1715dc0c0f1fb52d2cb4720930cf2510f9cb15ac7e7be1dd5764839ef0f",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/icons/hicolor/256x256/apps/scrip.png": {
+      "sha256": "e6467a678d45f5c501aa497e92c32e0eb92754c7935849bb0f003bebfcdcf1d3",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/licenses/scrip/LICENSE": {
+      "sha256": "6e4c151807550c0d56cdacd15ea874a9134f8c9cdda14537604b2968253e263e",
+      "components": [
+        "SCrip"
+      ]
+    }
+  },
+  "components": {
+    "SCrip": {
+      "license": "GPL-3.0-only",
+      "notice": "payload/usr/share/licenses/scrip/LICENSE",
+      "source": "sources/SCrip-1.4.2-source.tar.gz",
+      "source_sha256": "b9e02eb62ffc2b65d772f143a8c3d0be19e585732dbcc8a8dcae302ac13c2a19"
+    }
+  }
+}

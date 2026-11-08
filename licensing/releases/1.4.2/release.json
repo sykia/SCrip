@@ -1,0 +1,42 @@
+{
+  "version": "1.4.2",
+  "platforms": [
+    "Windows",
+    "Android",
+    "Linux-DEB",
+    "Linux-Arch"
+  ],
+  "application_code_commit": "8d68c764c8524089d8a4314ddaae1b9046834ab9",
+  "application_source": "sources/SCrip-1.4.2-source.tar.gz",
+  "application_source_sha256": "b9e02eb62ffc2b65d772f143a8c3d0be19e585732dbcc8a8dcae302ac13c2a19",
+  "artifacts": [
+    {
+      "name": "SCrip-1.4.2-Android-universal.apk",
+      "sha256": "b0026f026b74060ae72592c37b5604e293b83e111f88ef4a00055056db065f8b"
+    },
+    {
+      "name": "SCrip-1.4.2-Windows-x64.exe",
+      "sha256": "853125096d3dca564bf4d822c48ebf2fc7b8d8bfa3737f2f953c050c1735f35f"
+    },
+    {
+      "name": "SCrip-1.4.2-debian13-amd64.deb",
+      "sha256": "039c95705617249453c83a24cb8adbc63ac560ec8c52b130f615889cd9a24eb2"
+    },
+    {
+      "name": "SCrip-1.4.2-source.tar.gz",
+      "sha256": "b9e02eb62ffc2b65d772f143a8c3d0be19e585732dbcc8a8dcae302ac13c2a19"
+    },
+    {
+      "name": "scrip-1.4.2-1-x86_64.pkg.tar.zst",
+      "sha256": "7b9f60949bbcf5bed9c0efc8d3d4836387b58d37746af002ff1e30f706877e81"
+    }
+  ],
+  "base_materials": {
+    "url": "https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz",
+    "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
+  },
+  "windows_build": {
+    "commit": "2d2cdbffb0484689423e7903dd3d40bfca724078",
+    "workflow_run": "https://github.com/sykia/SCrip/actions/runs/42461779633"
+  }
+}

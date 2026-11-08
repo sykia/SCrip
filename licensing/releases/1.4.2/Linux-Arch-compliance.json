@@ -1,0 +1,67 @@
+{
+  "artifact_sha256": "7b9f60949bbcf5bed9c0efc8d3d4836387b58d37746af002ff1e30f706877e81",
+  "files": {
+    ".BUILDINFO": {
+      "sha256": "83cca761933acc069d7f39473479126fcf57fd53030979a41628e3bf0b3dcf0a",
+      "components": [
+        "SCrip"
+      ]
+    },
+    ".MTREE": {
+      "sha256": "9cf0fc9c5775ae506c436f9c17061ad88b42918f27774a27e8f06add46f25d1a",
+      "components": [
+        "SCrip"
+      ]
+    },
+    ".PKGINFO": {
+      "sha256": "d84466ea9855db4253d4f6fe0d2511fbc8bc90c7a73e43f24af57f5f77abd0d6",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/bin/scrip": {
+      "sha256": "3b3b082fb0c2b964b297afd06d4f70f15b8b28f9200b22efc9a04665714c4d20",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/applications/scrip.desktop": {
+      "sha256": "77aadc05556fe3334fd1496c4a10ee6edfe664f3f8dcf7de982b996754b34386",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/doc/scrip/THIRD_PARTY_NOTICES.md": {
+      "sha256": "d191a51532dff66b32ec44f67483916b0c880ceb3376610d7d815f4745fd016a",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/doc/scrip/TRADEMARKS.md": {
+      "sha256": "8d09c1715dc0c0f1fb52d2cb4720930cf2510f9cb15ac7e7be1dd5764839ef0f",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/icons/hicolor/256x256/apps/scrip.png": {
+      "sha256": "e6467a678d45f5c501aa497e92c32e0eb92754c7935849bb0f003bebfcdcf1d3",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "usr/share/licenses/scrip/LICENSE": {
+      "sha256": "6e4c151807550c0d56cdacd15ea874a9134f8c9cdda14537604b2968253e263e",
+      "components": [
+        "SCrip"
+      ]
+    }
+  },
+  "components": {
+    "SCrip": {
+      "license": "GPL-3.0-only",
+      "notice": "payload/usr/share/licenses/scrip/LICENSE",
+      "source": "sources/SCrip-1.4.2-source.tar.gz",
+      "source_sha256": "b9e02eb62ffc2b65d772f143a8c3d0be19e585732dbcc8a8dcae302ac13c2a19"
+    }
+  }
+}
