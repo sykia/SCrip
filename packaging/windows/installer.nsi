@@ -66,7 +66,14 @@ FunctionEnd
   Pop $1
   !insertmacro TestTrace "process_check=$0;output=$1"
   StrCmp $0 "0" 0 check_closed_prompt
-  StrCpy $2 $1 9
+  StrCpy $3 0
+  check_closed_trim:
+  StrCpy $2 $1 1 $3
+  StrCmp $2 " " 0 check_closed_compare
+  IntOp $3 $3 + 1
+  Goto check_closed_trim
+  check_closed_compare:
+  StrCpy $2 $1 9 $3
   StrCmp $2 "SCrip.exe" check_closed_prompt check_closed_done
   check_closed_prompt:
   IfSilent check_closed_abort
