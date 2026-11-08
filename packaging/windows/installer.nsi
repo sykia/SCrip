@@ -69,7 +69,11 @@ FunctionEnd
   StrCpy $3 0
   check_closed_trim:
   StrCpy $2 $1 1 $3
-  StrCmp $2 " " 0 check_closed_compare
+  StrCmp $2 " " check_closed_trim_next
+  StrCmp $2 "$\r" check_closed_trim_next
+  StrCmp $2 "$\n" check_closed_trim_next
+  Goto check_closed_compare
+  check_closed_trim_next:
   IntOp $3 $3 + 1
   Goto check_closed_trim
   check_closed_compare:
