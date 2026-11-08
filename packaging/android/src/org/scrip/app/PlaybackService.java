@@ -88,7 +88,7 @@ public class PlaybackService extends Service {
         publish(); return START_NOT_STICKY;
     }
     void publish() {
-        String key = MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artwork + '\n' + MediaBridge.duration;
+        String key = metadataKey();
         if (!metadataKey.equals(key)) {
             metadataKey = key;
             MediaMetadata.Builder metadata = new MediaMetadata.Builder()
@@ -140,6 +140,10 @@ public class PlaybackService extends Service {
             getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
         }
         if (!MediaBridge.hasTrack && !active) stopSelf();
+    }
+    String metadataKey() {
+        return MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artwork + '\n'
+            + MediaBridge.duration + '\n' + MediaBridge.artworkRevision;
     }
     @Override public void onDestroy() {
         destroyed = true; handler.removeCallbacksAndMessages(null); resumeAfterFocus = focusPaused = false;

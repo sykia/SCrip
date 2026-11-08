@@ -94,6 +94,36 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         dispatch.invoke(null, getTargetContext(), 5, 0L);
         require(!(Boolean) pending.get(null), "Тёплая команда ошибочно стала отложенным Play");
     }
+    private void testArtworkPublication() throws Exception {
+        Object instance = field(service, null, "instance");
+        require(instance != null, "Нет службы для теста обложки");
+        Field artwork = bridge.getDeclaredField("artwork"); artwork.setAccessible(true);
+        Field revision = bridge.getDeclaredField("artworkRevision"); revision.setAccessible(true);
+        Field cover = bridge.getDeclaredField("cover"); cover.setAccessible(true);
+        Field position = bridge.getDeclaredField("position"); position.setAccessible(true);
+        Method key = service.getDeclaredMethod("metadataKey"); key.setAccessible(true);
+        String originalArtwork = (String) artwork.get(null);
+        int originalRevision = revision.getInt(null);
+        long originalPosition = position.getLong(null);
+        artwork.set(null, "same-track-art"); revision.setInt(null, originalRevision + 1);
+        String loadingKey = (String) key.invoke(instance);
+        position.setLong(null, originalPosition + 1000);
+        require(loadingKey.equals(key.invoke(instance)), "Прогресс изменил ключ метаданных");
+        position.setLong(null, originalPosition);
+        Method currentArtwork = bridge.getDeclaredMethod("isCurrentArtwork", String.class, int.class); currentArtwork.setAccessible(true);
+        require((Boolean) currentArtwork.invoke(null, "same-track-art", originalRevision + 1), "Текущая загрузка обложки ошибочно устарела");
+        require(!(Boolean) currentArtwork.invoke(null, "same-track-art", originalRevision), "Устаревший результат принят");
+        Bitmap image = previewArtwork(); cover.set(null, image); revision.setInt(null, originalRevision + 2);
+        String loadedKey = (String) key.invoke(instance);
+        require(!loadingKey.equals(loadedKey), "Готовность Bitmap не инвалидировала кэш метаданных");
+        Method publish = service.getDeclaredMethod("publish"); publish.setAccessible(true); publish.invoke(instance);
+        MediaSession session = (MediaSession) field(service, instance, "session");
+        Bitmap published = session.getController().getMetadata().getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART);
+        require(published != null && published.getWidth() == image.getWidth(), "Обложка не опубликована в MediaSession");
+        artwork.set(null, originalArtwork); cover.set(null, null); revision.setInt(null, originalRevision + 3);
+        publish.invoke(instance);
+        require(session.getController().getMetadata().getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART) == null, "Отсутствие обложки не сбросило старые метаданные");
+    }
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); testArguments = arguments; start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
@@ -170,6 +200,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             bridge.getMethod("preparePlayback").invoke(null);
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);
+            testArtworkPublication();
             Object playbackService = field(service, null, "instance");
             Method focus = service.getDeclaredMethod("handleAudioFocusChange", int.class); focus.setAccessible(true);
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT);

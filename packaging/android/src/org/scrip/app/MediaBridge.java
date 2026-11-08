@@ -23,6 +23,7 @@ public final class MediaBridge {
     static boolean playing, active, buffering, hasTrack, liked;
     static long position, duration;
     static Bitmap cover;
+    static volatile int artworkRevision;
     static volatile Bitmap blurredCover;
     static volatile int widgetAccent = 0xffe89aa8;
     private static Bitmap roundedCover;
@@ -74,12 +75,14 @@ public final class MediaBridge {
                     || !artist.equals(nextArtist) || playing != nextPlaying || buffering != nextBuffering
                     || active != nextActive || hasTrack != nextHasTrack || liked != nextLiked || !artwork.equals(nextArtwork);
                 boolean progressChanged = position != nextPosition || duration != nextDuration;
+                boolean artworkChanged = !nextArtwork.equals(artwork);
                 title = nextTitle.isEmpty() ? "SCrip" : nextTitle; artist = nextArtist;
                 playing = nextPlaying; buffering = nextBuffering; active = nextActive; hasTrack = nextHasTrack; liked = nextLiked;
                 position = nextPosition; duration = nextDuration;
                 if (consumePendingPlay(nextHasTrack)) nativeAction(4, 0);
-                if (!nextArtwork.equals(artwork)) {
+                if (artworkChanged) {
                     artwork = nextArtwork;
+                    final int requestRevision = ++artworkRevision;
                     cover = null; roundedCover = null; blurredCover = null;
                     if (!artwork.isEmpty()) {
                         final String key = artwork;
@@ -91,9 +94,11 @@ public final class MediaBridge {
                             Bitmap square = centerCrop(decoded, 128);
                             Bitmap blur = boxBlur(centerCrop(decoded, 128), 12);
                             MAIN.post(() -> {
-                                if (!key.equals(artwork)) return;
+                                if (!isCurrentArtwork(key, requestRevision)) return;
                                 cover = square; roundedCover = rounded(square); blurredCover = blur; widgetAccent = accent(blur);
                                 MusicWidget.refresh(context);
+                                ++artworkRevision;
+                                if (PlaybackService.instance != null) PlaybackService.instance.publish();
                             });
                         });
                     }
@@ -127,14 +132,21 @@ public final class MediaBridge {
         artwork = p.getString("artwork", "");
         if (!artwork.isEmpty()) {
             final String key = artwork;
+            final int requestRevision = ++artworkRevision;
             IMAGE_WORKER.execute(() -> {
                 Bitmap decoded = BitmapFactory.decodeFile(key);
                 if (decoded == null) return;
                 Bitmap square = centerCrop(decoded, 128);
                 Bitmap blur = boxBlur(centerCrop(decoded, 128), 12);
-                MAIN.post(() -> { if (!key.equals(artwork)) return; cover = square; roundedCover = rounded(square); blurredCover = blur; widgetAccent = accent(blur); MusicWidget.refresh(context); });
+                MAIN.post(() -> {
+                    if (!isCurrentArtwork(key, requestRevision)) return;
+                    cover = square; roundedCover = rounded(square); blurredCover = blur; widgetAccent = accent(blur);
+                    ++artworkRevision;
+                    MusicWidget.refresh(context);
+                    if (PlaybackService.instance != null) PlaybackService.instance.publish();
+                });
             });
-        }
+        } else { ++artworkRevision; cover = null; roundedCover = null; blurredCover = null; }
         position = p.getLong("position", 0); duration = p.getLong("duration", 0); playing = false; active = buffering = preparing = false;
     }
     public static int getWidgetStyle() {
@@ -165,6 +177,9 @@ public final class MediaBridge {
         if (!trackAvailable || !pendingPlay || !ready) return false;
         pendingPlay = false;
         return true;
+    }
+    static boolean isCurrentArtwork(String key, int revision) {
+        return key.equals(artwork) && revision == artworkRevision;
     }
     static int generation() { return lifecycle; }
     static PendingIntent openApp(Context ctx) {
