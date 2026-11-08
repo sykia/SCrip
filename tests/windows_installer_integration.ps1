@@ -43,10 +43,13 @@ try {
     Build-Installer $payload1 $output1 'v1'
     Build-Installer $payload2 $output2 'v2' $true
 
-    & $output1 '/S'
-    Assert ($LASTEXITCODE -eq 0) 'Initial install failed.'
+    $initialInstall = Start-Process -FilePath $output1 -ArgumentList '/S' -PassThru -Wait
+    Write-Host "Initial NSIS installer exit code: $($initialInstall.ExitCode)"
+    Assert ($initialInstall.ExitCode -eq 0) 'Initial install failed.'
     if (!(Test-Path (Join-Path $install 'Uninstall.exe'))) {
         Get-ChildItem -LiteralPath $work -Force | Format-Table FullName, Length | Out-String | Write-Host
+        $defaultInstall = Join-Path $env:LOCALAPPDATA 'Programs\SCrip'
+        if (Test-Path $defaultInstall) { Get-ChildItem -LiteralPath $defaultInstall -Force | Format-Table FullName, Length | Out-String | Write-Host }
         $trace = "$install.trace"
         if (Test-Path $trace) { Get-Content -LiteralPath $trace -Raw | Write-Host }
         throw 'Installer did not use the isolated test directory.'
