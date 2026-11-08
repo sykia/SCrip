@@ -484,7 +484,7 @@ Window {
             Txt { visible: !!app.api.error; width: parent.width; text: app.api.error || ""; color: "#bc3b4a"; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 12 }
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
-                Tool { visible: app.api.authStep === "browser"; text: "Отменить"; onClicked: sc.cancelLogin() }
+                Tool { visible: app.api.authStep === "browser" || app.api.authStep === "exchange"; text: "Отменить"; onClicked: sc.cancelLogin() }
             }
         }
     }

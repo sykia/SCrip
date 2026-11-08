@@ -397,10 +397,19 @@ bool SoundCloud::clearSession() {
 }
 void SoundCloud::logout() {
     cancelLogin();
-    if (m_storageReady && m_userSession && !m_access.isEmpty()) {
-        // Отзыв доступа подтверждается сервером; при сетевой ошибке локальный выход доступен отдельно через настройки.
-        request("/disconnect", [this](QJsonDocument) { if (clearSession()) clearError(); }, "POST");
-    } else { if (clearSession()) clearError(); }
+    const bool revoke = m_storageReady && m_userSession && !m_access.isEmpty();
+    const auto access = m_access;
+    if (!clearSession()) return;
+    clearError();
+    if (revoke) {
+        QNetworkRequest req(QUrl("https://api.soundcloud.com/disconnect"));
+        req.setRawHeader("Authorization", "OAuth " + access.toUtf8());
+        req.setRawHeader("Accept", "application/json");
+        req.setTransferTimeout(25000);
+        req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        auto *reply = m_network->sendCustomRequest(req, "POST");
+        connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
+    }
 }
 QString SoundCloud::urn(const QVariantMap &item) { return item.value("urn").toString(); }
 void SoundCloud::browse(const QString &page, const QString &query) {

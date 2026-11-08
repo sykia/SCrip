@@ -283,6 +283,30 @@ private slots:
         QVERIFY(secrets->records.contains("connection"));
         QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty());
     }
+    void logoutIsImmediateWhenRevocationFailsOrIsLate() {
+        const QList<Response> failures = {
+            {401, "{}"}, {500, "{}"},
+            {0, "{}", 0, QNetworkReply::HostNotFoundError},
+            {200, "{}", 120}
+        };
+        for (const auto &response : failures) {
+            Network net; net.responses = {guest(), response};
+            SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+            sc.m_userSession = true; sc.set("signedIn", true);
+            QVERIFY(secrets->records.contains("session"));
+            sc.logout();
+            QVERIFY(!sc.state()["connected"].toBool()); QVERIFY(!sc.signedIn());
+            QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty());
+            QVERIFY(!secrets->records.contains("session"));
+            QCOMPARE(net.requests.size(), 2);
+            sc.logout();
+            QCOMPARE(net.requests.size(), 2);
+            QTest::qWait(150);
+            QVERIFY(!sc.state()["connected"].toBool()); QVERIFY(!sc.signedIn());
+            QVERIFY(!secrets->records.contains("session"));
+            QVERIFY(sc.state()["error"].toString().isEmpty());
+        }
+    }
     void failedLogoutDeletionIsVisible() {
         Network net; net.responses = {guest()};
         SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
