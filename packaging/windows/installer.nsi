@@ -152,7 +152,6 @@ Section
   ; Never remove an unmarked sibling directory: it may contain user data.
   IfFileExists "$BackupDir\*.*" preexisting_backup
   CreateDirectory "$BackupDir"
-  IfFileExists "$BackupDir\*.*" preexisting_backup
   Goto begin_transaction
   preexisting_backup:
   SetErrorLevel 2
