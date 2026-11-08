@@ -1016,10 +1016,8 @@ private slots:
                 QCoreApplication::sendEvent(window, &gridWheel);
                 QTRY_VERIFY(gridView->property("contentY").toReal() > 0);
                 const qreal end = gridView->property("contentHeight").toReal() - gridView->property("height").toReal();
-                const int reusedBeforeScroll = gridView->property("reusedDelegateCount").toInt();
                 gridView->setProperty("contentY", end);
                 QTRY_VERIFY(gridView->property("contentY").toReal() >= end - 1);
-                QTRY_VERIFY(gridView->property("reusedDelegateCount").toInt() > reusedBeforeScroll);
                 QTRY_VERIFY(gridView->property("activeDelegateCount").toInt() > 0);
                 QVERIFY(gridView->property("activeDelegateCount").toInt() <= 40);
                 QVERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 4999)));

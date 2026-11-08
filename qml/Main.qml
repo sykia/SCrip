@@ -667,7 +667,6 @@ Window {
             boundsBehavior: Flickable.StopAtBounds
             model: app.api.tracks
             property int activeDelegateCount: 0
-            property int reusedDelegateCount: 0
             function trackTitleAt(index) {
                 const item = itemAtIndex(index)
                 return item ? item.modelData.title : ""
@@ -691,7 +690,6 @@ Window {
                 Component.onCompleted: { virtualCoverGrid.activeDelegateCount++; if (inViewport) entered = true }
                 Component.onDestruction: virtualCoverGrid.activeDelegateCount--
                 GridView.onReused: {
-                    virtualCoverGrid.reusedDelegateCount++
                     entered = !prefs.motion
                     Qt.callLater(function() { if (tile.inViewport) tile.entered = true })
                 }
