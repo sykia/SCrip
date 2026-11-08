@@ -37,10 +37,14 @@ function Build-Installer($payload, $output, $version, $pauseAfterUninstall = $fa
 try {
     Push-Location $installerDir
     New-Item -ItemType Directory -Path $work, $payload1, $payload2 -Force | Out-Null
-    Copy-Item (Join-Path $PSHOME 'pwsh.exe') (Join-Path $payload1 'SCrip.exe')
+    $helperSource = Join-Path $work 'locked-app.cs'
+    Set-Content $helperSource 'using System.Threading; internal static class TestApp { private static void Main() { Thread.Sleep(60000); } }'
+    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    & $csc '/nologo' '/target:exe' "/out:$(Join-Path $payload1 'SCrip.exe')" $helperSource
+    if ($LASTEXITCODE -ne 0) { throw "Could not build locked EXE fixture ($LASTEXITCODE)." }
     Set-Content (Join-Path $payload1 'version.txt') 'version-one'
     Set-Content (Join-Path $payload1 'obsolete.dll') 'old-only application file'
-    Copy-Item (Join-Path $PSHOME 'pwsh.exe') (Join-Path $payload2 'SCrip.exe')
+    Copy-Item (Join-Path $payload1 'SCrip.exe') (Join-Path $payload2 'SCrip.exe')
     Set-Content (Join-Path $payload2 'version.txt') 'version-two'
     Build-Installer $payload1 $output1 'v1'
     Build-Installer $payload2 $output2 'v2' $true
@@ -102,7 +106,7 @@ try {
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'Repeated installation removed a user file.'
 
     # Run the fixture executable: setup must wait and leave v2 intact.
-    $runningApp = Start-Process -FilePath (Join-Path $install 'SCrip.exe') -ArgumentList '-NoLogo -NoProfile -Command "Start-Sleep -Seconds 60"' -PassThru
+    $runningApp = Start-Process -FilePath (Join-Path $install 'SCrip.exe') -PassThru
     try {
         Start-Sleep -Seconds 2
         $runningApp.Refresh()
