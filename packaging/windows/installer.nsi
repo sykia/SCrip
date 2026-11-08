@@ -226,6 +226,7 @@ Section
   uninstall_ok:
   !ifdef TEST_PAUSE_AFTER_UNINSTALL
     IfFileExists "$INSTDIR.__SCrip_test_pause" 0 test_pause_done
+    !insertmacro TestTrace "test_pause_entered"
     Sleep 30000
     Delete "$INSTDIR.__SCrip_test_pause"
     test_pause_done:
