@@ -84,7 +84,10 @@ try {
         if ((Test-Path $marker) -and !(Test-Path (Join-Path $install 'SCrip.exe'))) { break }
         Start-Sleep -Milliseconds 100
     }
-    Assert ((Test-Path $marker) -and !(Test-Path (Join-Path $install 'SCrip.exe'))) 'Did not reach the interrupted-upgrade window.'
+    if (!(Test-Path $marker) -or (Test-Path (Join-Path $install 'SCrip.exe'))) {
+        $trace = if (Test-Path "${install}.trace") { Get-Content "${install}.trace" -Raw } else { '<no trace>' }
+        throw "Did not reach interrupted-upgrade window; marker=$(Test-Path $marker), exe=$(Test-Path (Join-Path $install 'SCrip.exe')), pause=$(Test-Path "${install}.__SCrip_test_pause"). Trace: $trace"
+    }
     Stop-Process -Id $upgrade.Id -Force
     try { $upgrade.WaitForExit() } catch { }
     Assert (!(Test-Path (Join-Path $install 'SCrip.exe'))) 'Fault injection did not interrupt setup after the old version was removed.'
