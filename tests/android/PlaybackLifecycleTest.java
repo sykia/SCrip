@@ -137,6 +137,25 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         publish.invoke(instance);
         require(session.getController().getMetadata().getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART) == null, "Отсутствие обложки не сбросило старые метаданные");
     }
+    private void testNotificationProgressIsolation() throws Exception {
+        Object instance = field(service, null, "instance");
+        Field key = service.getDeclaredField("notificationKey"); key.setAccessible(true);
+        Field position = bridge.getDeclaredField("position"); position.setAccessible(true);
+        Field duration = bridge.getDeclaredField("duration"); duration.setAccessible(true);
+        long oldPosition = position.getLong(null), oldDuration = duration.getLong(null);
+        Method publish = service.getDeclaredMethod("publish"); publish.setAccessible(true);
+        String notification = (String) key.get(instance);
+        position.setLong(null, oldPosition + 1000); duration.setLong(null, oldDuration + 1000);
+        publish.invoke(instance);
+        require(notification.equals(key.get(instance)), "Прогресс пересоздал бы системное уведомление");
+        MediaSession session = (MediaSession) field(service, instance, "session");
+        require(session.getController().getPlaybackState().getPosition() == oldPosition + 1000, "Позиция не обновилась в MediaSession");
+        position.setLong(null, oldPosition); duration.setLong(null, oldDuration); publish.invoke(instance);
+        Field liked = bridge.getDeclaredField("liked"); liked.setAccessible(true);
+        boolean oldLiked = liked.getBoolean(null); liked.setBoolean(null, !oldLiked); publish.invoke(instance);
+        require(!notification.equals(key.get(instance)), "Смена лайка не обновила уведомление");
+        liked.setBoolean(null, oldLiked); publish.invoke(instance);
+    }
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); testArguments = arguments; start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
@@ -215,6 +234,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);
             testArtworkPublication();
+            testNotificationProgressIsolation();
             Object playbackService = field(service, null, "instance");
             Method focus = service.getDeclaredMethod("handleAudioFocusChange", int.class); focus.setAccessible(true);
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT);

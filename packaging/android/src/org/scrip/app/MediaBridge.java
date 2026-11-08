@@ -64,7 +64,7 @@ public final class MediaBridge {
             playing = active = buffering = hasTrack = preparing = false;
             if (context != null) {
                 context.stopService(new Intent(context, PlaybackService.class));
-                save(); MusicWidget.refresh(context);
+                save(true); MusicWidget.refresh(context);
             }
         });
     }
@@ -87,6 +87,8 @@ public final class MediaBridge {
                     || active != nextActive || hasTrack != nextHasTrack || liked != nextLiked || !artwork.equals(nextArtwork);
                 boolean progressChanged = position != nextPosition || duration != nextDuration;
                 boolean artworkChanged = !nextArtwork.equals(artwork);
+                boolean playbackEnded = hasTrack && playing && (!nextHasTrack || !nextPlaying);
+                if (playbackEnded) save(true);
                 title = nextTitle.isEmpty() ? "SCrip" : nextTitle; artist = nextArtist;
                 playing = nextPlaying; buffering = nextBuffering; active = nextActive; hasTrack = nextHasTrack; liked = nextLiked;
                 position = nextPosition; duration = nextDuration;
@@ -118,7 +120,7 @@ public final class MediaBridge {
                         });
                     }
                 }
-                save();
+                save(false);
                 if (widgetChanged) MusicWidget.refresh(context);
                 else if (progressChanged) MusicWidget.refreshProgress(context);
                 preparing = false;
@@ -129,10 +131,10 @@ public final class MediaBridge {
             } catch (org.json.JSONException error) { Log.w("SCripMedia", "Некорректное состояние плеера", error); }
         });
     }
-    private static void save() {
+    private static void save(boolean force) {
         // Диск обновляется при смене трека/паузы, а не каждую секунду.
         String key = currentUrn + '\n' + title + '\n' + artist + '\n' + artwork + '\n' + playing;
-        if (key.equals(savedKey) && Math.abs(position - savedPosition) < 15000) return;
+        if (!force && key.equals(savedKey) && Math.abs(position - savedPosition) < 15000) return;
         savedKey = key;
         android.content.SharedPreferences.Editor edit = context.getSharedPreferences("music_widget", Context.MODE_PRIVATE).edit()
             .putString("title", title).putString("artist", artist).putString("artwork", artwork)

@@ -27,6 +27,7 @@ public class PlaybackService extends Service {
         publish();
     };
     private String metadataKey = "";
+    private String notificationKey = "";
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { MediaBridge.dispatch(context, 5, 0); }
     };
@@ -108,6 +109,14 @@ public class PlaybackService extends Service {
         session.setPlaybackState(new PlaybackState.Builder().setActions(actions)
             .addCustomAction(LIKE, likeLabel, likeIcon)
             .setState(state, MediaBridge.position, state == PlaybackState.STATE_PLAYING ? 1f : 0f, SystemClock.elapsedRealtime()).build());
+        String nextNotificationKey = MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artworkRevision
+            + '\n' + active + '\n' + MediaBridge.playing + '\n' + MediaBridge.buffering + '\n' + MediaBridge.liked;
+        if (notificationKey.equals(nextNotificationKey)) {
+            updateForegroundState(active, null);
+            if (!MediaBridge.hasTrack && !active) stopSelf();
+            return;
+        }
+        notificationKey = nextNotificationKey;
         Notification notification = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.widget_notification).setContentTitle(MediaBridge.title).setContentText(MediaBridge.artist)
             .setLargeIcon(MediaBridge.cover).setContentIntent(MediaBridge.openApp(this))
@@ -118,9 +127,15 @@ public class PlaybackService extends Service {
             .addAction(new Notification.Action.Builder(R.drawable.widget_next, "Следующий", MediaBridge.control(this, 2)).build())
             .addAction(new Notification.Action.Builder(likeIcon, likeLabel, MediaBridge.control(this, 7)).build())
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0, 1, 2)).build();
+        updateForegroundState(active, notification);
+        if (!MediaBridge.hasTrack && !active) stopSelf();
+    }
+    private void updateForegroundState(boolean active, Notification notification) {
         if (active) {
-            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-            else startForeground(NOTIFICATION, notification);
+            if (!foreground && notification != null) {
+                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                else startForeground(NOTIFICATION, notification);
+            } else if (notification != null) getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
             foreground = true;
             if (!wakeLock.isHeld() && MediaBridge.playing && !MediaBridge.buffering) wakeLock.acquire();
             if (!hasFocus) {
@@ -128,18 +143,19 @@ public class PlaybackService extends Service {
                 if (!hasFocus) { resumeAfterFocus = false; focusPaused = false; MediaBridge.dispatch(this, 5, 0); }
             }
         } else {
+            if (notification != null) getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
             if (foreground) { stopForeground(STOP_FOREGROUND_DETACH); foreground = false; }
             if (wakeLock.isHeld()) wakeLock.release();
             if (resumeAfterFocus) {
                 if (wakeLock.isHeld()) wakeLock.release();
                 foreground = true;
-                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-                else startForeground(NOTIFICATION, notification);
+                if (notification != null) {
+                    if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                    else startForeground(NOTIFICATION, notification);
+                }
             } else if (hasFocus) { audioManager.abandonAudioFocusRequest(focusRequest); hasFocus = false; }
             else if (foreground) { stopForeground(STOP_FOREGROUND_DETACH); foreground = false; }
-            getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
         }
-        if (!MediaBridge.hasTrack && !active) stopSelf();
     }
     String metadataKey() {
         return MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artwork + '\n'
