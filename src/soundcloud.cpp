@@ -504,10 +504,26 @@ void SoundCloud::loadHome(bool force) {
     });
 }
 void SoundCloud::playMix(const QVariantList &tracks, int index) {
-    if (index < 0 || index >= tracks.size()) return;
-    m_queue.clear();
-    for (const auto &track : tracks) if (urn(track.toMap()).startsWith("soundcloud:tracks:")) m_queue.append(track);
-    set("queue", m_queue); playQueue(qMin(index, int(m_queue.size()) - 1));
+    if (tracks.isEmpty()) return;
+    const int selectedIndex = qBound(0, index, int(tracks.size()) - 1);
+    QVariantList queue;
+    int selectedQueueIndex = -1;
+    int previousQueueIndex = -1;
+    int nextQueueIndex = -1;
+    for (int i = 0; i < tracks.size(); ++i) {
+        const auto &track = tracks[i];
+        if (!urn(track.toMap()).startsWith("soundcloud:tracks:")) continue;
+        const int queueIndex = queue.size();
+        queue.append(track);
+        if (i < selectedIndex) previousQueueIndex = queueIndex;
+        else if (i == selectedIndex) selectedQueueIndex = queueIndex;
+        else if (nextQueueIndex < 0) nextQueueIndex = queueIndex;
+    }
+    if (queue.isEmpty()) return;
+    const int playIndex = selectedQueueIndex >= 0 ? selectedQueueIndex
+        : nextQueueIndex >= 0 ? nextQueueIndex : previousQueueIndex;
+    m_queue = queue;
+    set("queue", m_queue); playQueue(playIndex);
 }
 void SoundCloud::playStation(const QVariantMap &seed) {
     if (!urn(seed).startsWith("soundcloud:tracks:")) return;

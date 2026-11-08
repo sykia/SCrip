@@ -523,6 +523,46 @@ private slots:
         sc.next();
         QCOMPARE(sc.state()["current"], tracks[3]);
     }
+    void playMixKeepsSelectionAfterFiltering() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        const QVariantMap invalid{{"urn", "soundcloud:users:bad"}};
+        const QVariantMap first{{"urn", "soundcloud:tracks:1"}, {"access", "blocked"}};
+        const QVariantMap selected{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}};
+        const QVariantMap last{{"urn", "soundcloud:tracks:3"}, {"access", "blocked"}};
+
+        sc.playMix({invalid, first, selected, last}, 2);
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+
+        sc.playMix({invalid, first, selected}, 0);
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 0);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+
+        sc.playMix({first, selected, invalid}, 2);
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+
+        sc.playMix({invalid, first, first, selected}, 2);
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+
+        const auto oldQueue = sc.state()["queue"];
+        const auto oldCurrent = sc.state()["current"];
+        sc.playMix({invalid}, 0);
+        QCOMPARE(sc.state()["queue"], oldQueue);
+        QCOMPARE(sc.state()["current"], oldCurrent);
+        sc.playMix({}, 0);
+        QCOMPARE(sc.state()["queue"], oldQueue);
+        QCOMPARE(sc.state()["current"], oldCurrent);
+
+        sc.playMix({first, selected}, -8);
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 0);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+        sc.playMix({first, selected}, 99);
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+    }
     void removingQueueTracksPreservesPlaybackSelection() {
         const QVariantList tracks{
             QVariantMap{{"urn", "soundcloud:tracks:0"}, {"access", "blocked"}},
