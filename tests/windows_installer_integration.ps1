@@ -28,6 +28,7 @@ function Build-Installer($payload, $output, $version, $pauseAfterUninstall = $fa
             'RMDir "$INSTDIR\' + $relative.Replace('$', '$$') + '"'
         }
     Set-Content -LiteralPath $fileList -Value $entries -Encoding utf8
+    Write-Host "$version uninstall manifest:`n$($entries -join "`n")"
     $args = @("-DPAYLOAD=$payload", "-DOUTPUT=$output", "-DFILELIST=$fileList", "-DTEST_INSTALL_DIR=$install")
     if ($pauseAfterUninstall) { $args += '-DTEST_PAUSE_AFTER_UNINSTALL' }
     & makensis @args 'installer.nsi'
