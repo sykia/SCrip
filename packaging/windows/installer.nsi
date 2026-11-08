@@ -52,6 +52,13 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
+Function un.onInit
+  ReadRegStr $INSTDIR HKCU "${UNKEY}" "InstallLocation"
+  StrCmp $INSTDIR "" 0 un_init_done
+  StrCpy $INSTDIR "$EXEDIR"
+  un_init_done:
+FunctionEnd
+
 Var BackupDir
 Var StageDir
 Var Marker
@@ -89,6 +96,7 @@ Function RecoverInterruptedUpdate
   CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
@@ -124,6 +132,7 @@ Function RestorePrevious
   CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
@@ -262,6 +271,7 @@ Section
   CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
