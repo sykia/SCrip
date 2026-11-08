@@ -53,10 +53,9 @@ Function .onInit
 FunctionEnd
 
 Function un.onInit
-  ReadRegStr $INSTDIR HKCU "${UNKEY}" "InstallLocation"
-  StrCmp $INSTDIR "" 0 un_init_done
+  ; The uninstaller is stored beside the installed application. Use that path
+  ; directly so cleanup does not depend on a registry value from older builds.
   StrCpy $INSTDIR "$EXEDIR"
-  un_init_done:
 FunctionEnd
 
 Var BackupDir
