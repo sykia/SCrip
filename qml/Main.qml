@@ -56,7 +56,7 @@ Window {
     readonly property var pages: ["Поиск", "Любимые треки", "Плейлисты", "Профиль", "Настройки", "Главная"]
     readonly property bool compact: width < 1000
 
-    Settings { id: prefs; category: "appleInterface"; property bool gridView: true; property real volume: 0.7; property bool motion: true
+    Settings { id: prefs; objectName: "uiPreferences"; category: "appleInterface"; property bool gridView: true; property real volume: 0.7; property bool motion: true
         property string hiddenMixTracks: "{}"
         property string savedThemes: "[]"
         property string themeName: ""
@@ -319,6 +319,7 @@ Window {
                 boundsBehavior: Flickable.StopAtBounds
                 flickDeceleration: 1500; maximumFlickVelocity: 3600
                 property real wheelTarget: 0
+                property bool trackListHovered: false
                 function maybeLoad() {
                     if (prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
                 }
@@ -331,6 +332,7 @@ Window {
                 onMovementStarted: wheelMotion.stop()
                 NumberAnimation { id: wheelMotion; target: contentScroll; property: "contentY"; duration: Math.min(150, app.motion); easing.type: Easing.OutCubic }
                 WheelHandler {
+                    enabled: !contentScroll.trackListHovered
                     acceptedDevices: PointerDevice.Mouse
                     onWheel: event => {
                         if (event.pixelDelta.y !== 0 || event.angleDelta.y === 0) { event.accepted = false; return }
@@ -696,35 +698,56 @@ Window {
     }
     Component {
         id: trackList
-        Column {
-            Repeater {
-                model: app.api.tracks
-                delegate: Rectangle {
-                    id: row
-                    required property var modelData
-                    required property int index
-                    width: parent.width; height: 58; radius: 5
-                    color: app.api.current.urn === modelData.urn ? "#fff0f2" : rowHover.hovered ? "#f6f5f6" : index % 2 ? "#faf9fa" : "white"
-                    HoverHandler { id: rowHover }
-                    RowLayout {
-                        anchors.fill: parent; anchors.margins: 7; spacing: 10
-                        Tool { symbol: "play"; text: "Слушать"; onClicked: sc.play(row.modelData); implicitWidth: 24 }
-                        Artwork { radius: app.artworkRadius; width: 40; height: 40; source: app.cover(row.modelData); }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 4
-                            Txt { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; font.pixelSize: 12 }
-                            Txt { Layout.fillWidth: true; text: row.modelData.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
-                        }
-                        LikeButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); track: row.modelData }
-                        Tool { text: "⋯"; visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); onClicked: trackMenu.open() }
-                        Menu {
-                            id: trackMenu
-                            MenuItem { text: "Копировать название и исполнителя"; onTriggered: sc.copyText((row.modelData.title || "Без названия") + " — " + (row.modelData.user?.username || "SoundCloud")) }
-                            MenuItem { text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(row.modelData.permalink_url || ""); onTriggered: sc.copyText(row.modelData.permalink_url) }
-                        }
-                        Tool { visible: (row.modelData.urn || "").indexOf("soundcloud:tracks:") === 0; symbol: "plus"; text: "В очередь"; onClicked: sc.enqueue(row.modelData) }
-                        Txt { text: app.time(row.modelData.duration); color: app.muted; font.pixelSize: 11; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
+        ListView {
+            id: virtualTrackList
+            objectName: "trackListView"
+            width: parent.width
+            height: Math.min(count * 58, Math.max(58, contentScroll.height - y - 110))
+            clip: true
+            spacing: 0
+            cacheBuffer: Math.max(58 * 4, height / 2)
+            reuseItems: true
+            boundsBehavior: Flickable.StopAtBounds
+            model: app.api.tracks
+            property int activeDelegateCount: 0
+            function lastTrackTitle() {
+                const item = count > 0 ? itemAtIndex(count - 1) : null
+                return item ? item.modelData.title : ""
+            }
+            function maybeLoad() {
+                if (contentHeight > height && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
+            }
+            onContentYChanged: maybeLoad()
+            onContentHeightChanged: maybeLoad()
+            HoverHandler { onHoveredChanged: contentScroll.trackListHovered = hovered }
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            delegate: Rectangle {
+                id: row
+                required property var modelData
+                required property int index
+                width: virtualTrackList.width; height: 58; radius: 5
+                Component.onCompleted: virtualTrackList.activeDelegateCount++
+                Component.onDestruction: virtualTrackList.activeDelegateCount--
+                color: app.api.current.urn === modelData.urn ? "#fff0f2" : rowHover.hovered ? "#f6f5f6" : index % 2 ? "#faf9fa" : "white"
+                HoverHandler { id: rowHover }
+                RowLayout {
+                    anchors.fill: parent; anchors.margins: 7; spacing: 10
+                    Tool { symbol: "play"; text: "Слушать"; onClicked: sc.play(row.modelData); implicitWidth: 24 }
+                    Artwork { radius: app.artworkRadius; width: 40; height: 40; source: app.cover(row.modelData); }
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 4
+                        Txt { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; font.pixelSize: 12 }
+                        Txt { Layout.fillWidth: true; text: row.modelData.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
                     }
+                    LikeButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); track: row.modelData }
+                    Tool { text: "⋯"; visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); onClicked: trackMenu.open() }
+                    Menu {
+                        id: trackMenu
+                        MenuItem { text: "Копировать название и исполнителя"; onTriggered: sc.copyText((row.modelData.title || "Без названия") + " — " + (row.modelData.user?.username || "SoundCloud")) }
+                        MenuItem { text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(row.modelData.permalink_url || ""); onTriggered: sc.copyText(row.modelData.permalink_url) }
+                    }
+                    Tool { visible: (row.modelData.urn || "").indexOf("soundcloud:tracks:") === 0; symbol: "plus"; text: "В очередь"; onClicked: sc.enqueue(row.modelData) }
+                    Txt { text: app.time(row.modelData.duration); color: app.muted; font.pixelSize: 11; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
                 }
             }
         }

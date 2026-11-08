@@ -934,6 +934,48 @@ private slots:
         scroll->setProperty("contentY", scroll->property("contentHeight").toReal() - scroll->property("height").toReal());
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 33);
         net.responses = {{200, "[]"}};
+        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
+        preferences->setProperty("gridView", false);
+        preferences->setProperty("autoLoad", true);
+        auto *trackView = window->findChild<QObject *>("trackListView"); QVERIFY(trackView);
+        auto tracksJson = [](int count, bool more = false, int offset = 0) {
+            QJsonArray items;
+            for (int i = 0; i < count; ++i)
+                items.append(QJsonObject{{"urn", QString("soundcloud:tracks:virtual-%1").arg(offset + i)},
+                                         {"title", QString("Виртуальный трек %1").arg(offset + i)}, {"duration", 180000}});
+            QJsonObject page{{"collection", items}};
+            if (more) page["next_href"] = "https://api.soundcloud.com/tracks?cursor=virtual-next";
+            return QJsonDocument(page).toJson();
+        };
+        const QList<int> listSizes{0, 1, 100, 2000, 5000};
+        for (int size : listSizes) {
+            net.responses = {{200, tracksJson(size, size == 5000)}};
+            sc.browse("tracks", QString("virtual-%1").arg(size));
+            QTRY_COMPARE(sc.state()["tracks"].toList().size(), size);
+            QTRY_VERIFY(!sc.state()["busy"].toBool());
+            QTRY_VERIFY(trackView->property("activeDelegateCount").toInt() <= 40);
+            if (size == 0) QCOMPARE(trackView->property("activeDelegateCount").toInt(), 0);
+            if (size == 1) QCOMPARE(trackView->property("height").toReal(), 58.0);
+            if (size == 5000) {
+                QCOMPARE(trackView->property("count").toInt(), 5000);
+                net.responses = {{200, tracksJson(1, false, 5000)}};
+                const qreal end = trackView->property("contentHeight").toReal() - trackView->property("height").toReal();
+                trackView->setProperty("contentY", end);
+                QTRY_VERIFY(trackView->property("contentY").toReal() >= end - 1);
+                QTRY_VERIFY(trackView->property("activeDelegateCount").toInt() <= 40);
+                QVERIFY(trackView->property("activeDelegateCount").toInt() > 0);
+                QVariant lastTitle;
+                QVERIFY(QMetaObject::invokeMethod(trackView, "lastTrackTitle", Q_RETURN_ARG(QVariant, lastTitle)));
+                QCOMPARE(lastTitle.toString(), QString("Виртуальный трек 4999"));
+                QTRY_COMPARE(sc.state()["tracks"].toList().size(), 5001);
+                QTRY_VERIFY(!sc.state()["hasMore"].toBool());
+                const qreal appendedEnd = trackView->property("contentHeight").toReal() - trackView->property("height").toReal();
+                trackView->setProperty("contentY", appendedEnd);
+                QTRY_VERIFY(QMetaObject::invokeMethod(trackView, "lastTrackTitle", Q_RETURN_ARG(QVariant, lastTitle)));
+                QTRY_COMPARE(lastTitle.toString(), QString("Виртуальный трек 5000"));
+            }
+        }
+        net.responses = {{200, "[]"}};
         window->setProperty("section", 3); QTest::qWait(400);
         QVERIFY(window->grabWindow().save("ui-profile.png"));
         window->setProperty("section", 4); window->setProperty("settingGroup", 3); QTest::qWait(100);
