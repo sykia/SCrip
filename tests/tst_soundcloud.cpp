@@ -27,12 +27,13 @@ public:
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, response.status);
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
         QTimer::singleShot(response.delay, this, [this, response] {
+            if (aborted) return;
             if (response.error != QNetworkReply::NoError) setError(response.error, "Test network failure");
             else if (response.status >= 400) setError(QNetworkReply::ContentAccessDenied, "Test failure");
             setFinished(true); emit readyRead(); emit finished();
         });
     }
-    void abort() override {}
+    void abort() override { if (isFinished()) return; aborted = true; setError(QNetworkReply::OperationCanceledError, "Cancelled"); setFinished(true); emit finished(); }
     qint64 bytesAvailable() const override { return bytes.size() - offset + QNetworkReply::bytesAvailable(); }
 protected:
     qint64 readData(char *data, qint64 size) override {
@@ -41,7 +42,7 @@ protected:
         memcpy(data, bytes.constData() + offset, size_t(count)); offset += count; return count;
     }
 private:
-    QByteArray bytes; qint64 offset = 0;
+    QByteArray bytes; qint64 offset = 0; bool aborted = false;
 };
 class Network : public QNetworkAccessManager {
 public:
@@ -403,6 +404,72 @@ private slots:
         QVERIFY(sc.state()["updateError"].toString().contains("SHA-256"));
         QVERIFY(!sc.state()["updateReady"].toBool());
         QCoreApplication::setApplicationVersion(previousVersion);
+    }
+    void updateDownloadCancellationStopsActiveReply() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
+        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QByteArray payload("abcd");
+        QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex())}, {"size", 4},
+            {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
+        sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+        net.responses = {{200, payload, 1000}}; sc.downloadUpdate();
+        QVERIFY(sc.state()["updateDownloading"].toBool());
+        sc.cancelUpdateDownload();
+        QVERIFY(!sc.state()["updateDownloading"].toBool()); QVERIFY(!sc.state()["updateReady"].toBool());
+        QTest::qWait(20);
+        QVERIFY(!sc.state()["updateDownloading"].toBool());
+        QCoreApplication::setApplicationVersion(previousVersion);
+    }
+    void updateRepeatCheckKeepsVerifiedSameRelease() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
+        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QByteArray payload("abcd");
+        const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
+        QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        const QByteArray metadata = QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson();
+        net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+        net.responses = {{200, payload}}; sc.downloadUpdate(); QTRY_VERIFY(sc.state()["updateReady"].toBool());
+        net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+        QVERIFY(sc.state()["updateReady"].toBool());
+        const QString nextName = QFileInfo::exists("/etc/arch-release") ? "scrip-1000.0-x86_64.pkg.tar.zst" : "SCrip-1000.0-amd64.deb";
+        const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v1000.0/" + nextName}};
+        net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v1000.0"}, {"assets", QJsonArray{nextAsset}}}).toJson()}};
+        sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+        QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(sc.state()["updateAvailable"].toBool());
+        QCoreApplication::setApplicationVersion(previousVersion);
+    }
+    void updateDownloadRejectsHttpFailuresAndPartialBodies() {
+        const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
+        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QByteArray payload("abcd");
+        const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
+        QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        const QByteArray metadata = QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson();
+        for (const auto &response : QList<Response>{{403, "denied"}, {404, "missing"}, {500, "server error"}, {200, "abc"}, {200, "", 0, QNetworkReply::TimeoutError}}) {
+            Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+            QTRY_VERIFY(sc.state()["connected"].toBool()); net.responses = {{200, metadata}};
+            sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+            net.responses = {response}; sc.downloadUpdate(); QTRY_VERIFY(!sc.state()["updateDownloading"].toBool());
+            QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(!sc.state()["updateError"].toString().isEmpty());
+        }
+        QCoreApplication::setApplicationVersion(previousVersion);
+    }
+    void updateInstallBlocksCorruptedArtifactAndReentry() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        QTemporaryDir tmp; QVERIFY(tmp.isValid());
+        const QString path = tmp.filePath("corrupt.bin"); QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write("bad"), qint64(3)); file.close();
+        sc.m_updatePath = path; sc.m_updateExpectedSize = 3; sc.m_updateDigest = "sha256:" + QString(64, '0');
+        sc.m_updateVersion = "2.0"; sc.m_updateReadyVersion = "2.0"; sc.m_updateReadyName = "corrupt.bin"; sc.m_updateReadyDigest = sc.m_updateDigest;
+        sc.m_updateAsset = QJsonObject{{"name", "corrupt.bin"}}; sc.m_state["latestVersion"] = "2.0"; sc.m_state["updateReady"] = true;
+        sc.installUpdate(); QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(sc.state()["updateError"].toString().contains("Контрольная сумма"));
+        sc.m_state["updateReady"] = true; sc.m_state["updateInstalling"] = true; sc.installUpdate();
+        QVERIFY(sc.state()["updateInstalling"].toBool());
     }
     void movingQueuePreservesCurrentAndSetsNext() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);

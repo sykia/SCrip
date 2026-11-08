@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QUrlQuery>
 #include <functional>
+#include <memory>
 
 // Секреты доступны только хосту через системное защищённое хранилище.
 class SoundCloud : public QObject {
@@ -132,9 +133,11 @@ private:
     QVariantList m_queue;
     QNetworkReply *m_updateReply = nullptr;
     QSaveFile *m_updateFile = nullptr;
-    QCryptographicHash *m_updateHash = nullptr;
+    std::unique_ptr<QCryptographicHash> m_updateHash;
     QTimer m_updateProgressTimer;
     QJsonObject m_updateAsset;
     QString m_updateDigest, m_updatePath;
+    QString m_updateVersion, m_updateReadyVersion, m_updateReadyName;
+    QString m_updateReadyDigest;
     qint64 m_updateExpectedSize = -1, m_updateReceived = 0;
 };

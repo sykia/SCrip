@@ -773,15 +773,27 @@ void SoundCloud::checkForUpdates(bool manual) {
     auto *reply = m_network->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, manual] {
         reply->deleteLater(); set("updateChecking", false);
-        auto updateFailure = [this, manual](const QString &message) { if (manual) set("updateError", message); set("updateResult", "Ошибка проверки"); };
-        if (reply->error() != QNetworkReply::NoError) { updateFailure("Не удалось проверить обновления. Проверьте подключение к интернету."); return; }
-        QJsonParseError parseError; const auto doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
+        auto updateFailure = [this, manual](const QString &message) { set("updateAvailable", false); if (manual) set("updateError", message); set("updateResult", "Ошибка проверки"); };
+        const QUrl responseUrl = reply->url();
+        if (reply->error() != QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200 || responseUrl.scheme() != "https" || responseUrl.host() != "api.github.com" || responseUrl.port() != -1 || !responseUrl.userInfo().isEmpty()) { updateFailure("Не удалось проверить обновления. Проверьте подключение к GitHub."); return; }
+        if (reply->bytesAvailable() > 1024 * 1024) { updateFailure("Ответ сервиса обновлений слишком велик."); return; }
+        QJsonParseError parseError; const auto doc = QJsonDocument::fromJson(reply->read(1024 * 1024), &parseError);
         if (parseError.error != QJsonParseError::NoError || !doc.isObject()) { updateFailure("Сервис обновлений вернул некорректный ответ."); return; }
         const auto release = doc.object(); const QString tag = release.value("tag_name").toString();
         const QString remote = tag.startsWith('v') ? tag.mid(1) : tag;
         const auto latest = QVersionNumber::fromString(remote), current = QVersionNumber::fromString(QCoreApplication::applicationVersion());
         if (latest.isNull() || current.isNull()) { updateFailure("Не удалось определить версии приложения."); return; }
-        set("latestVersion", remote); set("updateAvailable", QVersionNumber::compare(latest, current) > 0);
+        const bool newerThanCurrent = QVersionNumber::compare(latest, current) > 0;
+        bool sameReadyRelease = m_state.value("updateReady").toBool() && m_updateReadyVersion == remote && newerThanCurrent;
+        if (!sameReadyRelease) {
+            if (!m_updatePath.isEmpty()) QFile::remove(m_updatePath);
+            m_updatePath.clear(); m_updateReadyVersion.clear(); m_updateReadyName.clear(); m_updateReadyDigest.clear();
+            set("updateReady", false);
+            m_updateAsset = {}; m_updateDigest.clear(); m_updateExpectedSize = -1;
+        } else {
+            m_updateVersion = remote; m_updateDigest = m_updateReadyDigest;
+        }
+        set("latestVersion", remote); set("updateAvailable", newerThanCurrent);
         set("updateUrl", "https://github.com/sykia/SCrip/releases/latest");
         if (QVersionNumber::compare(latest, current) <= 0) { set("updateResult", "Установлена последняя версия"); return; }
         QString suffix;
@@ -801,9 +813,19 @@ void SoundCloud::checkForUpdates(bool manual) {
             const QUrl url(asset.value("browser_download_url").toString());
             const QString digest = asset.value("digest").toString();
             const auto sizeValue = asset.value("size");
-            if (!name.endsWith(suffix) || (sizeValue.isDouble() && (sizeValue.toDouble() < 0 || sizeValue.toDouble() > 1024.0*1024*1024)) ||
-                !digest.startsWith("sha256:") || digest.size() != 71 || url.scheme() != "https" || url.host() != "github.com") continue;
-            m_updateAsset = asset; m_updateDigest = digest; m_updateExpectedSize = sizeValue.isDouble() && sizeValue.toDouble() > 0 ? qint64(sizeValue.toDouble()) : -1;
+            const double size = sizeValue.toDouble(-1);
+            const QString lowerDigest = digest.toLower();
+            if (name.isEmpty() || QFileInfo(name).fileName() != name || name == "." || name == ".." || !name.endsWith(suffix) || sizeValue.isNull() || size <= 0 || size > 1024.0*1024*1024 || qFloor(size) != size ||
+                !lowerDigest.startsWith("sha256:") || lowerDigest.size() != 71 ||
+                !QRegularExpression("^sha256:[0-9a-f]{64}$").match(lowerDigest).hasMatch() ||
+                url.scheme() != "https" || url.host() != "github.com" || url.port() != -1 || !url.userInfo().isEmpty() ||
+                !url.path().startsWith("/sykia/SCrip/releases/download/")) continue;
+            if (sameReadyRelease && (m_updateReadyName != name || m_updateReadyDigest != lowerDigest || m_updateExpectedSize != qint64(size))) {
+                if (!m_updatePath.isEmpty()) QFile::remove(m_updatePath);
+                m_updatePath.clear(); m_updateReadyVersion.clear(); m_updateReadyName.clear(); m_updateReadyDigest.clear();
+                set("updateReady", false); sameReadyRelease = false;
+            }
+            m_updateAsset = asset; m_updateDigest = lowerDigest; m_updateExpectedSize = qint64(size); m_updateVersion = remote;
             set("updateResult", "Доступна версия " + remote); set("updateError", ""); return;
         }
         updateFailure("Обновление доступно, но подходящий установочный файл с проверяемыми метаданными не найден.");
@@ -813,7 +835,7 @@ void SoundCloud::checkForUpdates(bool manual) {
 void SoundCloud::downloadUpdate() {
     if (!m_state.value("updateAvailable").toBool() || m_updateReply || m_state.value("updateDownloading").toBool() || m_state.value("updateInstalling").toBool() || m_updateAsset.isEmpty()) return;
     const QUrl url(m_updateAsset.value("browser_download_url").toString());
-    if (url.scheme() != "https" || url.host() != "github.com") { set("updateError", "Источник файла обновления не разрешён."); return; }
+    if (url.scheme() != "https" || url.host() != "github.com" || url.port() != -1 || !url.userInfo().isEmpty() || !url.path().startsWith("/sykia/SCrip/releases/download/") || m_updateVersion != m_state.value("latestVersion").toString()) { set("updateError", "Источник или версия файла обновления не разрешены."); return; }
     const QString dir = QStandardPaths::writableLocation(
 #ifdef Q_OS_ANDROID
         QStandardPaths::AppDataLocation
@@ -825,7 +847,7 @@ void SoundCloud::downloadUpdate() {
     m_updatePath = dir + "/" + QFileInfo(m_updateAsset.value("name").toString()).fileName();
     m_updateFile = new QSaveFile(m_updatePath, this);
     if (!m_updateFile->open(QIODevice::WriteOnly)) { delete m_updateFile; m_updateFile = nullptr; set("updateError", "Не удалось подготовить файл обновления."); return; }
-    delete m_updateHash; m_updateHash = new QCryptographicHash(QCryptographicHash::Sha256);
+    m_updateHash = std::make_unique<QCryptographicHash>(QCryptographicHash::Sha256);
     m_updateReceived = 0; set("updateError", ""); set("updateDownloading", true); set("updateResult", "Скачивание обновления…");
     QNetworkRequest req(url); req.setTransferTimeout(60000);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -833,14 +855,29 @@ void SoundCloud::downloadUpdate() {
     connect(m_updateReply, &QNetworkReply::metaDataChanged, this, [this] {
         if (!m_updateReply) return;
         const QUrl finalUrl = m_updateReply->url();
-        if (finalUrl.scheme() != "https" || !(finalUrl.host() == "github.com" || finalUrl.host().endsWith(".githubusercontent.com"))) cancelUpdateDownload();
+        if (finalUrl.scheme() != "https" || finalUrl.port() != -1 || !finalUrl.userInfo().isEmpty() ||
+            !(finalUrl.host() == "github.com" || finalUrl.host().endsWith(".githubusercontent.com"))) {
+            set("updateError", "Сервер перенаправил загрузку на запрещённый адрес."); cancelUpdateDownload(); return;
+        }
+        const auto length = m_updateReply->header(QNetworkRequest::ContentLengthHeader);
+        if (length.isValid()) {
+            bool valid = false; const qint64 n = length.toString().toLongLong(&valid);
+            if (!valid || n <= 0 || n > 1024LL*1024*1024 || (m_updateExpectedSize >= 0 && n != m_updateExpectedSize)) {
+                set("updateError", "Сервер указал некорректный размер обновления."); cancelUpdateDownload(); return;
+            }
+        }
     });
     connect(m_updateReply, &QNetworkReply::readyRead, this, [this] {
         if (!m_updateReply || !m_updateFile) return;
-        const QByteArray chunk = m_updateReply->read(256 * 1024);
-        if (chunk.isEmpty()) return;
-        if (m_updateReceived > 1024LL*1024*1024 - chunk.size() || (m_updateExpectedSize >= 0 && chunk.size() > m_updateExpectedSize - m_updateReceived) || m_updateFile->write(chunk) != chunk.size()) { cancelUpdateDownload(); set("updateError", "Файл превышает допустимый размер или не записывается."); return; }
-        m_updateHash->addData(chunk); m_updateReceived += chunk.size();
+        while (m_updateReply && m_updateFile && m_updateReply->bytesAvailable() > 0) {
+            const QByteArray chunk = m_updateReply->read(256 * 1024);
+            if (chunk.isEmpty()) break;
+            if (m_updateReceived > 1024LL*1024*1024 - chunk.size() || (m_updateExpectedSize >= 0 && chunk.size() > m_updateExpectedSize - m_updateReceived)) { set("updateError", "Файл превышает допустимый размер."); cancelUpdateDownload(); return; }
+            qint64 written = 0;
+            while (written < chunk.size()) { const qint64 n = m_updateFile->write(chunk.constData() + written, chunk.size() - written); if (n <= 0) break; written += n; }
+            if (written != chunk.size()) { set("updateError", "Не удалось записать файл обновления."); cancelUpdateDownload(); return; }
+            m_updateHash->addData(chunk); m_updateReceived += chunk.size();
+        }
     });
     disconnect(&m_updateProgressTimer, nullptr, this, nullptr);
     connect(&m_updateProgressTimer, &QTimer::timeout, this, [this] {
@@ -848,22 +885,33 @@ void SoundCloud::downloadUpdate() {
     });
     m_updateProgressTimer.start(150);
     connect(m_updateReply, &QNetworkReply::finished, this, [this] {
-        auto *reply = m_updateReply; m_updateReply = nullptr; m_updateProgressTimer.stop();
-        if (reply) { const auto tail = reply->readAll(); if (!tail.isEmpty() && m_updateFile && m_updateReceived <= 1024LL*1024*1024-tail.size() && (m_updateExpectedSize < 0 || tail.size() <= m_updateExpectedSize-m_updateReceived) && m_updateFile->write(tail) == tail.size()) { m_updateHash->addData(tail); m_updateReceived += tail.size(); } }
+        auto *reply = m_updateReply; m_updateProgressTimer.stop();
+        if (reply && m_updateFile) {
+            while (reply->bytesAvailable() > 0) {
+                const QByteArray tail = reply->read(256 * 1024);
+                if (tail.isEmpty() || m_updateReceived > 1024LL*1024*1024-tail.size() || (m_updateExpectedSize >= 0 && tail.size() > m_updateExpectedSize-m_updateReceived)) { set("updateError", "Не удалось записать все данные обновления."); break; }
+                qint64 written = 0;
+                while (written < tail.size()) { const qint64 n = m_updateFile->write(tail.constData() + written, tail.size() - written); if (n <= 0) break; written += n; }
+                if (written != tail.size()) { set("updateError", "Не удалось записать все данные обновления."); break; }
+                m_updateHash->addData(tail); m_updateReceived += tail.size();
+            }
+        }
         const int status = reply ? reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() : 0;
-        const bool ok = reply && reply->error() == QNetworkReply::NoError && status == 200 && (m_updateExpectedSize < 0 || m_updateReceived == m_updateExpectedSize) &&
+        const bool ok = reply && reply->error() == QNetworkReply::NoError && status == 200 && m_updateExpectedSize > 0 && m_updateReceived == m_updateExpectedSize &&
             ("sha256:" + QString::fromLatin1(m_updateHash->result().toHex()) == m_updateDigest);
+        m_updateHash.reset();
+        m_updateReply = nullptr;
         set("updateDownloaded", m_updateReceived); set("updateTotal", m_updateExpectedSize);
         if (!ok) {
             if (m_updateFile) { m_updateFile->cancelWriting(); delete m_updateFile; m_updateFile = nullptr; }
             set("updateDownloading", false); set("updateAvailable", true);
-            set("updateError", reply && reply->error() != QNetworkReply::NoError ? "Ошибка сети при скачивании обновления." : (m_updateExpectedSize >= 0 && m_updateReceived != m_updateExpectedSize ? "Обновление скачалось не полностью." : "Контрольная сумма SHA-256 не совпадает."));
+            if (m_state.value("updateError").toString().isEmpty()) set("updateError", reply && reply->error() != QNetworkReply::NoError ? "Ошибка сети при скачивании обновления." : (m_updateReceived != m_updateExpectedSize ? "Обновление скачалось не полностью." : "Контрольная сумма SHA-256 не совпадает."));
             set("updateResult", "Ошибка или отмена скачивания"); if (reply) reply->deleteLater(); return;
         }
         const bool committed = m_updateFile && m_updateFile->commit(); delete m_updateFile; m_updateFile = nullptr;
         set("updateDownloading", false);
         if (!committed) { set("updateError", "Не удалось сохранить проверенное обновление."); set("updateResult", "Ошибка сохранения файла"); }
-        else { set("updateReady", true); set("updateResult", "Обновление скачано и проверено"); }
+        else { m_updateReadyVersion = m_updateVersion; m_updateReadyName = m_updateAsset.value("name").toString(); m_updateReadyDigest = m_updateDigest; set("updateReady", true); set("updateResult", "Обновление скачано и проверено"); }
         if (reply) reply->deleteLater();
     });
 }
@@ -873,31 +921,36 @@ void SoundCloud::cancelUpdateDownload() {
     m_updateProgressTimer.stop(); auto *reply = m_updateReply; m_updateReply = nullptr;
     disconnect(reply, nullptr, this, nullptr); reply->abort(); reply->deleteLater();
     if (m_updateFile) { m_updateFile->cancelWriting(); delete m_updateFile; m_updateFile = nullptr; }
-    set("updateDownloading", false); set("updateReady", false); set("updateResult", "Скачивание отменено"); set("updateError", "");
+    m_updateHash.reset();
+    set("updateDownloading", false); set("updateReady", false); set("updateResult", "Скачивание отменено"); if (m_state.value("updateError").toString().isEmpty()) set("updateError", "");
 }
 
 void SoundCloud::installUpdate() {
-    if (!m_state.value("updateReady").toBool() || m_state.value("updateInstalling").toBool() || m_updateReply) return;
+    if (!m_state.value("updateReady").toBool() || m_state.value("updateInstalling").toBool() || m_updateReply || m_state.value("updateChecking").toBool() || m_updateReadyVersion != m_state.value("latestVersion").toString() || m_updateReadyVersion != m_updateVersion || m_updateReadyDigest != m_updateDigest || m_updateReadyName != m_updateAsset.value("name").toString()) return;
     QFile file(m_updatePath);
     if (!file.open(QIODevice::ReadOnly) || (m_updateExpectedSize >= 0 && file.size() != m_updateExpectedSize) || file.size() <= 0 || file.size() > 1024LL*1024*1024) { set("updateReady", false); set("updateError", "Проверенный файл обновления недоступен или повреждён."); set("updateResult", "Ошибка проверки файла"); return; }
     QCryptographicHash hash(QCryptographicHash::Sha256);
     while (!file.atEnd()) { const auto chunk = file.read(256 * 1024); if (chunk.isEmpty() && file.error() != QFile::NoError) break; hash.addData(chunk); }
+    if (file.error() != QFile::NoError || !file.atEnd()) { set("updateReady", false); set("updateError", "Не удалось полностью прочитать проверенный файл обновления."); set("updateResult", "Ошибка проверки файла"); return; }
     if ("sha256:" + QString::fromLatin1(hash.result().toHex()) != m_updateDigest) { set("updateReady", false); set("updateError", "Контрольная сумма файла изменилась. Установка заблокирована."); set("updateResult", "Ошибка проверки файла"); return; }
     set("updateInstalling", true); set("updateResult", "Передача системному установщику…");
 #ifdef Q_OS_ANDROID
-    const bool opened = QJniObject::callStaticMethod<jboolean>("org/scrip/app/ApkInstaller", "install", "(Landroid/content/Context;Ljava/lang/String;)Z", QNativeInterface::QAndroidApplication::context().object(), QJniObject::fromString(m_updatePath).object());
-    set("updateInstalling", false); set("updateResult", opened ? "Ожидание подтверждения в установщике Android" : "Установка отменена или не удалось открыть установщик");
-    if (!opened) set("updateError", "Android не открыл системный установщик APK.");
+    const jint result = QJniObject::callStaticMethod<jint>("org/scrip/app/ApkInstaller", "install", "(Landroid/content/Context;Ljava/lang/String;)I", QNativeInterface::QAndroidApplication::context().object(), QJniObject::fromString(m_updatePath).object());
+    set("updateInstalling", false);
+    if (result == 1) { set("updateResult", "Разрешите установку SCrip в настройках Android, затем нажмите «Установить сейчас» ещё раз."); set("updateError", "Нужно разрешить установку приложений из этого источника."); }
+    else if (result == 2) { set("updateResult", "Открыт системный установщик Android. Подтвердите или отмените установку там."); set("updateError", ""); }
+    else { set("updateResult", "Не удалось открыть системный установщик Android."); set("updateError", "Android не открыл системный установщик APK."); }
 #elif defined(Q_OS_WIN)
     auto *process = new QProcess(this); process->setProgram(m_updatePath); process->start();
-    connect(process, &QProcess::started, this, [this] { set("updateInstalling", false); set("updateResult", "Открыт мастер установки Windows"); });
-    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError) { set("updateInstalling", false); set("updateError", "Не удалось открыть мастер установки Windows."); set("updateResult", "Ошибка запуска установщика"); process->deleteLater(); });
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { set("updateInstalling", false); set("updateResult", status == QProcess::NormalExit && code == 0 ? "Мастер установки завершён" : "Установка отменена или завершилась с ошибкой"); process->deleteLater(); });
+    connect(process, &QProcess::started, this, [this] { set("updateResult", "Мастер установки Windows запущен"); });
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateError", "Не удалось открыть мастер установки Windows."); set("updateResult", "Ошибка запуска установщика"); process->deleteLater(); } });
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateResult", status == QProcess::NormalExit && code == 0 ? "Мастер установки завершён; проверьте установленную версию при следующем запуске" : "Установка отменена или завершилась с ошибкой"); if (status != QProcess::NormalExit || code != 0) set("updateError", "Установщик не подтвердил успешное завершение."); process->deleteLater(); } });
 #elif defined(Q_OS_LINUX)
     auto *process = new QProcess(this); const bool arch = m_updatePath.endsWith(".zst");
-    process->start("pkexec", arch ? QStringList{"pacman", "-U", m_updatePath} : QStringList{"dpkg", "-i", m_updatePath});
-    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError) { set("updateInstalling", false); set("updateError", "Не удалось запустить системный установщик."); set("updateResult", "Ошибка передачи установщику"); process->deleteLater(); });
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { set("updateInstalling", false); set("updateResult", code == 0 && status == QProcess::NormalExit ? "Установка завершена" : "Установка отменена или завершилась с ошибкой"); if (code != 0) set("updateError", "Системный установщик не завершил установку."); process->deleteLater(); });
+    if (!arch) { auto env = QProcessEnvironment::systemEnvironment(); env.insert("DEBIAN_FRONTEND", "noninteractive"); process->setProcessEnvironment(env); }
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateError", "Не удалось запустить системный установщик."); set("updateResult", "Ошибка передачи установщику"); process->deleteLater(); } });
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateResult", code == 0 && status == QProcess::NormalExit ? "Установка завершена" : "Установка отменена или завершилась с ошибкой"); if (code != 0 || status != QProcess::NormalExit) set("updateError", "Системный установщик не завершил установку."); process->deleteLater(); } });
+    process->start("pkexec", arch ? QStringList{"pacman", "--noconfirm", "-U", m_updatePath} : QStringList{"apt-get", "install", "-y", "--no-download", m_updatePath});
 #endif
 }
 
