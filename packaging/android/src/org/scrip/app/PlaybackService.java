@@ -13,6 +13,7 @@ public class PlaybackService extends Service {
     private MediaSession session;
     private PowerManager.WakeLock wakeLock;
     private boolean foreground;
+    int foregroundStarts, foregroundStops;
     private static final String CHANNEL = "scrip_playback";
     private static final int NOTIFICATION = 44;
     private static final String LIKE = "org.scrip.app.LIKE";
@@ -83,9 +84,7 @@ public class PlaybackService extends Service {
             .setSmallIcon(R.drawable.widget_notification).setContentTitle("SCrip")
             .setContentText("Подготовка воспроизведения…").setOngoing(true)
             .setContentIntent(MediaBridge.openApp(this)).build();
-        if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, pending, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-        else startForeground(NOTIFICATION, pending);
-        foreground = true;
+        enterForeground(pending);
         publish(); return START_NOT_STICKY;
     }
     void publish() {
@@ -111,7 +110,7 @@ public class PlaybackService extends Service {
             .setState(state, MediaBridge.position, state == PlaybackState.STATE_PLAYING ? 1f : 0f, SystemClock.elapsedRealtime()).build());
         String nextNotificationKey = MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artworkRevision
             + '\n' + active + '\n' + MediaBridge.playing + '\n' + MediaBridge.buffering + '\n' + MediaBridge.liked;
-        if (notificationKey.equals(nextNotificationKey)) {
+        if (notificationKey.equals(nextNotificationKey) && !(active && !foreground)) {
             updateForegroundState(active, null);
             if (!MediaBridge.hasTrack && !active) stopSelf();
             return;
@@ -132,11 +131,9 @@ public class PlaybackService extends Service {
     }
     private void updateForegroundState(boolean active, Notification notification) {
         if (active) {
-            if (!foreground && notification != null) {
-                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-                else startForeground(NOTIFICATION, notification);
+            if (!foreground) {
+                enterForeground(notification);
             } else if (notification != null) getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
-            foreground = true;
             if (!wakeLock.isHeld() && MediaBridge.playing && !MediaBridge.buffering) wakeLock.acquire();
             if (!hasFocus) {
                 hasFocus = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
@@ -144,18 +141,23 @@ public class PlaybackService extends Service {
             }
         } else {
             if (notification != null) getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
-            if (foreground) { stopForeground(STOP_FOREGROUND_DETACH); foreground = false; }
             if (wakeLock.isHeld()) wakeLock.release();
             if (resumeAfterFocus) {
-                if (wakeLock.isHeld()) wakeLock.release();
-                foreground = true;
-                if (notification != null) {
-                    if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-                    else startForeground(NOTIFICATION, notification);
-                }
-            } else if (hasFocus) { audioManager.abandonAudioFocusRequest(focusRequest); hasFocus = false; }
-            else if (foreground) { stopForeground(STOP_FOREGROUND_DETACH); foreground = false; }
+                // Keep the existing foreground service alive while a transient focus loss is resumable.
+            } else {
+                if (foreground) leaveForeground();
+                if (hasFocus) { audioManager.abandonAudioFocusRequest(focusRequest); hasFocus = false; }
+            }
         }
+    }
+    private void enterForeground(Notification notification) {
+        if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        else startForeground(NOTIFICATION, notification);
+        foreground = true; ++foregroundStarts;
+    }
+    private void leaveForeground() {
+        stopForeground(STOP_FOREGROUND_DETACH);
+        foreground = false; ++foregroundStops;
     }
     String metadataKey() {
         return MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artwork + '\n'
@@ -163,6 +165,7 @@ public class PlaybackService extends Service {
     }
     @Override public void onDestroy() {
         destroyed = true; handler.removeCallbacksAndMessages(null); resumeAfterFocus = focusPaused = false;
+        foreground = false;
         if (instance == this) instance = null;
         try { unregisterReceiver(noisy); } catch (IllegalArgumentException ignored) {}
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();

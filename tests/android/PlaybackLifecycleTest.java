@@ -144,10 +144,18 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         Field duration = bridge.getDeclaredField("duration"); duration.setAccessible(true);
         long oldPosition = position.getLong(null), oldDuration = duration.getLong(null);
         Method publish = service.getDeclaredMethod("publish"); publish.setAccessible(true);
+        Field starts = service.getDeclaredField("foregroundStarts"); starts.setAccessible(true);
+        Field stops = service.getDeclaredField("foregroundStops"); stops.setAccessible(true);
+        int oldStarts = starts.getInt(instance), oldStops = stops.getInt(instance);
+        publish.invoke(instance); publish.invoke(instance);
+        require(starts.getInt(instance) == oldStarts && stops.getInt(instance) == oldStops,
+            "Повторный publish без изменений повторил переход foreground");
         String notification = (String) key.get(instance);
         position.setLong(null, oldPosition + 1000); duration.setLong(null, oldDuration + 1000);
         publish.invoke(instance);
         require(notification.equals(key.get(instance)), "Прогресс пересоздал бы системное уведомление");
+        require(starts.getInt(instance) == oldStarts && stops.getInt(instance) == oldStops,
+            "Одно обновление позиции переключило foreground");
         MediaSession session = (MediaSession) field(service, instance, "session");
         require(session.getController().getPlaybackState().getPosition() == oldPosition + 1000, "Позиция не обновилась в MediaSession");
         position.setLong(null, oldPosition); duration.setLong(null, oldDuration); publish.invoke(instance);
@@ -239,6 +247,20 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             Method focus = service.getDeclaredMethod("handleAudioFocusChange", int.class); focus.setAccessible(true);
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT);
             require((Boolean) field(service, playbackService, "resumeAfterFocus"), "Не сохранён намеренный resume");
+            Field resume = service.getDeclaredField("resumeAfterFocus"); resume.setAccessible(true);
+            Field active = bridge.getDeclaredField("active"); active.setAccessible(true);
+            Field playing = bridge.getDeclaredField("playing"); playing.setAccessible(true);
+            Field starts = service.getDeclaredField("foregroundStarts"); starts.setAccessible(true);
+            Field stops = service.getDeclaredField("foregroundStops"); stops.setAccessible(true);
+            int focusStarts = starts.getInt(playbackService), focusStops = stops.getInt(playbackService);
+            boolean priorActive = active.getBoolean(null), priorPlaying = playing.getBoolean(null);
+            active.setBoolean(null, false); playing.setBoolean(null, false);
+            Method publish = service.getDeclaredMethod("publish"); publish.setAccessible(true);
+            publish.invoke(playbackService); publish.invoke(playbackService);
+            require((Boolean) field(service, playbackService, "foreground"), "Повторный publish снял foreground при ожидающем resume");
+            require(starts.getInt(playbackService) == focusStarts && stops.getInt(playbackService) == focusStops,
+                "Повторный publish при временной потере фокуса повторил foreground-переход");
+            active.setBoolean(null, priorActive); playing.setBoolean(null, priorPlaying);
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_GAIN);
             require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Resume не погашен после возврата фокуса");
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_GAIN);
@@ -250,6 +272,8 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Ручная остановка не отменила resume");
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS);
             require(!(Boolean) field(service, playbackService, "resumeAfterFocus"), "Постоянная потеря оставила resume");
+            snapshot(false, false, false, true);
+            check(false, false, PlaybackState.STATE_PAUSED);
             // Уводим настоящее Qt-приложение с экрана, не закрывая его.
             runOnMainSync(() -> activity.moveTaskToBack(true));
             snapshot(true, false, false, true);
@@ -261,11 +285,18 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             check(true, true, PlaybackState.STATE_BUFFERING);
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);
+            Object transitionService = field(service, null, "instance");
+            Field transitionStarts = service.getDeclaredField("foregroundStarts"); transitionStarts.setAccessible(true);
+            Field transitionStops = service.getDeclaredField("foregroundStops"); transitionStops.setAccessible(true);
+            int beforePauseStarts = transitionStarts.getInt(transitionService), beforePauseStops = transitionStops.getInt(transitionService);
             snapshot(false, false, false, true);
             check(false, false, PlaybackState.STATE_PAUSED);
+            require(transitionStops.getInt(transitionService) == beforePauseStops + 1, "Pause не снял foreground ровно один раз");
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);
+            require(transitionStarts.getInt(transitionService) == beforePauseStarts + 1, "Play не вошёл в foreground ровно один раз");
             snapshot(false, false, false, false);
+            require(transitionStops.getInt(transitionService) == beforePauseStops + 2, "Stop не снял foreground ровно один раз");
             for (int i = 0; i < 50 && field(service, null, "instance") != null; ++i) SystemClock.sleep(100);
             require(field(service, null, "instance") == null, "Stop не завершил службу");
             // Отмена/ошибка может опередить создание запрошенной foreground-службы.
@@ -274,6 +305,14 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             SystemClock.sleep(6000);
             check(false, false, PlaybackState.STATE_PAUSED);
             snapshot(false, false, false, false);
+            bridge.getMethod("preparePlayback").invoke(null);
+            snapshot(true, true, false, true);
+            Object shutdownService = field(service, null, "instance");
+            require((Boolean) field(service, shutdownService, "foreground"), "Shutdown-сценарий не вошёл в foreground");
+            bridge.getMethod("shutdown").invoke(null);
+            waitForIdleSync(); SystemClock.sleep(500); waitForIdleSync();
+            require(field(service, null, "instance") == null, "Shutdown не завершил foreground-службу");
+            require(!(Boolean) field(service, shutdownService, "foreground"), "Уничтоженная служба сохранила foreground-флаг");
             result.putString("stream", "PASS: фон, переход, буферизация >30 с, пауза, продолжение, остановка\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable error) {
