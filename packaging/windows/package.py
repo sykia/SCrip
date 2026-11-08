@@ -45,7 +45,11 @@ subprocess.run([sys.executable, str(repository / "scripts/check_licenses.py"),
 output.parent.mkdir(parents=True, exist_ok=True)
 filelist = output.with_suffix(".uninstall.nsh")
 with filelist.open("w", encoding="utf-8-sig") as manifest:
-    for item in sorted(payload.rglob("*"), reverse=True):
+    items = sorted(payload.rglob("*"), key=lambda item: str(PureWindowsPath(
+        item.relative_to(payload))).casefold(), reverse=True)
+    for item in items:
+        if item.is_symlink():
+            parser.error(f"Символические ссылки в каталоге приложения не поддерживаются: {item}")
         rel = str(PureWindowsPath(item.relative_to(payload))).replace("$", "$$")
         command = "RMDir" if item.is_dir() else "Delete"
         print(f'{command} "$INSTDIR\\{rel}"', file=manifest)

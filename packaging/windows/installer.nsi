@@ -69,6 +69,17 @@ FunctionEnd
 !define UNKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCrip"
 Section
   !insertmacro CheckClosed
+  ; Старый деинсталлятор знает точный список файлов предыдущей версии.
+  ; Он удалит только файлы приложения и оставит неизвестные файлы нетронутыми.
+  IfFileExists "$INSTDIR\Uninstall.exe" 0 install_files
+  ClearErrors
+  ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
+  IfErrors upgrade_failed
+  StrCmp $0 0 install_files upgrade_failed
+  upgrade_failed:
+  SetErrorLevel 2
+  Abort
+  install_files:
   SetOutPath "$INSTDIR"
   File /r "${PAYLOAD}\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
