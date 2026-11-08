@@ -37,9 +37,11 @@ function Build-Installer($payload, $output, $version, $pauseAfterUninstall = $fa
 try {
     Push-Location $installerDir
     New-Item -ItemType Directory -Path $work, $payload1, $payload2 -Force | Out-Null
-    Set-Content (Join-Path $payload1 'SCrip.exe') 'version-one'
+    Copy-Item (Join-Path $PSHOME 'pwsh.exe') (Join-Path $payload1 'SCrip.exe')
+    Set-Content (Join-Path $payload1 'version.txt') 'version-one'
     Set-Content (Join-Path $payload1 'obsolete.dll') 'old-only application file'
-    Set-Content (Join-Path $payload2 'SCrip.exe') 'version-two'
+    Copy-Item (Join-Path $PSHOME 'pwsh.exe') (Join-Path $payload2 'SCrip.exe')
+    Set-Content (Join-Path $payload2 'version.txt') 'version-two'
     Build-Installer $payload1 $output1 'v1'
     Build-Installer $payload2 $output2 'v2' $true
 
@@ -56,7 +58,7 @@ try {
     }
     if (Test-Path "$install.trace") { Get-Content -LiteralPath "$install.trace" -Raw | Write-Host }
     Get-ChildItem -LiteralPath $install -Recurse -Force | Select-Object FullName, Length | Format-Table | Out-String | Write-Host
-    Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
+    Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
     Assert (Test-Path (Join-Path $install 'obsolete.dll')) 'Legacy-only file was not installed for the upgrade test.'
 
     Set-Content (Join-Path $install 'user-notes.txt') 'keep this user file'
@@ -87,7 +89,7 @@ try {
     Assert ($recoveryInstall.ExitCode -eq 0) 'Recovery and upgrade failed.'
     if (Test-Path "$install.trace") { Write-Host 'Recovery trace:'; Get-Content -LiteralPath "$install.trace" -Raw | Write-Host }
     Get-ChildItem -LiteralPath $install -Recurse -Force | Select-Object FullName, Length | Format-Table | Out-String | Write-Host
-    Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-two') 'Version 2 was not installed after recovery.'
+    Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-two') 'Version 2 was not installed after recovery.'
     Assert (!(Test-Path (Join-Path $install 'obsolete.dll'))) 'Stale application file survived the upgrade.'
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'An unrelated file in the install folder was changed.'
     Assert ((Get-Content $settings -Raw).Trim() -eq 'keep user settings') 'User settings were changed.'
@@ -99,13 +101,16 @@ try {
     Assert ($LASTEXITCODE -eq 0) 'Repeated installation failed.'
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'Repeated installation removed a user file.'
 
-    # Hold the executable exclusively: setup must time out and leave v2 intact.
-    $lock = [IO.File]::Open((Join-Path $install 'SCrip.exe'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    # Run the fixture executable: setup must wait and leave v2 intact.
+    $runningApp = Start-Process -FilePath (Join-Path $install 'SCrip.exe') -ArgumentList '-NoLogo -NoProfile -Command "Start-Sleep -Seconds 60"' -PassThru
     try {
+        Start-Sleep -Seconds 2
+        $runningApp.Refresh()
+        Assert (!$runningApp.HasExited) 'The locked-EXE fixture process exited early.'
         & $output2 '/S'
         Assert ($LASTEXITCODE -ne 0) 'Setup unexpectedly succeeded while SCrip.exe was locked.'
-    } finally { $lock.Dispose() }
-    Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-two') 'Locked-executable failure damaged the installed version.'
+    } finally { Stop-Process -Id $runningApp.Id -Force -ErrorAction SilentlyContinue }
+    Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-two') 'Locked-executable failure damaged the installed version.'
 
     & (Join-Path $install 'Uninstall.exe') '/S'
     Assert ($LASTEXITCODE -eq 0) 'Uninstall failed.'
