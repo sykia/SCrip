@@ -183,6 +183,7 @@ Section
   CreateDirectory "$StageDir"
   SetOutPath "$StageDir"
   File /r "${PAYLOAD}\*"
+  !insertmacro TestTrace "payload_staged"
   IfErrors staging_failed
   ; Keep an exact copy until the new payload and metadata are installed.
   IfFileExists "$INSTDIR\*.*" 0 no_previous_files
@@ -227,6 +228,7 @@ Section
   ClearErrors
   ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$StageDir" "$INSTDIR" /E /COPY:DAT /R:1 /W:1' $0
   IfErrors new_copy_failed
+  !insertmacro TestTrace "payload_copy_exit=$0"
   IntCmp $0 8 new_copy_failed write_new_uninstaller new_copy_failed
   new_copy_failed:
   Call RestorePrevious

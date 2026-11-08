@@ -54,6 +54,7 @@ try {
         if (Test-Path $trace) { Get-Content -LiteralPath $trace -Raw | Write-Host }
         throw 'Installer did not use the isolated test directory.'
     }
+    if (Test-Path "$install.trace") { Get-Content -LiteralPath "$install.trace" -Raw | Write-Host }
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
     Assert (Test-Path (Join-Path $install 'obsolete.dll')) 'Legacy-only file was not installed for the upgrade test.'
 
