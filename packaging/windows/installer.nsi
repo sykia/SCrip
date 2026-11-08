@@ -99,7 +99,7 @@ Function RecoverInterruptedUpdate
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
-  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   Goto recovery_done
@@ -135,7 +135,7 @@ Function RestorePrevious
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
-  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   Goto restore_done
@@ -198,7 +198,7 @@ Section
   remove_previous:
   IfFileExists "$INSTDIR\Uninstall.exe" 0 copy_staged
   ClearErrors
-  ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
+  ExecWait '"$INSTDIR\Uninstall.exe" /S _?=$INSTDIR' $0
   !insertmacro TestTrace "old_uninstall_exit=$0"
   StrCmp $0 0 uninstall_exit_ok old_uninstall_exit_failed
   uninstall_exit_ok:
@@ -281,7 +281,7 @@ Section
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.4.2"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
-  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
 SectionEnd
