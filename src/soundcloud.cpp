@@ -279,7 +279,7 @@ void SoundCloud::ensureToken(std::function<void()> continuation) {
 }
 void SoundCloud::request(const QString &path, Callback done, const QByteArray &method, const QJsonObject &body, bool retry, std::function<void(QString)> failed) {
     QUrl url(path.startsWith('/') ? "https://api.soundcloud.com" + path : path);
-    if (url.scheme() != "https" || url.host() != "api.soundcloud.com" || (url.port() != -1 && url.port() != 443) || !url.userInfo().isEmpty()) { set("busy", false); if (failed) failed("API вернул недопустимый адрес."); else fail("API вернул недопустимый адрес."); return; }
+    if (url.scheme() != "https" || url.host() != "api.soundcloud.com" || (url.port() != -1 && url.port() != 443) || !url.userInfo().isEmpty()) { if (failed) failed("API вернул недопустимый адрес."); else fail("API вернул недопустимый адрес."); return; }
     ensureToken([this, url, path, done, method, body, retry, failed] {
         QNetworkRequest req(url); req.setRawHeader("Authorization", "OAuth " + m_access.toUtf8());
         req.setRawHeader("Accept", "application/json"); req.setTransferTimeout(25000);
@@ -292,14 +292,14 @@ void SoundCloud::request(const QString &path, Callback done, const QByteArray &m
             int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             if (status == 401 && retry && !m_refresh.isEmpty()) { m_expires = 0; request(path, done, method, body, false, failed); return; }
             if (reply->error() != QNetworkReply::NoError || status >= 300) {
-                if (!failed) { set("busy", false); set("buffering", false); }
+                if (!failed) set("buffering", false);
                 const QString message = status == 429 ? "SoundCloud ограничил запросы. Повторите позже." : status == 403 ? "SoundCloud ограничил доступ к этому действию или треку." : status == 401 ? "Сессия истекла. Подключитесь заново." : QString("Не удалось выполнить запрос (HTTP %1). Проверьте сеть и повторите.").arg(status);
                 if (failed) failed(message); else fail(message);
                 return;
             }
             const QByteArray bytes = reply->readAll(); QJsonParseError error;
             auto doc = QJsonDocument::fromJson(bytes, &error);
-            if (!bytes.isEmpty() && error.error != QJsonParseError::NoError) { set("busy", false); if (failed) failed("SoundCloud вернул некорректный ответ."); else fail("SoundCloud вернул некорректный ответ."); return; }
+            if (!bytes.isEmpty() && error.error != QJsonParseError::NoError) { if (failed) failed("SoundCloud вернул некорректный ответ."); else fail("SoundCloud вернул некорректный ответ."); return; }
             done(doc);
         });
     });

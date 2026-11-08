@@ -379,6 +379,33 @@ private slots:
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1); QTest::qWait(150);
         QCOMPARE(sc.state()["tracks"].toList()[0].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
     }
+    void independentRequestErrorsKeepCatalogBusy() {
+        for (const auto &response : {Response{500, "{}"}, Response{200, "{invalid"}}) {
+            Network net; net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}]}", 100}, response};
+            SoundCloud sc(nullptr, &net, secrets);
+            sc.set("configured", false); sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+            sc.browse("tracks", "loading"); sc.profile();
+            QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+            QVERIFY(sc.state()["busy"].toBool());
+            QTRY_VERIFY(!sc.state()["busy"].toBool());
+            QCOMPARE(sc.state()["tracks"].toList().size(), 1);
+        }
+    }
+    void stalePageFailureDoesNotChangeCurrentPagination() {
+        Network net; net.responses = {guest(),
+            {500, "{}", 100},
+            {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:2\"}],\"next_href\":\"https://api.soundcloud.com/tracks?cursor=next\"}"},
+            {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:3\"}]}"}};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.browse("tracks", "old"); sc.browse("tracks", "current");
+        QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1);
+        QTRY_VERIFY(sc.state()["hasMore"].toBool()); QTest::qWait(120);
+        QVERIFY(!sc.state()["busy"].toBool()); QVERIFY(sc.state()["hasMore"].toBool());
+        QCOMPARE(sc.state()["tracks"].toList().first().toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+        sc.more(); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2);
+        QVERIFY(!sc.state()["hasMore"].toBool());
+        QCOMPARE(sc.state()["tracks"].toList().last().toMap()["urn"].toString(), QString("soundcloud:tracks:3"));
+    }
     void refreshesOnceForConcurrentRequests() {
         QFile session(config + "/session.json"); QVERIFY(session.open(QIODevice::WriteOnly));
         session.write("{\"client_id\":\"test-client\",\"access_token\":\"old\",\"refresh_token\":\"refresh-once\",\"expires_at\":0,\"user_session\":false}"); session.close();
