@@ -48,6 +48,7 @@ jobs:
       - name: Собрать исходники штатным CMake под Windows
         run: |
           set -eu
+          rm -rf /clang64/include/c++/v1
           tar --zstd -xf build/windows-build-kit.tar.zst -C /
           tar --zstd -xf build/windows-build-tools.tar.zst -C /
           cmake -S . -B build/windows -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_PREFIX_PATH=/clang64 -DCMAKE_CXX_COMPILER=clang++
