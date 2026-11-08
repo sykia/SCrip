@@ -6,12 +6,35 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QQmlExpression>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUuid>
 #include <QtTest>
+
+// Модель без сети для проверки геометрии настоящего Android Main.qml.
+class AndroidLayoutModel : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
+    Q_PROPERTY(QVariantMap catalogState READ state CONSTANT)
+    Q_PROPERTY(qint64 position READ position CONSTANT)
+    Q_PROPERTY(qint64 duration READ position CONSTANT)
+public:
+    bool signedIn() const { return true; }
+    qint64 position() const { return 0; }
+    QVariantMap state() const {
+        return {{"home", QVariantList{QVariantMap{{"title", "Микс любимых"},
+            {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}}}}}}},
+            {"profile", QVariantMap{}}, {"current", QVariantMap{}}};
+    }
+    Q_INVOKABLE void volume(double) {}
+    Q_INVOKABLE void loadHome() {}
+    Q_INVOKABLE void browse(const QString &, const QString & = {}) {}
+signals:
+    void signedInChanged();
+};
 
 class PluginTests : public QObject {
     Q_OBJECT
@@ -513,6 +536,53 @@ class PluginTests : public QObject {
         QCOMPARE(migrated.configure("studio", 0, true), QString());
         QVERIFY(!concurrent.enable("studio", false).isEmpty());
         QVERIFY(concurrent.installed()[0].toMap()["enabled"].toBool());
+    }
+    void androidHeaderReservesSpace() {
+        QCoreApplication::setOrganizationName("SCripLayoutTests");
+        AndroidLayoutModel sc;
+        Plugins host;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("sc", &sc);
+        engine.rootContext()->setContextProperty("pluginManager", &host);
+        QFile source(QString(SCRIP_SOURCE_DIR) + "/qml/android/Main.qml");
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        QQmlComponent component(&engine);
+        // Qt 6.8 повторно открывает URL inline-компонентов: используем настоящие файлы
+        // в build/, с той же плоской структурой, что и QRC приложения.
+        const auto fixture = QDir::currentPath() + "/android-layout-fixture";
+        QVERIFY(QDir().mkpath(fixture));
+        QFile mainFile(fixture + "/Main.qml");
+        QVERIFY(mainFile.open(QIODevice::WriteOnly));
+        mainFile.write(source.readAll()); mainFile.close();
+        for (auto name : {"PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml"}) {
+            QFile::remove(fixture + "/" + name);
+            QVERIFY(QFile::copy(QString(SCRIP_SOURCE_DIR) + "/qml/" + name, fixture + "/" + name));
+        }
+        component.loadUrl(QUrl::fromLocalFile(fixture + "/Main.qml"));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> object(component.create());
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *window = qobject_cast<QQuickWindow *>(object.data());
+        QVERIFY(window);
+        auto *header = object->property("header").value<QQuickItem *>();
+        QVERIFY(header);
+        QQmlExpression expression(QQmlEngine::contextForObject(object.data()), object.data(), "body");
+        auto *body = qobject_cast<QQuickItem *>(expression.evaluate().value<QObject *>());
+        QVERIFY2(body, qPrintable(expression.error().toString()));
+        QQmlExpression closeStartup(QQmlEngine::contextForObject(object.data()), object.data(), "startup.close()");
+        closeStartup.evaluate();
+        QVERIFY2(!closeStartup.hasError(), qPrintable(closeStartup.error().toString()));
+        for (const auto size : {QSize(412,860), QSize(320,640), QSize(860,412)}) {
+            window->resize(size);
+            QTest::qWait(40);
+            QVERIFY2(header->height() >= 66, "Шапка потеряла высоту");
+            const auto headerBottom = header->mapToScene(QPointF(0, header->height())).y();
+            const auto bodyTop = body->mapToScene(QPointF(0, 0)).y();
+            QVERIFY2(bodyTop >= headerBottom - 0.5, qPrintable(QString("Содержимое %1 перекрывает шапку %2").arg(bodyTop).arg(headerBottom)));
+        }
+        QTest::qWait(950);
+        window->resize(412,860); QTest::qWait(40);
+        QVERIFY(window->grabWindow().save("android-header.png"));
     }
     void lifecycle() {
         QTemporaryDir data;

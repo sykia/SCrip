@@ -20,6 +20,8 @@ ApplicationWindow {
     readonly property real coverRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginManager.theme.coverRadius ?? prefs.coverRadius
     readonly property color ink: "#242426"
     readonly property color muted: "#858589"
+    // SafeArea появился в Qt 6.9; на Qt 6.8 шапка всё равно должна занимать 66 px.
+    readonly property real headerTopInset: typeof SafeArea !== "undefined" ? app.SafeArea.margins.top : 0
     Settings {
         id: prefs
         category: "androidInterface"
@@ -241,10 +243,10 @@ ApplicationWindow {
 
     header: Item {
         id: topBar
-        height: 66 + SafeArea.margins.top
+        height: 66 + app.headerTopInset
         Item {
             anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 16
-            anchors.topMargin: topBar.SafeArea.margins.top
+            anchors.topMargin: app.headerTopInset
             ColumnLayout {
                 anchors.left: parent.left; anchors.right: accountButton.left; anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter

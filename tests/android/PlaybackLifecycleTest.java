@@ -44,6 +44,18 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             for (int i = 0; i < 100 && !(Boolean) field(bridge, null, "ready"); ++i) SystemClock.sleep(100);
             require((Boolean) field(bridge, null, "ready"), "Qt-мост не готов");
             SystemClock.sleep(2000);
+            final boolean[] darkStatusIcons = {false};
+            runOnMainSync(() -> {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    android.view.WindowInsetsController controller = activity.getWindow().getInsetsController();
+                    darkStatusIcons[0] = controller != null && (controller.getSystemBarsAppearance()
+                            & android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS) != 0;
+                } else {
+                    darkStatusIcons[0] = (activity.getWindow().getDecorView().getSystemUiVisibility()
+                            & android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) != 0;
+                }
+            });
+            require(darkStatusIcons[0], "Значки строки состояния должны быть тёмными");
             bridge.getMethod("preparePlayback").invoke(null);
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);
