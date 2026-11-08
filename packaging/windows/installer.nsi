@@ -70,7 +70,7 @@ FunctionEnd
   MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Закройте SCrip, затем нажмите «Повторить»." IDRETRY check_closed_retry
   check_closed_abort:
   SetErrorLevel 2
-  Abort
+  Quit
   check_closed_done:
 !macroend
 
