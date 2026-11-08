@@ -223,7 +223,7 @@ bool SoundCloud::saveSession() {
         {"expires_at", m_expires}, {"user_session", m_userSession}})) { storageFailure(); return false; }
     return true;
 }
-void SoundCloud::token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed) {
+void SoundCloud::token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed, int loginEpoch) {
     QNetworkRequest request{QUrl(m_useWorker ? "https://scrip-auth.scrip-desktop-aca3d9.workers.dev/oauth/token"
                                             : "https://secure.soundcloud.com/oauth/token")};
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
@@ -232,8 +232,8 @@ void SoundCloud::token(const QUrlQuery &form, bool basic, std::function<void()> 
     if (basic && !m_useWorker) request.setRawHeader("Authorization", "Basic " + (m_clientId + ":" + m_clientSecret).toUtf8().toBase64());
     auto *reply = m_network->post(request, form.query(QUrl::FullyEncoded).toUtf8().replace("+", "%2B"));
     const int epoch = m_epoch;
-    connect(reply, &QNetworkReply::finished, this, [this, reply, done, failed, epoch] {
-        reply->deleteLater(); if (epoch != m_epoch) return;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, done, failed, epoch, loginEpoch] {
+        reply->deleteLater(); if (epoch != m_epoch || (loginEpoch >= 0 && loginEpoch != m_loginEpoch)) return;
         const auto obj = QJsonDocument::fromJson(reply->readAll()).object();
         if (reply->error() != QNetworkReply::NoError || obj.value("access_token").toString().isEmpty()) {
             if (m_state.value("buffering").toBool()) set("playbackActive", false);
@@ -317,7 +317,7 @@ void SoundCloud::login() {
     const QUrl redirect(m_redirect);
     if (redirect.scheme() != "http" || redirect.host() != "127.0.0.1" || redirect.path() != "/callback" || (redirect.port() < 1024 || redirect.port() > 65535) || redirect.hasQuery() || redirect.hasFragment() || !redirect.userInfo().isEmpty()) { fail("Настройте локальный адрес возврата."); return; }
     if (!m_callback.listen(QHostAddress::LocalHost, quint16(redirect.port()))) { fail("Порт для входа занят. Закройте второй экземпляр SCrip или измените порт."); return; }
-    clearError(); m_verifier = nonce(); m_oauthState = nonce();
+    ++m_loginEpoch; clearError(); m_verifier = nonce(); m_oauthState = nonce();
     QUrl url("https://secure.soundcloud.com/authorize"); QUrlQuery query;
     query.addQueryItem("client_id", m_clientId); query.addQueryItem("redirect_uri", m_redirect);
     query.addQueryItem("response_type", "code"); query.addQueryItem("code_challenge_method", "S256"); query.addQueryItem("state", m_oauthState);
@@ -326,7 +326,7 @@ void SoundCloud::login() {
     set("authStep", "browser"); emit authorizationRequested(url);
 }
 void SoundCloud::browserFailed() { cancelLogin(); fail("Не удалось открыть окно входа. Проверьте установленный браузер."); }
-void SoundCloud::cancelLogin() { m_callback.close(); m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear(); set("authBusy", false); set("authStep", ""); }
+void SoundCloud::cancelLogin() { ++m_loginEpoch; m_callback.close(); m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear(); set("authBusy", false); set("authStep", ""); }
 void SoundCloud::callbackConnection() {
     while (m_callback.hasPendingConnections()) {
         auto *socket = m_callback.nextPendingConnection();
@@ -351,7 +351,8 @@ void SoundCloud::callbackConnection() {
                 peer->disconnectFromHost();
             };
             if (!valid) { respond(false); return; }
-            const auto verifier = m_verifier; cancelLogin();
+            const auto verifier = m_verifier; const int loginEpoch = m_loginEpoch;
+            m_callback.close(); m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear();
             if (!receivedCode) { respond(false); fail("Вход отменён в SoundCloud."); return; }
             // Отменяем ответы старой гостевой сессии перед обменом кода.
             ++m_epoch; m_waiting.clear(); m_refreshing = false; set("authBusy", true); set("authStep", "exchange");
@@ -377,7 +378,7 @@ void SoundCloud::callbackConnection() {
                 respond(true);
                 profile();
                 browse("likes");
-            }, [this, respond] { set("authStep", ""); respond(false); });
+            }, [this, respond] { set("authStep", ""); respond(false); }, loginEpoch);
         });
     }
 }

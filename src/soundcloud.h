@@ -88,7 +88,7 @@ private:
     bool saveSession();
     void storageFailure();
     void ensureToken(std::function<void()> continuation);
-    void token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed = {});
+    void token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed = {}, int loginEpoch = -1);
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
     void collection(const QString &path, bool append = false);
     void profile();
@@ -128,6 +128,7 @@ private:
     bool m_crossfadeStarted = false;
     int m_homeGeneration = 0;
     int m_epoch = 0, m_listing = 0, m_playGeneration = 0, m_queueIndex = -1;
+    int m_loginEpoch = 0;
     QList<std::function<void()>> m_waiting;
     bool m_forceNext = false;
     QVariantList m_queue;

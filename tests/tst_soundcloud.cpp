@@ -601,6 +601,39 @@ private slots:
         QCOMPARE(net.requests.size(), requestsBeforeCallback + 1);
         QVERIFY(!QFile::exists(config + "/session.json"));
     }
+    void oauthCancellationBeforeCallbackAndDuringExchange() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
+
+        sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
+        sc.cancelLogin();
+        QTest::qWait(20);
+        QVERIFY(!sc.state()["authBusy"].toBool());
+        QCOMPARE(net.requests.size(), 1);
+
+        sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
+        const QByteArray callback = "GET /callback?code=cancelled&state=" + QUrlQuery(authorizationUrl).queryItemValue("state").toUtf8()
+            + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
+        net.responses = {{200, "{\"access_token\":\"late-access\",\"refresh_token\":\"late-refresh\",\"expires_in\":3600}", 150}};
+        QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost, callbackPort); QVERIFY(socket.waitForConnected());
+        socket.write(callback); socket.flush();
+        QTRY_COMPARE(net.requests.size(), 2);
+        QCOMPARE(sc.state()["authStep"].toString(), QString("exchange"));
+        sc.cancelLogin();
+        QTest::qWait(220);
+        QVERIFY(!sc.signedIn()); QVERIFY(!sc.state()["authBusy"].toBool());
+        QVERIFY(!sc.m_userSession); QVERIFY(!QFile::exists(config + "/session.json"));
+
+        net.responses = {{200, "{\"access_token\":\"fresh-access\",\"refresh_token\":\"fresh-refresh\",\"expires_in\":3600}", 1}, {200, "{\"username\":\"Fresh\"}"}, {200, "[]"}};
+        sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
+        QTcpSocket retry; retry.connectToHost(QHostAddress::LocalHost, callbackPort); QVERIFY(retry.waitForConnected());
+        const QByteArray retryCallback = "GET /callback?code=fresh&state=" + QUrlQuery(authorizationUrl).queryItemValue("state").toUtf8()
+            + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
+        retry.write(retryCallback); retry.flush();
+        QTRY_VERIFY(sc.signedIn());
+        QVERIFY(sc.m_userSession);
+    }
     void windowControls() {
         Network net;
         net.responses = {guest(), {200, "[]"}};
