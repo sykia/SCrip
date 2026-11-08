@@ -116,10 +116,6 @@ Function .onInstFailed
   Call RestorePrevious
 FunctionEnd
 
-Function .onUserAbort
-  Call RestorePrevious
-FunctionEnd
-
 !macro CheckClosed
   IfFileExists "$INSTDIR\SCrip.exe" 0 done
   StrCpy $1 0
