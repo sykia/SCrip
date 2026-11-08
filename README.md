@@ -7,36 +7,22 @@
 <p align="center">SCrip — плеер для Windows, Linux и Android, который работает через официальный API SoundCloud.<br>Ваши лайки, свежие релизы и станции любимых исполнителей — в отдельном приложении.</p>
 
 <p align="center">
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.0/SCrip-1.4.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Скачать для Windows 10 и 11 x64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.0/SCrip-1.4.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Скачать для Debian 13 x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.0/scrip-1.4.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Скачать для Arch Linux x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.1/SCrip-1.4.1-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Скачать для Android"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.2/SCrip-1.4.2-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Скачать для Windows 10 и 11 x64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.2/SCrip-1.4.2-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Скачать для Debian 13 x86-64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.2/scrip-1.4.2-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Скачать для Arch Linux x86-64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.4.2/SCrip-1.4.2-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Скачать для Android"></a>
 </p>
 
-## Что нового в 1.4.0
+## Версия 1.4.2
 
-Автоматическая загрузка и установка обновлений с проверкой SHA-256 и трёхсекундный плавный переход между треками. Музыка воспроизводится через SoundCloud по сети.
-
-На Windows обновление устанавливается автоматически с перезапуском. На Linux система запрашивает права для установки пакета. На Android загруженный APK открывается в системном установщике: его подтверждение обязательно. Для Android установите 1.4.1; настольные пакеты остаются на версии 1.4.0.
+Актуальные сборки для Windows, Linux и Android с исправлениями Android-плеера и Plugin API v2. Android APK поддерживает ARM64, ARMv7 и x86-64; устанавливайте его поверх прежней версии, чтобы сохранить данные.
 
 <p align="center">
   <img src="docs/screenshots/android-home-frame.svg" width="32%" alt="Главная SCrip на Android">
   <img src="docs/screenshots/android-player-frame.svg" width="32%" alt="Экран воспроизведения SCrip на Android">
 </p>
 
-[Все изменения с 1.0.0](CHANGELOG.md) · [Android 1.4.1](https://github.com/sykia/SCrip/releases/tag/v1.4.1) · [Настольные версии 1.4.0](https://github.com/sykia/SCrip/releases/tag/v1.4.0)
-
-## Android
-
-Установите [универсальный APK 1.4.1](https://github.com/sykia/SCrip/releases/download/v1.4.1/SCrip-1.4.1-Android-universal.apk) и разрешите установку из выбранного браузера или файлового менеджера.
-
-На телефоне доступны вход через системный браузер, любимые треки, поиск и управление воспроизведением. Поддерживаются Android 9 и новее, ARM64, ARMv7 и x86-64. Для сборки под ARM64 нужны Qt 6.10.1 для Android и настольный комплект той же версии, Qt Multimedia, JDK 17, Android SDK и NDK r27c (27.2.12479018). Для HTTPS также нужен [android_openssl](https://github.com/KDAB/android_openssl), проверенный коммит `b71f1470962019bd89534a2919f5925f93bc5779`. Укажите путь к нему в `SCRIP_ANDROID_OPENSSL_ROOT`. Укажите пути к комплектам в `QT_ANDROID` и `QT_HOST_PATH`, а пути к инструментам Android — в `ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT` и `JAVA_HOME`.
-
-```sh
-"$QT_ANDROID/bin/qt-cmake" -S . -B build/android -G Ninja -DCMAKE_BUILD_TYPE=Debug -DQT_HOST_PATH="$QT_HOST_PATH"
-cmake --build build/android --target apk
-adb install -r build/android/android-build/build/outputs/apk/debug/android-build-debug.apk
-```
+[История изменений](CHANGELOG.md) · [Все файлы выпуска и SHA-256](https://github.com/sykia/SCrip/releases/tag/v1.4.2)
 
 ## Что послушать сегодня
 

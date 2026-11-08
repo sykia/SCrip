@@ -1,0 +1,61 @@
+name: Сборка Windows
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег выпуска с архивом установленного комплекта Qt
+        required: true
+      kit_sha256:
+        description: SHA-256 windows-build-kit.tar.zst
+        required: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: false
+          install: >-
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            zstd
+      - name: Получить закреплённый комплект сборки
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          KIT_SHA256: ${{ inputs.kit_sha256 }}
+        run: |
+          gh release download $env:TAG --repo $env:GITHUB_REPOSITORY --pattern windows-build-kit.tar.zst --dir build
+          if ($LASTEXITCODE -ne 0) { throw 'Не удалось скачать комплект' }
+          if ((Get-FileHash build/windows-build-kit.tar.zst -Algorithm SHA256).Hash.ToLower() -ne $env:KIT_SHA256) { throw 'SHA-256 комплекта не совпадает' }
+      - name: Собрать исходники штатным CMake под Windows
+        run: |
+          set -eu
+          tar --zstd -xf build/windows-build-kit.tar.zst -C /
+          cmake -S . -B build/windows -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_PREFIX_PATH=/clang64 -DCMAKE_CXX_COMPILER=clang++
+          cmake --build build/windows --parallel 2
+      - name: Проверить запуск новой сборки
+        run: |
+          set -eu
+          QT_QPA_PLATFORM=offscreen ./build/windows/scrip.exe > build/windows/startup.log 2>&1 &
+          player_pid=$!
+          sleep 8
+          if ! kill -0 "$player_pid" 2>/dev/null; then cat build/windows/startup.log; exit 1; fi
+          kill "$player_pid"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-native
+          path: |
+            build/windows/scrip.exe
+            build/windows/startup.log
+          if-no-files-found: error
