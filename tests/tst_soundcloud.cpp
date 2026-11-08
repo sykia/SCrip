@@ -19,30 +19,38 @@
 
 // Транспорт подменяется только в тестах. Рабочий клиент использует фиксированные HTTPS-хосты.
 #ifndef Q_MOC_RUN
-struct Response { int status = 200; QByteArray body; int delay = 0; QNetworkReply::NetworkError error = QNetworkReply::NoError; };
+struct Response { int status = 200; QByteArray body; int delay = 0; QNetworkReply::NetworkError error = QNetworkReply::NoError; int chunkSize = 0; qint64 contentLength = -2; bool lateSignals = false; };
 class Reply : public QNetworkReply {
 public:
-    Reply(const QNetworkRequest &request, Response response, QObject *parent) : QNetworkReply(parent), bytes(response.body) {
+    Reply(const QNetworkRequest &request, Response response, QObject *parent) : QNetworkReply(parent), bytes(response.body), chunkSize(response.chunkSize > 0 ? response.chunkSize : qMax(1, response.body.size())) {
         setRequest(request); setUrl(request.url()); setOperation(QNetworkAccessManager::GetOperation);
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, response.status);
+        const auto contentLength = response.contentLength != -2 ? response.contentLength : qint64(response.body.size());
+        setHeader(QNetworkRequest::ContentLengthHeader, contentLength);
+        setRawHeader("Content-Length", QByteArray::number(contentLength));
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
-        QTimer::singleShot(response.delay, this, [this, response] {
-            if (aborted) return;
+        auto *timer = new QTimer(this); timer->setInterval(1);
+        connect(timer, &QTimer::timeout, this, [this, response, timer] {
+            if (aborted) { timer->stop(); timer->deleteLater(); return; }
+            if (!metadataEmitted) { metadataEmitted = true; emit metaDataChanged(); }
             if (response.error != QNetworkReply::NoError) setError(response.error, "Test network failure");
             else if (response.status >= 400) setError(QNetworkReply::ContentAccessDenied, "Test failure");
-            setFinished(true); emit readyRead(); emit finished();
+            released = qMin(bytes.size(), released + chunkSize);
+            emit readyRead();
+            if (released >= bytes.size()) { timer->stop(); timer->deleteLater(); setFinished(true); emit finished(); if (response.lateSignals) { emit readyRead(); emit finished(); } }
         });
+        QTimer::singleShot(response.delay, timer, [timer] { timer->start(); });
     }
     void abort() override { if (isFinished()) return; aborted = true; setError(QNetworkReply::OperationCanceledError, "Cancelled"); setFinished(true); emit finished(); }
-    qint64 bytesAvailable() const override { return bytes.size() - offset + QNetworkReply::bytesAvailable(); }
+    qint64 bytesAvailable() const override { return released - offset + QNetworkReply::bytesAvailable(); }
 protected:
     qint64 readData(char *data, qint64 size) override {
-        qint64 count = qMin(size, qint64(bytes.size() - offset));
+        qint64 count = qMin(size, qint64(released - offset));
         if (count <= 0) return -1;
         memcpy(data, bytes.constData() + offset, size_t(count)); offset += count; return count;
     }
 private:
-    QByteArray bytes; qint64 offset = 0; bool aborted = false;
+    QByteArray bytes; qint64 offset = 0, released = 0; int chunkSize = 1; bool aborted = false, metadataEmitted = false;
 };
 class Network : public QNetworkAccessManager {
 public:
@@ -436,12 +444,40 @@ private slots:
         net.responses = {{200, payload}}; sc.downloadUpdate(); QTRY_VERIFY(sc.state()["updateReady"].toBool());
         net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         QVERIFY(sc.state()["updateReady"].toBool());
+        const QString verifiedPath = sc.m_updatePath;
+        net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{}}}).toJson()}};
+        sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+        QVERIFY(!sc.state()["updateAvailable"].toBool()); QVERIFY(!sc.state()["updateReady"].toBool());
+        QVERIFY(QFileInfo::exists(verifiedPath));
         const QString nextName = QFileInfo::exists("/etc/arch-release") ? "scrip-1000.0-x86_64.pkg.tar.zst" : "SCrip-1000.0-amd64.deb";
         const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v1000.0/" + nextName}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v1000.0"}, {"assets", QJsonArray{nextAsset}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(sc.state()["updateAvailable"].toBool());
         QCoreApplication::setApplicationVersion(previousVersion);
+    }
+    void updateDownloadStreamsChunksAndRejectsInvalidLengthAndOversizedBody() {
+        const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
+        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QByteArray payload("multi-block-payload");
+        const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
+        const QJsonObject asset{{"name", name}, {"digest", digest}, {"size", payload.size()}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        const QByteArray metadata = QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson();
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+        net.responses = {{200, payload, 0, QNetworkReply::NoError, 3, payload.size(), true}}; sc.downloadUpdate(); QTRY_VERIFY(sc.state()["updateReady"].toBool());
+        QVERIFY(QFileInfo::exists(sc.m_updatePath));
+        QCoreApplication::setApplicationVersion(previousVersion);
+
+        Network badNet; badNet.responses = {guest()}; SoundCloud bad(nullptr, &badNet, secrets); QTRY_VERIFY(bad.state()["connected"].toBool());
+        QCoreApplication::setApplicationVersion("1.0.0"); badNet.responses = {{200, metadata}}; bad.checkForUpdates(); QTRY_VERIFY(!bad.state()["updateChecking"].toBool());
+        badNet.responses = {{200, payload + "overflow", 0, QNetworkReply::NoError, 2}}; bad.downloadUpdate(); QTRY_VERIFY(!bad.state()["updateDownloading"].toBool());
+        QVERIFY(!bad.state()["updateReady"].toBool()); QCoreApplication::setApplicationVersion(previousVersion);
+
+        Network lengthNet; lengthNet.responses = {guest()}; SoundCloud invalidLength(nullptr, &lengthNet, secrets); QTRY_VERIFY(invalidLength.state()["connected"].toBool());
+        QCoreApplication::setApplicationVersion("1.0.0"); lengthNet.responses = {{200, metadata}}; invalidLength.checkForUpdates(); QTRY_VERIFY(!invalidLength.state()["updateChecking"].toBool());
+        lengthNet.responses = {{200, payload, 0, QNetworkReply::NoError, 2, -1}}; invalidLength.downloadUpdate(); QTRY_VERIFY(!invalidLength.state()["updateDownloading"].toBool());
+        QVERIFY(!invalidLength.state()["updateReady"].toBool()); QCoreApplication::setApplicationVersion(previousVersion);
     }
     void updateDownloadRejectsHttpFailuresAndPartialBodies() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");

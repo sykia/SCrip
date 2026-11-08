@@ -32,12 +32,15 @@
 #include <QJniObject>
 #include <QtCore/qcoreapplication_platform.h>
 #endif
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#endif
 
 namespace {
 QByteArray callbackPage(bool valid, bool receivedCode) {
     static const QByteArray page = [] {
         QFile file(":/resources/callback.html");
-        file.open(QIODevice::ReadOnly);
+        if (!file.open(QIODevice::ReadOnly)) return QByteArray{};
         auto html = file.readAll();
         QImage logo(":/qt/qml/SCrip/assets/blob.png");
         QBuffer buffer;
@@ -773,7 +776,12 @@ void SoundCloud::checkForUpdates(bool manual) {
     auto *reply = m_network->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, manual] {
         reply->deleteLater(); set("updateChecking", false);
-        auto updateFailure = [this, manual](const QString &message) { set("updateAvailable", false); if (manual) set("updateError", message); set("updateResult", "Ошибка проверки"); };
+        auto updateFailure = [this, manual](const QString &message) {
+            set("updateAvailable", false); set("updateReady", false);
+            m_updateAsset = {}; m_updateDigest.clear(); m_updateVersion.clear(); m_updateExpectedSize = -1;
+            m_updateReadyVersion.clear(); m_updateReadyName.clear(); m_updateReadyDigest.clear();
+            if (manual) set("updateError", message); set("updateResult", "Ошибка проверки");
+        };
         const QUrl responseUrl = reply->url();
         if (reply->error() != QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200 || responseUrl.scheme() != "https" || responseUrl.host() != "api.github.com" || responseUrl.port() != -1 || !responseUrl.userInfo().isEmpty()) { updateFailure("Не удалось проверить обновления. Проверьте подключение к GitHub."); return; }
         if (reply->bytesAvailable() > 1024 * 1024) { updateFailure("Ответ сервиса обновлений слишком велик."); return; }
@@ -786,7 +794,6 @@ void SoundCloud::checkForUpdates(bool manual) {
         const bool newerThanCurrent = QVersionNumber::compare(latest, current) > 0;
         bool sameReadyRelease = m_state.value("updateReady").toBool() && m_updateReadyVersion == remote && newerThanCurrent;
         if (!sameReadyRelease) {
-            if (!m_updatePath.isEmpty()) QFile::remove(m_updatePath);
             m_updatePath.clear(); m_updateReadyVersion.clear(); m_updateReadyName.clear(); m_updateReadyDigest.clear();
             set("updateReady", false);
             m_updateAsset = {}; m_updateDigest.clear(); m_updateExpectedSize = -1;
@@ -821,7 +828,6 @@ void SoundCloud::checkForUpdates(bool manual) {
                 url.scheme() != "https" || url.host() != "github.com" || url.port() != -1 || !url.userInfo().isEmpty() ||
                 !url.path().startsWith("/sykia/SCrip/releases/download/")) continue;
             if (sameReadyRelease && (m_updateReadyName != name || m_updateReadyDigest != lowerDigest || m_updateExpectedSize != qint64(size))) {
-                if (!m_updatePath.isEmpty()) QFile::remove(m_updatePath);
                 m_updatePath.clear(); m_updateReadyVersion.clear(); m_updateReadyName.clear(); m_updateReadyDigest.clear();
                 set("updateReady", false); sameReadyRelease = false;
             }
@@ -885,7 +891,9 @@ void SoundCloud::downloadUpdate() {
     });
     m_updateProgressTimer.start(150);
     connect(m_updateReply, &QNetworkReply::finished, this, [this] {
-        auto *reply = m_updateReply; m_updateProgressTimer.stop();
+        auto *reply = qobject_cast<QNetworkReply *>(sender());
+        if (!reply || m_updateReply != reply) return;
+        m_updateProgressTimer.stop();
         if (reply && m_updateFile) {
             while (reply->bytesAvailable() > 0) {
                 const QByteArray tail = reply->read(256 * 1024);
@@ -941,10 +949,26 @@ void SoundCloud::installUpdate() {
     else if (result == 2) { set("updateResult", "Открыт системный установщик Android. Подтвердите или отмените установку там."); set("updateError", ""); }
     else { set("updateResult", "Не удалось открыть системный установщик Android."); set("updateError", "Android не открыл системный установщик APK."); }
 #elif defined(Q_OS_WIN)
-    auto *process = new QProcess(this); process->setProgram(m_updatePath); process->start();
-    connect(process, &QProcess::started, this, [this] { set("updateResult", "Мастер установки Windows запущен"); });
-    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateError", "Не удалось открыть мастер установки Windows."); set("updateResult", "Ошибка запуска установщика"); process->deleteLater(); } });
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateResult", status == QProcess::NormalExit && code == 0 ? "Мастер установки завершён; проверьте установленную версию при следующем запуске" : "Установка отменена или завершилась с ошибкой"); if (status != QProcess::NormalExit || code != 0) set("updateError", "Установщик не подтвердил успешное завершение."); process->deleteLater(); } });
+    qint64 installerPid = 0;
+    if (!QProcess::startDetached(m_updatePath, {}, QFileInfo(m_updatePath).absolutePath(), &installerPid)) {
+        set("updateInstalling", false); set("updateError", "Не удалось открыть мастер установки Windows."); set("updateResult", "Ошибка запуска установщика");
+    } else {
+        set("updateError", "");
+        set("updateResult", "Мастер установки Windows открыт. Завершите его; результат будет проверен при следующем запуске.");
+        HANDLE installer = OpenProcess(SYNCHRONIZE, FALSE, DWORD(installerPid));
+        if (installer) {
+            auto *watcher = new QTimer(this); watcher->setInterval(500);
+            connect(watcher, &QTimer::timeout, this, [this, watcher, installer] {
+                if (WaitForSingleObject(installer, 0) != WAIT_OBJECT_0) return;
+                watcher->stop(); watcher->deleteLater(); CloseHandle(installer);
+                set("updateInstalling", false);
+                set("updateResult", "Мастер установки закрыт. Результат обновления проверится при следующем запуске.");
+            });
+            watcher->start();
+        } else {
+            set("updateResult", "Мастер установки открыт. Завершите его; перезапустите SCrip после установки или отмены.");
+        }
+    }
 #elif defined(Q_OS_LINUX)
     auto *process = new QProcess(this); const bool arch = m_updatePath.endsWith(".zst");
     if (!arch) { auto env = QProcessEnvironment::systemEnvironment(); env.insert("DEBIAN_FRONTEND", "noninteractive"); process->setProcessEnvironment(env); }
