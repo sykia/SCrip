@@ -376,7 +376,7 @@ ApplicationWindow {
                 Label { x: 18; width: parent.width - 36; visible: !(app.api.home || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
                 Action { x: 24; text: "Обновить подборки"; enabled: !app.api.homeBusy; onClicked: sc.loadHome(true) }
                 PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
-                Item { width: 1; height: 16 }
+                Item { width: 1; height: navigationFooter.height + 16 }
             }
         }
         ScrollView {
@@ -424,10 +424,12 @@ ApplicationWindow {
                     Layout.fillWidth: true; Layout.margins: 18
                     PluginManagerView { Layout.fillWidth: true; manager: pluginManager; appearanceHint: prefs.accentOverride || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
                 }
+                Item { Layout.fillWidth: true; implicitHeight: navigationFooter.height }
             }
         }
         ListView {
             id: tracks
+            bottomMargin: navigationFooter.height
             visible: sc.signedIn && app.page > 0 && app.page < 5
             Layout.fillWidth: true; Layout.fillHeight: true
             clip: true; model: app.api.tracks || []
@@ -467,10 +469,14 @@ ApplicationWindow {
         }
     }
 
-    footer: Item {
+    Item {
         id: navigationFooter
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        z: 10
+        height: implicitHeight
         implicitHeight: navigationStack.implicitHeight
-        Rectangle { anchors.fill: parent; color: app.color }
         Column {
         id: navigationStack
         width: parent.width

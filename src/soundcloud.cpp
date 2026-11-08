@@ -739,7 +739,7 @@ void SoundCloud::openExternal(const QString &value) {
 }
 
 void SoundCloud::checkForUpdates() {
-    if (m_state.value("updateChecking").toBool()) return;
+    if (m_state.value("updateChecking").toBool() || m_state.value("updateInstalling").toBool()) return;
     set("updateChecking", true);
     QNetworkRequest req(QUrl("https://api.github.com/repos/sykia/SCrip/releases/latest"));
     req.setRawHeader("Accept", "application/vnd.github+json");
@@ -784,10 +784,23 @@ void SoundCloud::checkForUpdates() {
             auto *fileReply = m_network->get(download);
             connect(fileReply, &QNetworkReply::finished, this, [this, fileReply, asset, digest] {
                 fileReply->deleteLater();
+                const int status = fileReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                if (fileReply->error() != QNetworkReply::NoError || status != 200) {
+                    set("updateInstalling", false);
+                    fail(status >= 400
+                        ? QString("Не удалось скачать обновление: сервер вернул HTTP %1. Повторите загрузку позже.").arg(status)
+                        : "Загрузка обновления прервана из-за ошибки сети. Проверьте соединение и повторите загрузку.");
+                    return;
+                }
                 const auto bytes = fileReply->readAll();
-                if (fileReply->error() != QNetworkReply::NoError ||
-                    "sha256:" + QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()) != digest) {
-                    set("updateInstalling", false); fail("Обновление не прошло проверку SHA-256. Установка отменена."); return;
+                const qint64 expectedSize = asset.value("size").toVariant().toLongLong();
+                if (bytes.isEmpty() || (expectedSize > 0 && bytes.size() != expectedSize)) {
+                    set("updateInstalling", false);
+                    fail("Обновление скачалось не полностью. Проверьте соединение и повторите загрузку.");
+                    return;
+                }
+                if ("sha256:" + QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()) != digest) {
+                    set("updateInstalling", false); fail("Контрольная сумма SHA-256 скачанного файла не совпадает с релизом. Установка отменена; повторите загрузку."); return;
                 }
                 const QString dir = QStandardPaths::writableLocation(
 #ifdef Q_OS_ANDROID

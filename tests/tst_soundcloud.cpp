@@ -18,7 +18,7 @@
 
 // Транспорт подменяется только в тестах. Рабочий клиент использует фиксированные HTTPS-хосты.
 #ifndef Q_MOC_RUN
-struct Response { int status = 200; QByteArray body; int delay = 0; };
+struct Response { int status = 200; QByteArray body; int delay = 0; QNetworkReply::NetworkError error = QNetworkReply::NoError; };
 class Reply : public QNetworkReply {
 public:
     Reply(const QNetworkRequest &request, Response response, QObject *parent) : QNetworkReply(parent), bytes(response.body) {
@@ -26,7 +26,8 @@ public:
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, response.status);
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
         QTimer::singleShot(response.delay, this, [this, response] {
-            if (response.status >= 400) setError(QNetworkReply::ContentAccessDenied, "Test failure");
+            if (response.error != QNetworkReply::NoError) setError(response.error, "Test network failure");
+            else if (response.status >= 400) setError(QNetworkReply::ContentAccessDenied, "Test failure");
             setFinished(true); emit readyRead(); emit finished();
         });
     }
@@ -196,6 +197,40 @@ private slots:
         QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
         QVERIFY(!sc.state()["playbackActive"].toBool());
         QVERIFY(!sc.state()["buffering"].toBool());
+    }
+    void updateFailuresHaveDistinctMessages_data() {
+        QTest::addColumn<int>("status"); QTest::addColumn<int>("networkError");
+        QTest::addColumn<QByteArray>("body"); QTest::addColumn<int>("expectedSize");
+        QTest::addColumn<QString>("message");
+        QTest::newRow("network") << 200 << int(QNetworkReply::TimeoutError) << QByteArray{} << 4 << QString("ошибки сети");
+        QTest::newRow("http") << 403 << int(QNetworkReply::NoError) << QByteArray{} << 4 << QString("HTTP 403");
+        QTest::newRow("truncated") << 200 << int(QNetworkReply::NoError) << QByteArray("ab") << 4 << QString("не полностью");
+        QTest::newRow("checksum") << 200 << int(QNetworkReply::NoError) << QByteArray("abcd") << 4 << QString("SHA-256");
+    }
+    void updateFailuresHaveDistinctMessages() {
+        QFETCH(int, status); QFETCH(int, networkError); QFETCH(QByteArray, body);
+        QFETCH(int, expectedSize); QFETCH(QString, message);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        const auto previousVersion = QCoreApplication::applicationVersion();
+        QCoreApplication::setApplicationVersion("1.0.0");
+#ifdef Q_OS_WIN
+        const QString name = "SCrip-999.0-Windows-x64.exe";
+#else
+        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+#endif
+        QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')},
+            {"size", expectedSize}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()},
+                         {status, body, 100, QNetworkReply::NetworkError(networkError)}};
+        sc.checkForUpdates();
+        QTRY_VERIFY(sc.state()["updateInstalling"].toBool());
+        const auto requests = net.requests.size();
+        sc.checkForUpdates(); QCOMPARE(net.requests.size(), requests);
+        QTRY_VERIFY(!sc.state()["updateInstalling"].toBool());
+        QCoreApplication::setApplicationVersion(previousVersion);
+        QVERIFY2(sc.state()["error"].toString().contains(message), qPrintable(sc.state()["error"].toString()));
+        if (message != "SHA-256") QVERIFY(!sc.state()["error"].toString().contains("SHA-256"));
     }
     void movingQueuePreservesCurrentAndSetsNext() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);

@@ -15,7 +15,7 @@ public class PlaybackService extends Service {
     private boolean foreground;
     private static final String CHANNEL = "scrip_playback";
     private static final int NOTIFICATION = 44;
-    private static final String STOP = "org.scrip.app.STOP";
+    private static final String LIKE = "org.scrip.app.LIKE";
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
     private boolean hasFocus, resumeAfterFocus;
@@ -49,7 +49,7 @@ public class PlaybackService extends Service {
             @Override public void onPause() { MediaBridge.dispatch(PlaybackService.this, 5, 0); }
             @Override public void onStop() { MediaBridge.dispatch(PlaybackService.this, 6, 0); }
             @Override public void onCustomAction(String action, Bundle extras) {
-                if (STOP.equals(action)) MediaBridge.dispatch(PlaybackService.this, 6, 0);
+                if (LIKE.equals(action)) MediaBridge.dispatch(PlaybackService.this, 7, 0);
             }
             @Override public void onSkipToNext() { MediaBridge.dispatch(PlaybackService.this, 2, 0); }
             @Override public void onSkipToPrevious() { MediaBridge.dispatch(PlaybackService.this, 1, 0); }
@@ -86,8 +86,10 @@ public class PlaybackService extends Service {
         final int state = !MediaBridge.hasTrack ? PlaybackState.STATE_STOPPED
             : active && (!MediaBridge.playing || MediaBridge.buffering) ? PlaybackState.STATE_BUFFERING
             : MediaBridge.playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED;
+        final int likeIcon = MediaBridge.liked ? R.drawable.widget_heart_filled : R.drawable.widget_heart;
+        final String likeLabel = MediaBridge.liked ? "Снять лайк" : "Поставить лайк";
         session.setPlaybackState(new PlaybackState.Builder().setActions(actions)
-            .addCustomAction(STOP, "Остановить", android.R.drawable.ic_menu_close_clear_cancel)
+            .addCustomAction(LIKE, likeLabel, likeIcon)
             .setState(state, MediaBridge.position, state == PlaybackState.STATE_PLAYING ? 1f : 0f, SystemClock.elapsedRealtime()).build());
         Notification notification = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.widget_notification).setContentTitle(MediaBridge.title).setContentText(MediaBridge.artist)
@@ -97,7 +99,7 @@ public class PlaybackService extends Service {
             .addAction(new Notification.Action.Builder(R.drawable.widget_previous, "Предыдущий", MediaBridge.control(this, 1)).build())
             .addAction(new Notification.Action.Builder(active ? R.drawable.widget_pause : R.drawable.widget_play, active ? "Пауза" : "Воспроизвести", MediaBridge.control(this, 0)).build())
             .addAction(new Notification.Action.Builder(R.drawable.widget_next, "Следующий", MediaBridge.control(this, 2)).build())
-            .addAction(new Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, "Остановить", MediaBridge.control(this, 6)).build())
+            .addAction(new Notification.Action.Builder(likeIcon, likeLabel, MediaBridge.control(this, 7)).build())
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0, 1, 2)).build();
         if (active) {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);

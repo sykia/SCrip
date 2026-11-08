@@ -15,7 +15,7 @@ public final class MediaBridge {
     static volatile boolean ready;
     static volatile boolean preparing;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
-    static boolean playing, active, buffering, hasTrack;
+    static boolean playing, active, buffering, hasTrack, liked;
     static long position, duration;
     static Bitmap cover;
     private static String savedKey = "";
@@ -59,6 +59,7 @@ public final class MediaBridge {
                 buffering = data.optBoolean("buffering");
                 active = data.optBoolean("active");
                 hasTrack = data.optBoolean("hasTrack");
+                liked = data.optBoolean("liked");
                 position = Math.max(0, data.optLong("position"));
                 duration = Math.max(0, data.optLong("duration"));
                 String nextArtwork = data.optString("artwork");

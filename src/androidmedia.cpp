@@ -28,6 +28,7 @@ void mediaAction(JNIEnv *, jclass, jint action, jlong position) {
         case 4: controller->resumePlayback(); break;
         case 5: controller->pausePlayback(); break;
         case 6: controller->stopPlayback(); break;
+        case 7: controller->like(controller->state().value("current").toMap()); break;
         }
     }, Qt::QueuedConnection);
 }
@@ -93,6 +94,7 @@ void AndroidMedia::publish() {
     const QJsonObject data{{"title", track.value("title").toString()}, {"artist", user.value("username").toString()},
         {"artwork", m_artworkPath}, {"playing", state.value("playing").toBool()},
         {"buffering", state.value("buffering").toBool()},
+        {"liked", track.value("user_favorite").toBool()},
         {"active", state.value("playbackActive").toBool()}, {"hasTrack", !track.isEmpty()},
         {"position", state.value("position").toLongLong()}, {"duration", state.value("duration").toLongLong()}};
     const auto json = QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact));
