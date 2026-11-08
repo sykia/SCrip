@@ -61,24 +61,9 @@ FunctionEnd
 
 !macro CheckClosed
   check_closed_retry:
-  nsExec::ExecToStack /OEM '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq SCrip.exe" /NH'
+  nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "if (Get-Process -Name SCrip -ErrorAction SilentlyContinue) { exit 42 } else { exit 0 }"'
   Pop $0
-  Pop $1
-  !insertmacro TestTrace "process_check=$0;output=$1"
-  StrCmp $0 "0" 0 check_closed_prompt
-  StrCpy $3 0
-  check_closed_trim:
-  StrCpy $2 $1 1 $3
-  StrCmp $2 " " check_closed_trim_next
-  StrCmp $2 "$\r" check_closed_trim_next
-  StrCmp $2 "$\n" check_closed_trim_next
-  Goto check_closed_compare
-  check_closed_trim_next:
-  IntOp $3 $3 + 1
-  Goto check_closed_trim
-  check_closed_compare:
-  StrCpy $2 $1 9 $3
-  StrCmp $2 "SCrip.exe" check_closed_prompt check_closed_done
+  StrCmp $0 "0" check_closed_done check_closed_prompt
   check_closed_prompt:
   IfSilent check_closed_abort
   MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Закройте SCrip, затем нажмите «Повторить»." IDRETRY check_closed_retry
