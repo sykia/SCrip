@@ -27,7 +27,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
-      - run: sudo apt-get update && sudo apt-get install -y p7zip-full libarchive-tools
+      - run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+      - name: Подготовить закреплённый распаковщик NSIS
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p build/7zip
+          curl --fail --location --retry 3 https://github.com/ip7z/7zip/releases/download/26.05/7z2605-linux-x64.tar.xz -o build/7zip.tar.xz
+          echo '22cf82fcc6eb7474f1d5bb4f02c0f8ebd573a718089d6833dc30f8350a3b232e  build/7zip.tar.xz' | sha256sum -c -
+          tar -xJf build/7zip.tar.xz -C build/7zip
+          ln -s 7zz build/7zip/7z
+          echo "$PWD/build/7zip" >> "$GITHUB_PATH"
       - name: Скачать материалы соответствующего релиза
         env:
           GH_TOKEN: ${{ github.token }}
