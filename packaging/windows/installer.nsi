@@ -200,14 +200,32 @@ Section
   ClearErrors
   ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
   !insertmacro TestTrace "old_uninstall_exit=$0"
-  IfErrors old_uninstall_failed
-  StrCmp $0 0 uninstall_ok old_uninstall_failed
-  old_uninstall_failed:
+  IfErrors old_uninstall_launch_failed
+  StrCmp $0 0 uninstall_exit_ok old_uninstall_exit_failed
+  uninstall_exit_ok:
+  IfFileExists "$INSTDIR\SCrip.exe" old_uninstall_file_remains
+  Goto uninstall_ok
+  old_uninstall_launch_failed:
   !ifdef TEST_INSTALL_DIR
     FileOpen $8 "${TEST_INSTALL_DIR}.failure" w
-    FileWrite $8 "uninstaller result=$0$\r$\n"
+    FileWrite $8 "uninstaller launch failed; result=$0$\r$\n"
     FileClose $8
   !endif
+  Goto old_uninstall_restore
+  old_uninstall_exit_failed:
+  !ifdef TEST_INSTALL_DIR
+    FileOpen $8 "${TEST_INSTALL_DIR}.failure" w
+    FileWrite $8 "uninstaller exit=$0$\r$\n"
+    FileClose $8
+  !endif
+  Goto old_uninstall_restore
+  old_uninstall_file_remains:
+  !ifdef TEST_INSTALL_DIR
+    FileOpen $8 "${TEST_INSTALL_DIR}.failure" w
+    FileWrite $8 "uninstaller left SCrip.exe; result=$0$\r$\n"
+    FileClose $8
+  !endif
+  old_uninstall_restore:
   Call RestorePrevious
   SetErrorLevel 2
   Abort
