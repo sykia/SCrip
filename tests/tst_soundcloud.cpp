@@ -10,6 +10,7 @@
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QDesktopServices>
+#include <QSettings>
 #include <QTcpSocket>
 #include <QWheelEvent>
 #ifdef Q_OS_WIN
@@ -109,6 +110,33 @@ private:
         file.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"client_secret", "test-secret"}, {"redirect_uri", QString("http://127.0.0.1:%1/callback").arg(callbackPort)}}).toJson());
     }
 private slots:
+    void volumeAndCrossfadePreferencesRestore() {
+        QSettings preferences;
+        preferences.remove("player/volume"); preferences.remove("player/crossfade");
+        {
+            Network firstRunNet;
+            SoundCloud firstRun(nullptr, &firstRunNet, secrets);
+            QVERIFY(qAbs(firstRun.state()["volume"].toDouble() - 0.7) < 0.001);
+            QVERIFY(!firstRun.state()["crossfade"].toBool());
+        }
+        preferences.setValue("player/volume", 0.42);
+        preferences.setValue("player/crossfade", false);
+        {
+            Network net;
+            SoundCloud sc(nullptr, &net, secrets);
+            QVERIFY(qAbs(sc.state()["volume"].toDouble() - 0.42) < 0.001);
+            QVERIFY(!sc.state()["crossfade"].toBool());
+            sc.volume(0.25);
+            sc.setCrossfade(true);
+            QCOMPARE(preferences.value("player/volume").toDouble(), 0.25);
+            QVERIFY(preferences.value("player/crossfade").toBool());
+        }
+        Network net;
+        SoundCloud restarted(nullptr, &net, secrets);
+        QVERIFY(qAbs(restarted.state()["volume"].toDouble() - 0.25) < 0.001);
+        QVERIFY(restarted.state()["crossfade"].toBool());
+        preferences.remove("player/volume"); preferences.remove("player/crossfade");
+    }
     void playbackProgressDoesNotInvalidateCatalog() {
         Network net;
         SoundCloud sc(nullptr, &net, secrets);
@@ -352,6 +380,22 @@ private slots:
         QTest::newRow("http") << 403 << int(QNetworkReply::NoError) << QByteArray{} << 4 << QString("HTTP 403");
         QTest::newRow("truncated") << 200 << int(QNetworkReply::NoError) << QByteArray("ab") << 4 << QString("не полностью");
         QTest::newRow("checksum") << 200 << int(QNetworkReply::NoError) << QByteArray("abcd") << 4 << QString("SHA-256");
+    }
+    void updateCheckErrorsAreManualOnly() {
+        {
+            Network net; net.responses = {{503, "{}"}};
+            SoundCloud sc(nullptr, &net, secrets);
+            sc.checkForUpdates(false);
+            QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+            QVERIFY(sc.state()["updateError"].toString().isEmpty());
+        }
+        {
+            Network net; net.responses = {{503, "{}"}};
+            SoundCloud sc(nullptr, &net, secrets);
+            sc.checkForUpdates(true);
+            QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
+            QVERIFY(sc.state()["updateError"].toString().contains("интернет"));
+        }
     }
     void updateFailuresHaveDistinctMessages() {
         QFETCH(int, status); QFETCH(int, networkError); QFETCH(QByteArray, body);

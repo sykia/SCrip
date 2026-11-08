@@ -716,6 +716,12 @@ Window {
                             Txt { Layout.fillWidth: true; text: row.modelData.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
                         }
                         LikeButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); track: row.modelData }
+                        Tool { text: "⋯"; visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); onClicked: trackMenu.open() }
+                        Menu {
+                            id: trackMenu
+                            MenuItem { text: "Копировать название и исполнителя"; onTriggered: sc.copyText((row.modelData.title || "Без названия") + " — " + (row.modelData.user?.username || "SoundCloud")) }
+                            MenuItem { text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(row.modelData.permalink_url || ""); onTriggered: sc.copyText(row.modelData.permalink_url) }
+                        }
                         Tool { visible: (row.modelData.urn || "").indexOf("soundcloud:tracks:") === 0; symbol: "plus"; text: "В очередь"; onClicked: sc.enqueue(row.modelData) }
                         Txt { text: app.time(row.modelData.duration); color: app.muted; font.pixelSize: 11; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
                     }
@@ -814,8 +820,8 @@ Window {
             FormBlock {
                 width: Math.min(parent.width, 480); heading: "SCrip"
                 Txt { text: "Версия " + Qt.application.version; color: app.muted }
-                Txt { text: app.api.updateAvailable ? "Доступна версия " + app.api.latestVersion : "Установлена последняя версия"; color: app.api.updateAvailable ? app.accent : app.muted }
-                Tool { text: app.api.updateAvailable ? "Установить обновление" : app.api.updateChecking ? "Проверяем обновления…" : "Проверить обновления"; enabled: !app.api.updateChecking; onClicked: { sc.checkForUpdates() } }
+                Txt { text: app.api.updateChecking ? "Проверяем обновления…" : app.api.updateError || (app.api.updateAvailable ? "Доступна версия " + app.api.latestVersion : app.api.updateResult || "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.api.updateAvailable ? app.accent : app.muted; width: parent.width; wrapMode: Text.WordWrap }
+                Tool { text: app.api.updateAvailable ? "Установить обновление" : "Проверить обновления"; enabled: !app.api.updateChecking; onClicked: sc.checkForUpdates(true) }
                 Txt { text: "Независимый клиент SoundCloud"; color: app.muted }
             }
         }

@@ -29,13 +29,14 @@ Column {
                     model: card.modelData.displayItems || []
                     Row {
                         id: stateItem
+                        width: content.width
                         required property var modelData
                         spacing: 8
                         Label {
+                            width: stateItem.width
                             text: stateItem.modelData.label + ": " + (stateItem.modelData.available ? (stateItem.modelData.valueType === "boolean" ? (stateItem.modelData.value ? "Включено" : "Выключено") : String(stateItem.modelData.value)) : "—")
-                            textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink
+                            textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; color: root.ink
                         }
-                        Switch { visible: stateItem.modelData.type === "toggle" && stateItem.modelData.available; checked: stateItem.modelData.value === true; enabled: false }
                     }
                 }
                 Flow {

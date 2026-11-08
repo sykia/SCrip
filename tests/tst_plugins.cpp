@@ -350,6 +350,12 @@ class PluginTests : public QObject {
         QCOMPARE(target, qint64(0));
         QVERIFY(!Plugins::relativeSeekTarget(1000, 10000, 1, false, &target));
         QVERIFY(!Plugins::relativeSeekTarget(10001, 10000, 1, true, &target));
+        QVERIFY(Plugins::relativeSeekTarget(1, std::numeric_limits<qint64>::max(), std::numeric_limits<qint64>::max(), true, &target));
+        QCOMPARE(target, std::numeric_limits<qint64>::max());
+        QVERIFY(Plugins::relativeSeekTarget(std::numeric_limits<qint64>::max() - 1,
+                                            std::numeric_limits<qint64>::max(),
+                                            std::numeric_limits<qint64>::min(), true, &target));
+        QCOMPARE(target, qint64(0));
         auto p = basic();
         p["permissions"] = QJsonArray{"ui.panels", "player.control"};
         p["contributions"] = QJsonArray{panel("player.seekRelative", {{"offsetMs", 2500}}),
@@ -408,10 +414,14 @@ class PluginTests : public QObject {
                                       {"items", QJsonArray{QJsonObject{{"type", "toggle"}, {"source", "setting"},
                                           {"key", "enabled"}, {"valueType", "boolean"}, {"label", "Флаг"}},
                                           QJsonObject{{"type", "text"}, {"source", "storage"}, {"key", "mark"},
-                                              {"valueType", "text"}, {"label", "Метка"}}}}};
-        auto storePanel = panel("storage.set", {{"key", "mark"}, {"value", "one"}});
+                                              {"valueType", "text"}, {"label", "Метка"}},
+                                          QJsonObject{{"type", "text"}, {"source", "storage"}, {"key", "mark"},
+                                              {"valueType", "integer"}, {"label", "Неверный тип"}}}}};
+        auto storePanel = panel("storage.set", {{"key", "mark"}, {"value", QString(250, 'x')}});
         storePanel["id"] = "write";
-        p["contributions"] = QJsonArray{statePanel, storePanel};
+        auto removeMissing = panel("storage.remove", {{"key", "missing"}});
+        removeMissing["id"] = "remove-missing";
+        p["contributions"] = QJsonArray{statePanel, storePanel, removeMissing};
         QVERIFY(PluginManifest::validate(p).isEmpty());
         auto noStorage = p; noStorage["permissions"] = QJsonArray{"ui.panels"};
         QVERIFY(!PluginManifest::validate(noStorage).isEmpty());
@@ -426,6 +436,7 @@ class PluginTests : public QObject {
         QCOMPARE(host.enable("first", true), QString());
         QCOMPARE(host.enable("second", true), QString());
         QCOMPARE(host.invokeButton("first", "write", 0), QString());
+        QCOMPARE(host.invokeButton("first", "remove-missing", 0), QString());
         QCOMPARE(host.invokeButton("second", "write", 0), QString());
         const auto panels = host.panels();
         auto valueFor = [&](const QString &id) {
@@ -436,10 +447,21 @@ class PluginTests : public QObject {
             }
             return QString();
         };
-        QCOMPARE(valueFor("first"), QString("one"));
+        QCOMPARE(valueFor("first"), QString(160, 'x'));
         QCOMPARE(valueFor("second"), QString("two"));
+        QCOMPARE(panels[0].toMap()["displayItems"].toList()[2].toMap()["available"].toBool(), false);
         QVERIFY(!host.setSetting("first", "enabled", false).size());
         QCOMPARE(host.panels()[0].toMap()["displayItems"].toList()[0].toMap()["value"].toBool(), false);
+        const auto registryPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins.json";
+        QFile beforeFile(registryPath); QVERIFY(beforeFile.open(QIODevice::ReadOnly)); const auto before = beforeFile.readAll(); beforeFile.close();
+        QCOMPARE(host.invokeButton("first", "write", 0), QString());
+        QFile afterFile(registryPath); QVERIFY(afterFile.open(QIODevice::ReadOnly)); QCOMPARE(afterFile.readAll(), before); afterFile.close();
+        const auto firstData = host.installed()[0].toMap()["data"].toMap();
+        QCOMPARE(host.setPermission("first", "storage", false), QString());
+        QVERIFY(!host.invokeButton("first", "write", 0).isEmpty());
+        QCOMPARE(host.installed()[0].toMap()["data"].toMap()["mark"].toString(), QString(250, 'x'));
+        QCOMPARE(host.installed()[1].toMap()["data"].toMap()["mark"].toString(), QString("two"));
+        QVERIFY(!firstData.isEmpty());
     }
     void preparedImportsAreBoundedAndCancellable() {
         Plugins host;

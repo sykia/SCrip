@@ -124,12 +124,14 @@ Column {
         Rectangle {
             id: card
             required property var modelData
+            property bool permissionsOpen: false
+            property bool settingsOpen: false
             objectName: "plugin-card-" + modelData.plugin.id
-            width: root.width; height: body.implicitHeight + 24; radius: 14
+            width: root.width; height: body.implicitHeight + 20; radius: 12
             color: "#f5f2f5"; border.color: "#e6e0e6"
             Column {
                 id: body
-                x: 12; y: 12; width: parent.width - 24; spacing: 10
+                x: 10; y: 10; width: parent.width - 20; spacing: 7
                 Label { width: parent.width; text: card.modelData.plugin.name + " · " + card.modelData.version; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true; color: root.ink }
                 Label { width: parent.width; text: card.modelData.plugin.description || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
                 Label { width: parent.width; text: ({"active":"Работает", "disabled":"Отключён", "removed":"Пакет удалён, конфигурация сохранена", "awaiting-permissions":"Нужны разрешения", "blocked":"Заблокирован", "error":"Ошибка"})[card.modelData.status] + (card.modelData.reason ? ": " + card.modelData.reason : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
@@ -141,25 +143,30 @@ Column {
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Обновить из файла"; onClicked: picker.open() }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Удалить"; onClicked: { root.removalId = card.modelData.plugin.id; keep.checked = false; removal.open() } }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить ошибку"; visible: !!card.modelData.lastError; onClicked: root.manager.clearError(card.modelData.plugin.id) }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Копировать ошибку"; visible: !!card.modelData.lastError; onClicked: sc.copyText(String(card.modelData.lastError)) }
                 }
+                PluginAction { text: "Разрешения · " + (card.modelData.permissionRows || []).length; onClicked: card.permissionsOpen = !card.permissionsOpen }
                 Repeater {
                     model: card.modelData.permissionRows || []
                     CheckBox {
                         id: permission
                         required property var modelData
                         width: body.width
+                        visible: card.permissionsOpen
                         checked: modelData.granted
                         text: modelData.label
                         contentItem: Label { text: permission.text; color: root.ink; textFormat: Text.PlainText; wrapMode: Text.Wrap; leftPadding: permission.indicator.width + permission.spacing; verticalAlignment: Text.AlignVCenter }
                         onToggled: root.showResult(root.manager.setPermission(card.modelData.plugin.id, modelData.id, checked))
                     }
                 }
+                PluginAction { text: "Настройки · " + (card.modelData.settingRows || []).length; onClicked: card.settingsOpen = !card.settingsOpen }
                 Repeater {
                     model: card.modelData.settingRows || []
                     Column {
                         id: setting
                         required property var modelData
                         width: body.width; spacing: 4
+                        visible: card.settingsOpen
                         Label { width: parent.width; text: setting.modelData.label; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
                         Switch { palette.windowText: root.ink; visible: setting.modelData.type === "boolean"; checked: setting.modelData.value === true; text: "Включено"; onToggled: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, checked)) }
                         SpinBox { palette.base: "#ffffff"; palette.text: root.ink; palette.button: "#ede7ee"; palette.buttonText: root.ink; visible: setting.modelData.type === "integer"; from: setting.modelData.min || 0; to: setting.modelData.max || 0; value: setting.modelData.type === "integer" ? setting.modelData.value : 0; editable: true; onValueModified: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, value)) }
@@ -167,9 +174,16 @@ Column {
                     }
                 }
                 Label { width: parent.width; text: "Собственные данные: " + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }
-                PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить данные"; onClicked: root.showResult(root.manager.clearData(card.modelData.plugin.id)) }
+                PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить данные"; onClicked: { root.removalId = card.modelData.plugin.id; clearDataDialog.open() } }
             }
         }
+    }
+    Dialog {
+        id: clearDataDialog
+        parent: Overlay.overlay; anchors.centerIn: parent; width: Math.min(380, parent.width - 24); height: 120
+        modal: true; title: "Очистить данные плагина"; standardButtons: Dialog.Ok | Dialog.Cancel
+        contentItem: Label { text: "Удалить все настройки и собственные данные плагина «" + root.removalId + "»?"; textFormat: Text.PlainText; wrapMode: Text.Wrap; padding: 16 }
+        onAccepted: root.showResult(root.manager.clearData(root.removalId))
     }
     Label { text: "Пока нет установленных плагинов"; visible: !!root.manager && !root.manager.installed.length; color: root.muted }
 }

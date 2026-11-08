@@ -1020,19 +1020,27 @@ QString Plugins::execute(const QString &id, const QJsonObject &a, bool button, i
             auto next = entries;
             auto row = next[i].toMap();
             auto data = row["data"].toMap();
-            if (cmd == "storage.set")
-                data[a["key"].toString()] = a["value"].toVariant();
-            else
-                data.remove(a["key"].toString());
-            row["data"] = data;
-            if (!dataValid(row)) {
-                error = "Превышена квота данных.";
-                code = "storage-error";
-            } else {
-                next[i] = row;
-                error = save(next);
-                if (!error.isEmpty())
+            const auto key = a["key"].toString();
+            bool changed = true;
+            if (cmd == "storage.set") {
+                const auto value = a["value"].toVariant();
+                if (!data.contains(key) || data.value(key) != value)
+                    data[key] = value;
+                else changed = false;
+            } else if (!data.contains(key)) {
+                changed = false;
+            } else data.remove(key);
+            if (changed) {
+                row["data"] = data;
+                if (!dataValid(row)) {
+                    error = "Превышена квота данных.";
                     code = "storage-error";
+                } else {
+                    next[i] = row;
+                    error = save(next);
+                    if (!error.isEmpty())
+                        code = "storage-error";
+                }
             }
         }
         m_depth = oldDepth;

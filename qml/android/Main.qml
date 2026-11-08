@@ -628,6 +628,8 @@ ApplicationWindow {
             Action { text: "Профиль исполнителя"; Layout.fillWidth: true; onClicked: { app.openProfile(app.selectedTrack.user); trackMenu.close(); player.close() } }
             Action { text: "Станция по треку"; Layout.fillWidth: true; onClicked: { sc.playStation(app.selectedTrack); trackMenu.close() } }
             Action { text: "Открыть в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.openExternal(app.selectedTrack.permalink_url); trackMenu.close() } }
+            Action { text: "Копировать название и исполнителя"; Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || "Без названия") + " — " + (app.selectedTrack.user?.username || "SoundCloud")); trackMenu.close() } }
+            Action { text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
             Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: trackMenu.close() }
         }
     }
@@ -736,5 +738,5 @@ ApplicationWindow {
         }
         Timer { interval: 900; running: startup.opened; onTriggered: startup.close() }
     }
-    Component.onCompleted: { startup.open(); sc.volume(1.0); if (sc.signedIn) sc.loadHome() }
+    Component.onCompleted: { startup.open(); if (sc.signedIn) sc.loadHome() }
 }

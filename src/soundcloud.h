@@ -60,7 +60,8 @@ public:
     Q_INVOKABLE void like(const QVariantMap &item);
     Q_INVOKABLE void createPlaylist(const QString &title, bool includeCurrent);
     Q_INVOKABLE void openExternal(const QString &url);
-    Q_INVOKABLE void checkForUpdates();
+    Q_INVOKABLE void copyText(const QString &text);
+    Q_INVOKABLE void checkForUpdates(bool manual = true);
     Q_INVOKABLE void clearError();
     Q_INVOKABLE void setRepeat(bool enabled);
     Q_INVOKABLE void setShuffle(bool enabled);

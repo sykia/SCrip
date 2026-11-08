@@ -19,6 +19,8 @@
 #include <QRandomGenerator>
 #include <QSaveFile>
 #include <QSettings>
+#include <QGuiApplication>
+#include <QClipboard>
 #include <QStandardPaths>
 #include <QTcpSocket>
 #include <QUrlQuery>
@@ -85,7 +87,7 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         {"queue", QVariantList{}}, {"profile", QVariantMap{}}, {"current", QVariantMap{}},
         {"playing", false}, {"playbackActive", false}, {"position", 0}, {"duration", 0}, {"hasMore", false},
         {"heading", "Откройте свою музыку"}, {"configPath", m_configPath}, {"repeat", false}, {"shuffle", false}, {"crossfade", false},
-        {"updateChecking", false}, {"updateAvailable", false}};
+        {"updateChecking", false}, {"updateAvailable", false}, {"updateError", ""}, {"updateResult", ""}, {"updateManual", false}};
     QJsonObject connection, session;
     m_storageReady = m_authStorage.load("connection", m_configPath, connection)
         && m_authStorage.load("session", m_sessionPath, session);
@@ -161,7 +163,7 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     m_loginTimeout.setSingleShot(true); m_loginTimeout.setInterval(600000);
     connect(&m_loginTimeout, &QTimer::timeout, this, [this] { cancelLogin(); fail("Время ожидания входа истекло. Попробуйте снова."); });
     QTimer::singleShot(0, this, [this, network] {
-        if (!network) checkForUpdates();
+        if (!network) checkForUpdates(false);
         if (m_state.value("configured").toBool() && (!m_useWorker || m_userSession)) connectCatalog();
     });
 }
@@ -758,9 +760,12 @@ void SoundCloud::openExternal(const QString &value) {
     const bool updates = url.host() == "github.com" && url.path() == "/sykia/SCrip/releases/latest";
     if (url.scheme() == "https" && (soundcloud || updates)) QDesktopServices::openUrl(url);
 }
+void SoundCloud::copyText(const QString &text) { QGuiApplication::clipboard()->setText(text); }
 
-void SoundCloud::checkForUpdates() {
+void SoundCloud::checkForUpdates(bool manual) {
     if (m_state.value("updateChecking").toBool() || m_state.value("updateInstalling").toBool()) return;
+    set("updateError", "");
+    set("updateManual", manual);
     set("updateChecking", true);
     QNetworkRequest req(QUrl("https://api.github.com/repos/sykia/SCrip/releases/latest"));
     req.setRawHeader("Accept", "application/vnd.github+json");
@@ -769,20 +774,25 @@ void SoundCloud::checkForUpdates() {
     req.setTransferTimeout(15000);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     auto *reply = m_network->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, manual] {
         reply->deleteLater();
         set("updateChecking", false);
-        if (reply->error() != QNetworkReply::NoError) return;
-        const auto release = QJsonDocument::fromJson(reply->readAll()).object();
+        auto updateFailure = [this](const QString &message) { if (m_state.value("updateManual").toBool()) set("updateError", message); };
+        if (reply->error() != QNetworkReply::NoError) { updateFailure("Не удалось проверить обновления. Проверьте подключение к интернету."); return; }
+        QJsonParseError parseError;
+        const auto releaseDoc = QJsonDocument::fromJson(reply->readAll(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !releaseDoc.isObject()) { updateFailure("Сервис обновлений вернул некорректный ответ."); return; }
+        const auto release = releaseDoc.object();
         const QString tag = release.value("tag_name").toString();
         const QString remote = tag.startsWith('v') ? tag.mid(1) : tag;
         const auto latest = QVersionNumber::fromString(remote);
         const auto current = QVersionNumber::fromString(QCoreApplication::applicationVersion());
-        if (latest.isNull() || current.isNull()) return;
+        if (latest.isNull() || current.isNull()) { updateFailure("Не удалось определить версии приложения."); return; }
         set("latestVersion", remote);
         set("updateAvailable", QVersionNumber::compare(latest, current) > 0);
         set("updateUrl", "https://github.com/sykia/SCrip/releases/latest");
-        if (QVersionNumber::compare(latest, current) <= 0) return;
+        if (QVersionNumber::compare(latest, current) <= 0) { if (manual) set("updateResult", "Установлена последняя версия"); return; }
+        set("updateResult", "Доступна версия " + remote);
         QString suffix;
 #ifdef Q_OS_ANDROID
         suffix = "-Android-universal.apk";
@@ -791,14 +801,16 @@ void SoundCloud::checkForUpdates() {
 #elif defined(Q_OS_LINUX)
         suffix = QFileInfo::exists("/etc/arch-release") ? "-x86_64.pkg.tar.zst" : "-amd64.deb";
 #else
-        return;
+        updateFailure("Автоматическая установка не поддерживается на этой платформе. Откройте страницу релиза вручную."); return;
 #endif
+        bool assetFound = false;
         for (const auto &entry : release.value("assets").toArray()) {
             const auto asset = entry.toObject();
             if (!asset.value("name").toString().endsWith(suffix)) continue;
             const QString digest = asset.value("digest").toString();
             const QUrl url(asset.value("browser_download_url").toString());
             if (!digest.startsWith("sha256:") || url.scheme() != "https" || url.host() != "github.com") continue;
+            assetFound = true;
             set("updateInstalling", true);
             QNetworkRequest download(url); download.setTransferTimeout(60000);
             download.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -858,6 +870,7 @@ void SoundCloud::checkForUpdates() {
             });
             break;
         }
+        if (!assetFound) updateFailure("Обновление доступно, но подходящий установочный файл не найден.");
 
     });
 }
