@@ -17,10 +17,16 @@ class SoundCloud : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
+    // Каталог не инвалидируется при каждом обновлении позиции воспроизведения.
+    Q_PROPERTY(QVariantMap catalogState READ state NOTIFY catalogChanged)
+    Q_PROPERTY(qint64 position READ position NOTIFY progressChanged)
+    Q_PROPERTY(qint64 duration READ duration NOTIFY progressChanged)
 public:
     explicit SoundCloud(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr);
     bool signedIn() const { return m_state.value("signedIn").toBool(); }
     QVariantMap state() const { return m_state; }
+    qint64 position() const { return m_state.value("position").toLongLong(); }
+    qint64 duration() const { return m_state.value("duration").toLongLong(); }
     Q_INVOKABLE void connectCatalog();
     Q_INVOKABLE void login();
     Q_INVOKABLE void cancelLogin();
@@ -59,10 +65,13 @@ public:
     Q_INVOKABLE void setCrossfade(bool enabled);
 signals:
     void changed();
+    void catalogChanged();
+    void progressChanged();
     void signedInChanged();
     void trackSaved();
     void authorizationRequested(const QUrl &url);
 private:
+    friend class SoundCloudTest;
     using Callback = std::function<void(QJsonDocument)>;
     void set(const QString &key, const QVariant &value);
     void fail(const QString &message);

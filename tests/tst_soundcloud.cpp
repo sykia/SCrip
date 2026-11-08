@@ -74,6 +74,30 @@ private:
         file.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"client_secret", "test-secret"}, {"redirect_uri", QString("http://127.0.0.1:%1/callback").arg(callbackPort)}}).toJson());
     }
 private slots:
+    void playbackProgressDoesNotInvalidateCatalog() {
+        Network net;
+        SoundCloud sc(nullptr, &net);
+        QSignalSpy legacy(&sc, &SoundCloud::changed);
+        QSignalSpy catalog(&sc, &SoundCloud::catalogChanged);
+        QSignalSpy progress(&sc, &SoundCloud::progressChanged);
+        const QList<QMediaPlayer *> players{&sc.m_player, &sc.m_sparePlayer};
+        // Сигнал backend: активный плеер обновляет прогресс, запасной игнорируется.
+        for (auto *media : players)
+            media->positionChanged(1234);
+        QCOMPARE(sc.position(), 1234);
+        QCOMPARE(progress.count(), 1);
+        QCOMPARE(legacy.count(), 1);
+        QCOMPARE(catalog.count(), 0);
+        sc.m_activePlayer->durationChanged(90000);
+        QCOMPARE(sc.duration(), 90000);
+        QCOMPARE(progress.count(), 2);
+        QCOMPARE(catalog.count(), 0);
+        sc.m_activePlayer->positionChanged(1234); // Повторное значение не уведомляет QML.
+        QCOMPARE(progress.count(), 2);
+        sc.setRepeat(!sc.state().value("repeat").toBool());
+        QCOMPARE(catalog.count(), 1);
+        QCOMPARE(progress.count(), 2);
+    }
     void initTestCase() {
 #ifdef Q_OS_WIN
         QStandardPaths::setTestModeEnabled(true);

@@ -173,6 +173,8 @@ void SoundCloud::set(const QString &key, const QVariant &value) {
     if (m_state.value(key) == value) return;
     m_state[key] = value;
     emit changed();
+    if (key == "position" || key == "duration") emit progressChanged();
+    else emit catalogChanged();
     if (key == "signedIn") emit signedInChanged();
 }
 void SoundCloud::fail(const QString &message) { set("error", message); }
@@ -568,6 +570,7 @@ void SoundCloud::moveQueue(int from, int to) {
     m_state["queueIndex"] = m_queueIndex;
     m_state["queue"] = m_queue;
     emit changed();
+    emit catalogChanged();
     prepareNext();
 }
 void SoundCloud::queueNext(int index) {

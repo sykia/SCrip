@@ -15,7 +15,7 @@ ApplicationWindow {
     minimumHeight: 480
     title: "SCrip · Android"
     color: "#faf9fa"
-    readonly property var api: sc.state
+    readonly property var api: sc.catalogState
     readonly property color accent: pluginManager.theme.accent || prefs.accent
     readonly property color ink: "#242426"
     readonly property color muted: "#858589"
@@ -108,6 +108,9 @@ ApplicationWindow {
             id: picture
             anchors.fill: parent
             asynchronous: true
+            // Ограничиваем декодирование и текстуру физическим размером обложки.
+            sourceSize.width: Math.max(1, Math.ceil(width * Screen.devicePixelRatio))
+            sourceSize.height: Math.max(1, Math.ceil(height * Screen.devicePixelRatio))
             fillMode: Image.PreserveAspectCrop
             layer.enabled: true
             layer.effect: MultiEffect {
@@ -526,7 +529,7 @@ ApplicationWindow {
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 4
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: parent.width - 40; height: 2; radius: 1; color: "#e3d9df"
-                Rectangle { height: parent.height; radius: 1; width: parent.width * Math.min(1, (app.api.position || 0) / Math.max(1, app.api.duration || 0)); color: app.accent }
+                Rectangle { height: parent.height; radius: 1; width: parent.width * Math.min(1, (sc.position || 0) / Math.max(1, sc.duration || 0)); color: app.accent }
             }
         }
         Item {
@@ -656,17 +659,17 @@ ApplicationWindow {
             Caption { text: app.api.current?.user?.username || ""; color: app.muted; Layout.fillWidth: true }
             FineSlider {
                 id: progress
-                Layout.fillWidth: true; to: Math.max(1, app.api.duration || 0)
-                value: app.api.position || 0
-                enabled: (app.api.duration || 0) > 0
+                Layout.fillWidth: true; to: Math.max(1, sc.duration || 0)
+                value: sc.position || 0
+                enabled: (sc.duration || 0) > 0
                 onPressedChanged: if (!pressed) sc.seek(value)
                 Accessible.name: "Позиция воспроизведения"
             }
             RowLayout {
                 Layout.fillWidth: true
-                Caption { text: app.time(app.api.position); color: app.muted; font.pixelSize: 12 }
+                Caption { text: app.time(sc.position); color: app.muted; font.pixelSize: 12 }
                 Item { Layout.fillWidth: true }
-                Caption { text: app.time(app.api.duration); color: app.muted; font.pixelSize: 12 }
+                Caption { text: app.time(sc.duration); color: app.muted; font.pixelSize: 12 }
             }
             RowLayout {
                 Layout.fillWidth: true; spacing: 0

@@ -41,7 +41,7 @@ AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwor
     QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "initialize", "(Landroid/content/Context;)V",
         QNativeInterface::QAndroidApplication::context().object());
     // Позиция обновляется не чаще раза в секунду; кнопки и смена трека — сразу.
-    connect(soundcloud, &SoundCloud::changed, this, [this] {
+    connect(soundcloud, &SoundCloud::catalogChanged, this, [this] {
         const auto s = m_soundcloud->state();
         const bool active = s.value("playbackActive").toBool();
         if (active && !m_playbackActive)
