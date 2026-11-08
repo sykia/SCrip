@@ -71,6 +71,15 @@ int main(int argc, char *argv[])
         const auto track = state.value("current").toMap();
         if (command == "player.repeat") { soundcloud.setRepeat(args["enabled"].toBool()); return {}; }
         if (command == "player.shuffle") { soundcloud.setShuffle(args["enabled"].toBool()); return {}; }
+        if (command == "player.volume") { soundcloud.volume(args["value"].toDouble()); return {}; }
+        if (command == "player.seekRelative") {
+            qint64 target = 0;
+            if (!Plugins::relativeSeekTarget(soundcloud.position(), soundcloud.duration(),
+                                             args["offsetMs"].toInteger(), soundcloud.seekable(), &target))
+                return "Перемотка недоступна или позиция трека некорректна.";
+            soundcloud.seek(target);
+            return {};
+        }
         if (track.isEmpty()) return "Нет текущего трека.";
         if (command == "player.pause") soundcloud.pausePlayback();
         else if (command == "player.resume") soundcloud.resumePlayback();

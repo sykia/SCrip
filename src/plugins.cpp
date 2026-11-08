@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 #include <QThreadPool>
 #include <QUuid>
+#include <cmath>
 #include <memory>
 
 namespace {
@@ -117,6 +118,14 @@ class ImportReader final : public QObject {
 };
 } // namespace
 
+bool Plugins::relativeSeekTarget(qint64 position, qint64 duration, qint64 offset, bool seekable,
+                                 qint64 *target) {
+    if (!target || !seekable || duration <= 0 || position < 0 || position > duration)
+        return false;
+    *target = offset >= 0 ? (offset >= duration - position ? duration : position + offset)
+                          : (offset <= -position ? qint64(0) : position + offset);
+    return true;
+}
 Plugins::Plugins(QObject *parent) : QObject(parent) {
     m_clock.start();
     m_progressTimer.setInterval(1000);
@@ -855,6 +864,35 @@ QVariantList Plugins::panels() const {
                 panel["label"] = c["title"].toString();
                 panel["pluginId"] = id;
                 panel["contributionId"] = c["id"].toString();
+                QVariantList displayedItems;
+                const auto settings = row["settings"].toMap();
+                const auto data = row["data"].toMap();
+                for (auto itemValue : c["items"].toArray()) {
+                    auto item = itemValue.toObject().toVariantMap();
+                    const auto key = item["key"].toString();
+                    const auto value = item["source"] == "setting" ? settings.value(key) : data.value(key);
+                    const auto type = item["valueType"].toString();
+                    bool matches = false;
+                    if (type == "boolean")
+                        matches = value.metaType().id() == QMetaType::Bool;
+                    else if (type == "text")
+                        matches = value.metaType().id() == QMetaType::QString;
+                    else if (type == "integer")
+                        matches = value.metaType().id() == QMetaType::Int ||
+                                  value.metaType().id() == QMetaType::LongLong ||
+                                  value.metaType().id() == QMetaType::UInt ||
+                                  value.metaType().id() == QMetaType::ULongLong ||
+                                  (value.metaType().id() == QMetaType::Double &&
+                                   std::isfinite(value.toDouble()) &&
+                                   std::floor(value.toDouble()) == value.toDouble());
+                    item["available"] = matches;
+                    if (matches && type == "text")
+                        item["value"] = value.toString().left(160);
+                    else if (matches)
+                        item["value"] = value;
+                    displayedItems.append(item);
+                }
+                panel["displayItems"] = displayedItems;
                 QStringList timers;
                 const auto own = m_timers.value(id);
                 for (auto it = own.cbegin(); it != own.cend(); ++it)

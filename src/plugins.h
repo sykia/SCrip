@@ -18,6 +18,8 @@ class Plugins : public QObject {
     Q_PROPERTY(QString error READ error NOTIFY changed)
   public:
     explicit Plugins(QObject *parent = nullptr);
+    static bool relativeSeekTarget(qint64 position, qint64 duration, qint64 offset, bool seekable,
+                                   qint64 *target);
     QVariantList installed() const;
     QVariantMap theme() const;
     QVariantList panels() const;

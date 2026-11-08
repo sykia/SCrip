@@ -238,7 +238,7 @@ bool settingValue(const QJsonObject &s, const QJsonValue &v) {
 }
 QString commandPermission(const QString &c) {
     if (QStringList{"player.pause", "player.resume", "player.next", "player.previous", "player.seek",
-                    "player.repeat", "player.shuffle"}
+                    "player.seekRelative", "player.volume", "player.repeat", "player.shuffle"}
             .contains(c))
         return "player.control";
     if (c == "navigation.open")
@@ -350,6 +350,17 @@ QString validate(const QJsonObject &o) {
             if (!integer(a["positionMs"], 0, 9007199254740991.0))
                 return "Некорректная позиция.";
         }
+        if (cmd == "player.seekRelative") {
+            keys.append("offsetMs");
+            if (!integer(a["offsetMs"], -9007199254740991.0, 9007199254740991.0))
+                return "Некорректное относительное смещение.";
+        }
+        if (cmd == "player.volume") {
+            keys.append("value");
+            if (!a["value"].isDouble() || !std::isfinite(a["value"].toDouble()) ||
+                a["value"].toDouble() < 0.0 || a["value"].toDouble() > 1.0)
+                return "Громкость должна быть числом от 0 до 1.";
+        }
         if (cmd == "player.repeat" || cmd == "player.shuffle") {
             keys.append("enabled");
             if (!a["enabled"].isBool())
@@ -405,7 +416,7 @@ QString validate(const QJsonObject &o) {
                 return "Некорректный вклад темы.";
         } else if (type == "panel") {
             if (!grants.contains("ui.panels") ||
-                !fields(c, {"id", "type", "slot", "title", "text", "buttons", "enabledSetting"},
+                !fields(c, {"id", "type", "slot", "title", "text", "buttons", "items", "enabledSetting"},
                         {"id", "type", "slot", "title"}) ||
                 !QStringList{"home.panels", "profile.panels", "player.tools"}.contains(
                     c["slot"].toString()) ||
@@ -413,6 +424,35 @@ QString validate(const QJsonObject &o) {
                 return "Некорректная панель.";
             if (c.contains("buttons") && (!c["buttons"].isArray() || c["buttons"].toArray().size() > 4))
                 return "Некорректные кнопки.";
+            if (c.contains("items")) {
+                auto items = c["items"].toArray();
+                if (!c["items"].isArray() || items.size() > 8)
+                    return "Некорректные элементы панели.";
+                for (auto itemValue : items) {
+                    auto item = itemValue.toObject();
+                    const auto type = item["type"].toString();
+                    const auto source = item["source"].toString();
+                    const auto key = item["key"].toString();
+                    const auto valueType = item["valueType"].toString();
+                    if (!itemValue.isObject() || !fields(item, {"type", "source", "key", "label", "valueType"},
+                                                         {"type", "source", "key", "label", "valueType"}) ||
+                        !QStringList{"text", "toggle"}.contains(type) ||
+                        !QStringList{"setting", "storage"}.contains(source) || !id(item["key"]) ||
+                        !QStringList{"text", "boolean", "integer"}.contains(valueType) ||
+                        !text(item["label"], 48) || (type == "toggle") != (valueType == "boolean"))
+                        return "Некорректная ссылка состояния.";
+                    if (source == "setting") {
+                        const auto setting = settings.value(key);
+                        const auto settingType = setting["type"].toString();
+                        if (setting.isEmpty() || (valueType == "boolean" && settingType != "boolean") ||
+                            (valueType == "integer" && settingType != "integer") ||
+                            (valueType == "text" && settingType != "enum"))
+                            return "Ссылка панели не соответствует типу настройки.";
+                    } else if (!grants.contains("storage")) {
+                        return "Для чтения storage нужно разрешение.";
+                    }
+                }
+            }
             for (auto b : c["buttons"].toArray()) {
                 auto bt = b.toObject();
                 if (!b.isObject() || !fields(bt, {"label", "action"}, {"label", "action"}) ||

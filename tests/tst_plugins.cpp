@@ -13,6 +13,7 @@
 #include <QTemporaryDir>
 #include <QUuid>
 #include <QtTest>
+#include <limits>
 
 // Модель без сети для проверки геометрии настоящего Android Main.qml.
 class AndroidLayoutModel : public QObject {
@@ -336,6 +337,109 @@ class PluginTests : public QObject {
         QVERIFY(!host.enable("test", false).isEmpty());
         QVERIFY(host.installed()[0].toMap()["enabled"].toBool());
         QDir(path).removeRecursively();
+    }
+    void playerSeekRelativeAndVolumeValidation() {
+        qint64 target = -1;
+        QVERIFY(Plugins::relativeSeekTarget(1000, 10000, 2500, true, &target));
+        QCOMPARE(target, qint64(3500));
+        QVERIFY(Plugins::relativeSeekTarget(1000, 10000, -2500, true, &target));
+        QCOMPARE(target, qint64(0));
+        QVERIFY(Plugins::relativeSeekTarget(9000, 10000, 5000, true, &target));
+        QCOMPARE(target, qint64(10000));
+        QVERIFY(Plugins::relativeSeekTarget(1000, 10000, -5000, true, &target));
+        QCOMPARE(target, qint64(0));
+        QVERIFY(!Plugins::relativeSeekTarget(1000, 10000, 1, false, &target));
+        QVERIFY(!Plugins::relativeSeekTarget(10001, 10000, 1, true, &target));
+        auto p = basic();
+        p["permissions"] = QJsonArray{"ui.panels", "player.control"};
+        p["contributions"] = QJsonArray{panel("player.seekRelative", {{"offsetMs", 2500}}),
+                                        panel("player.volume", {{"value", 0.5}})};
+        auto commandPanels = p["contributions"].toArray();
+        auto seekPanel = commandPanels[0].toObject(); seekPanel["id"] = "seek";
+        auto volumePanel = commandPanels[1].toObject(); volumePanel["id"] = "volume";
+        commandPanels[0] = seekPanel; commandPanels[1] = volumePanel; p["contributions"] = commandPanels;
+        QVERIFY(PluginManifest::validate(p).isEmpty());
+        auto bad = p;
+        auto contributions = bad["contributions"].toArray();
+        auto action = contributions[0].toObject()["buttons"].toArray()[0].toObject();
+        auto args = action["action"].toObject(); args["offsetMs"] = 1.5;
+        action["action"] = args;
+        contributions[0] = action;
+        bad["contributions"] = contributions;
+        QVERIFY(!PluginManifest::validate(bad).isEmpty());
+        bad = p; contributions = bad["contributions"].toArray();
+        action = contributions[1].toObject()["buttons"].toArray()[0].toObject();
+        args = action["action"].toObject(); args["value"] = 1.01;
+        action["action"] = args; contributions[1] = action; bad["contributions"] = contributions;
+        QVERIFY(!PluginManifest::validate(bad).isEmpty());
+        bad = p; contributions = bad["contributions"].toArray();
+        action = contributions[1].toObject()["buttons"].toArray()[0].toObject();
+        args = action["action"].toObject(); args["value"] = QJsonValue(std::numeric_limits<double>::quiet_NaN());
+        action["action"] = args; contributions[1] = action; bad["contributions"] = contributions;
+        QVERIFY(!PluginManifest::validate(bad).isEmpty());
+        auto missingGrant = p; missingGrant["permissions"] = QJsonArray{"ui.panels"};
+        QVERIFY(!PluginManifest::validate(missingGrant).isEmpty());
+        Plugins host;
+        QCOMPARE(add(host, p), QString());
+        QCOMPARE(host.enable("test", true), QString());
+        QStringList calls;
+        host.setPlayerCommand([&](const QString &command, const QJsonObject &arguments) {
+            calls.append(command + QJsonDocument(arguments).toJson(QJsonDocument::Compact));
+            return QString();
+        });
+        QCOMPARE(host.invokeButton("test", "seek", 0), QString());
+        QCOMPARE(host.invokeButton("test", "volume", 0), QString());
+        QCOMPARE(calls.size(), 2);
+        QVERIFY(calls[0].startsWith("player.seekRelative"));
+        QVERIFY(calls[1].startsWith("player.volume"));
+        QCOMPARE(host.setPermission("test", "player.control", false), QString());
+        QVERIFY(!host.invokeButton("test", "seek", 0).isEmpty());
+        QCOMPARE(host.enable("test", false), QString());
+        QVERIFY(!host.invokeButton("test", "seek", 0).isEmpty());
+    }
+    void declarativeOwnStateIsTypedAndIsolated() {
+        Plugins host;
+        auto p = basic("first");
+        p["permissions"] = QJsonArray{"ui.panels", "storage"};
+        p["settings"] = QJsonArray{QJsonObject{{"id", "enabled"}, {"type", "boolean"},
+                                               {"label", "Включено"}, {"default", true}}};
+        auto statePanel = QJsonObject{{"id", "state"}, {"type", "panel"}, {"slot", "home.panels"},
+                                      {"title", "Состояние"},
+                                      {"items", QJsonArray{QJsonObject{{"type", "toggle"}, {"source", "setting"},
+                                          {"key", "enabled"}, {"valueType", "boolean"}, {"label", "Флаг"}},
+                                          QJsonObject{{"type", "text"}, {"source", "storage"}, {"key", "mark"},
+                                              {"valueType", "text"}, {"label", "Метка"}}}}};
+        auto storePanel = panel("storage.set", {{"key", "mark"}, {"value", "one"}});
+        storePanel["id"] = "write";
+        p["contributions"] = QJsonArray{statePanel, storePanel};
+        QVERIFY(PluginManifest::validate(p).isEmpty());
+        auto noStorage = p; noStorage["permissions"] = QJsonArray{"ui.panels"};
+        QVERIFY(!PluginManifest::validate(noStorage).isEmpty());
+        QCOMPARE(add(host, p), QString());
+        auto second = p; second["id"] = "second";
+        auto secondPanel = second["contributions"].toArray();
+        auto write = secondPanel[1].toObject();
+        auto button = write["buttons"].toArray()[0].toObject();
+        auto action = button["action"].toObject(); action["value"] = "two"; button["action"] = action;
+        write["buttons"] = QJsonArray{button}; secondPanel[1] = write; second["contributions"] = secondPanel;
+        QCOMPARE(add(host, second), QString());
+        QCOMPARE(host.enable("first", true), QString());
+        QCOMPARE(host.enable("second", true), QString());
+        QCOMPARE(host.invokeButton("first", "write", 0), QString());
+        QCOMPARE(host.invokeButton("second", "write", 0), QString());
+        const auto panels = host.panels();
+        auto valueFor = [&](const QString &id) {
+            for (const auto &entry : panels) {
+                const auto row = entry.toMap();
+                if (row["pluginId"] == id && row["contributionId"] == "state")
+                    return row["displayItems"].toList()[1].toMap()["value"].toString();
+            }
+            return QString();
+        };
+        QCOMPARE(valueFor("first"), QString("one"));
+        QCOMPARE(valueFor("second"), QString("two"));
+        QVERIFY(!host.setSetting("first", "enabled", false).size());
+        QCOMPARE(host.panels()[0].toMap()["displayItems"].toList()[0].toMap()["value"].toBool(), false);
     }
     void preparedImportsAreBoundedAndCancellable() {
         Plugins host;

@@ -25,6 +25,19 @@ Column {
                 Label { width: parent.width; text: card.modelData.label || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true; color: root.ink }
                 Label { width: parent.width; text: card.modelData.text || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.muted }
                 Label { width: parent.width; text: card.modelData.timerText || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
+                Repeater {
+                    model: card.modelData.displayItems || []
+                    Row {
+                        id: stateItem
+                        required property var modelData
+                        spacing: 8
+                        Label {
+                            text: stateItem.modelData.label + ": " + (stateItem.modelData.available ? (stateItem.modelData.valueType === "boolean" ? (stateItem.modelData.value ? "Включено" : "Выключено") : String(stateItem.modelData.value)) : "—")
+                            textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink
+                        }
+                        Switch { visible: stateItem.modelData.type === "toggle" && stateItem.modelData.available; checked: stateItem.modelData.value === true; enabled: false }
+                    }
+                }
                 Flow {
                     width: parent.width; spacing: 8
                     Repeater {
