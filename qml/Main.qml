@@ -414,7 +414,7 @@ Window {
                     Rectangle {
                         Layout.preferredWidth: 50; Layout.preferredHeight: 50
                         radius: app.artworkRadius; color: Qt.tint("#faf9fa", Qt.alpha(app.accent, 0.09))
-                        Artwork { id: dockArt; anchors.fill: parent; source: app.cover(app.api.current); visible: !!source }
+                        Artwork { radius: app.artworkRadius; id: dockArt; anchors.fill: parent; source: app.cover(app.api.current); visible: !!source }
                         Glyph { visible: !dockArt.visible; anchors.centerIn: parent; width: 24; height: 24; name: "music"; ink: app.accent }
                     }
                     ColumnLayout {
@@ -505,7 +505,7 @@ Window {
                     width: parent.width; spacing: 16
                     Column {
                         Layout.preferredWidth: Math.min(184, mix.width * 0.28); spacing: 5
-                        Artwork {
+                        Artwork { radius: app.artworkRadius;
                             width: parent.width; height: width; source: app.cover(mix.modelData.tracks[0])
                             TapHandler { onTapped: sc.playMix(mix.songs, 0) }
                         }
@@ -669,7 +669,7 @@ Window {
                     Rectangle {
                         id: artwork; width: parent.width; height: width; radius: app.artworkRadius; color: "#f1eded"; border.color: "#eeeaec"; clip: true
                         Glyph { anchors.centerIn: parent; width: 40; height: 40; name: tile.playlist ? "grid" : "music"; ink: "#c6b6bf" }
-                        Artwork { anchors.fill: parent; source: app.cover(tile.modelData); }
+                        Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(tile.modelData); }
                         TapHandler { onTapped: sc.play(tile.modelData) }
                         Rectangle { anchors.fill: parent; radius: parent.radius; color: "transparent"; border.color: "#14000000" }
                         Rectangle {
@@ -709,7 +709,7 @@ Window {
                     RowLayout {
                         anchors.fill: parent; anchors.margins: 7; spacing: 10
                         Tool { symbol: "play"; text: "Слушать"; onClicked: sc.play(row.modelData); implicitWidth: 24 }
-                        Artwork { width: 40; height: 40; source: app.cover(row.modelData); }
+                        Artwork { radius: app.artworkRadius; width: 40; height: 40; source: app.cover(row.modelData); }
                         ColumnLayout {
                             Layout.fillWidth: true; spacing: 4
                             Txt { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; font.pixelSize: 12 }
@@ -792,7 +792,7 @@ Window {
             FormBlock {
                 width: parent.width; heading: "Форма и движение"
                 Row { spacing: 16
-                    Artwork { width: 64; height: 64; source: app.cover(app.api.current) }
+                    Artwork { radius: app.artworkRadius; width: 64; height: 64; source: app.cover(app.api.current) }
                     Avatar { width: 64; height: 64; source: app.imageUrl(app.api.profile.avatar_url || "") }
                 }
                 SettingSlider { label: "Обложки"; suffix: " px"; maximum: 24; value: prefs.coverRadius; onEdited: v => { prefs.coverRadius = v; prefs.coverRadiusOverride = true } }
@@ -985,26 +985,6 @@ Window {
             }
         }
     }
-    component Artwork: Canvas {
-        property real radius: app.artworkRadius
-        onRadiusChanged: requestPaint()
-        onHeightChanged: requestPaint()
-        property string source: ""
-        onSourceChanged: { if (source) loadImage(source); requestPaint() }
-        onAvailableChanged: if (available && source && !isImageLoaded(source)) loadImage(source)
-        onImageLoaded: requestPaint()
-        onWidthChanged: requestPaint()
-        onPaint: {
-            const c = getContext("2d"); c.reset(); c.beginPath()
-            const r = Math.min(radius, width / 2, height / 2)
-            c.moveTo(r,0); c.lineTo(width-r,0); c.quadraticCurveTo(width,0,width,r)
-            c.lineTo(width,height-r); c.quadraticCurveTo(width,height,width-r,height)
-            c.lineTo(r,height); c.quadraticCurveTo(0,height,0,height-r)
-            c.lineTo(0,r); c.quadraticCurveTo(0,0,r,0); c.closePath(); c.clip()
-            c.fillStyle = "#e9e7e9"; c.fillRect(0,0,width,height)
-            if (source && isImageLoaded(source)) c.drawImage(source,0,0,width,height)
-        }
-    }
     component Avatar: Artwork { radius: Math.min(width, height) * prefs.avatarRoundness / 100 }
     component Inspector: ColumnLayout {
         id: inspector
@@ -1019,7 +999,7 @@ Window {
             visible: !!app.api.current.urn && inspector.height >= 480
             Layout.fillWidth: true; Layout.preferredHeight: Math.min(width, inspector.height * 0.34); radius: app.artworkRadius; color: "#f0eef0"; clip: true
             Glyph { anchors.centerIn: parent; width: 36; height: 36; name: "music"; ink: "#bbb4bb" }
-            Artwork { anchors.fill: parent; source: app.cover(app.api.current); }
+            Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(app.api.current); }
         }
         RowLayout {
             visible: !!app.api.current.urn; Layout.fillWidth: true; spacing: 8
@@ -1081,7 +1061,7 @@ Window {
                     anchors.fill: parent; anchors.margins: 6; spacing: 8
                     Item {
                         width: 34; height: 34
-                        Artwork { anchors.fill: parent; source: app.cover(queuedTrack.modelData); }
+                        Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(queuedTrack.modelData); }
                         Tool { anchors.fill: parent; symbol: queuedTrack.index === app.api.queueIndex && app.api.playing ? "pause" : "play"; text: "Слушать"; onClicked: { if (queuedTrack.index === app.api.queueIndex) sc.togglePlayback(); else sc.playQueue(queuedTrack.index) } }
                     }
                     ColumnLayout {

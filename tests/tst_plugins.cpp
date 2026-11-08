@@ -624,9 +624,10 @@ class PluginTests : public QObject {
         QFile mainFile(fixture + "/Main.qml");
         QVERIFY(mainFile.open(QIODevice::WriteOnly));
         mainFile.write(source.readAll()); mainFile.close();
-        for (auto name : {"PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml"}) {
+        for (auto name : {"PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
+            const auto sourcePath = QString(SCRIP_SOURCE_DIR) + (QString(name) == "RoundedImage.qml" || QString(name) == "AndroidGlyph.qml" ? "/qml/android/" : "/qml/") + name;
             QFile::remove(fixture + "/" + name);
-            QVERIFY(QFile::copy(QString(SCRIP_SOURCE_DIR) + "/qml/" + name, fixture + "/" + name));
+            QVERIFY(QFile::copy(sourcePath, fixture + "/" + name));
         }
         component.loadUrl(QUrl::fromLocalFile(fixture + "/Main.qml"));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));

@@ -99,39 +99,8 @@ ApplicationWindow {
             Behavior on color { ColorAnimation { duration: prefs.motion ? 150 : 0 } }
         }
         contentItem: Item {
-            Glyph { anchors.centerIn: parent; width: transport.main ? 26 : 22; height: width; name: transport.symbol; ink: transport.main ? "white" : transport.active ? app.accent : app.ink }
+            AndroidGlyph { anchors.centerIn: parent; width: transport.main ? 26 : 22; height: width; name: transport.symbol; ink: transport.main ? "white" : transport.active ? app.accent : app.ink }
             Rectangle { visible: transport.active && !transport.main; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 3; height: 3; radius: 1.5; color: app.accent }
-        }
-    }
-    component RoundedImage: Item {
-        id: rounded
-        property alias source: picture.source
-        property real radius: app.coverRadius
-        property bool avatar: false
-        Rectangle { anchors.fill: parent; radius: rounded.avatar ? width / 2 : rounded.radius; color: "#eee7ec" }
-        Glyph { anchors.centerIn: parent; visible: rounded.avatar && picture.status !== Image.Ready; name: "profile"; ink: app.muted }
-        Image {
-            id: picture
-            anchors.fill: parent
-            asynchronous: true
-            // Ограничиваем декодирование и текстуру физическим размером обложки.
-            sourceSize.width: Math.max(1, Math.ceil(width * Screen.devicePixelRatio))
-            sourceSize.height: Math.max(1, Math.ceil(height * Screen.devicePixelRatio))
-            fillMode: Image.PreserveAspectCrop
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                maskEnabled: true
-                maskSource: mask
-            }
-            opacity: status === Image.Ready ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: app.motion } }
-        }
-        Item {
-            id: mask
-            anchors.fill: parent
-            visible: false
-            layer.enabled: true
-            Rectangle { anchors.fill: parent; radius: rounded.avatar ? width / 2 : rounded.radius; color: "white" }
         }
     }
     component Sheet: Popup {
@@ -153,42 +122,6 @@ ApplicationWindow {
             }
         }
     }
-    component Glyph: Canvas {
-        property string name: "music"
-        property color ink: app.ink
-        width: 20; height: 20
-        onNameChanged: requestPaint()
-        onInkChanged: requestPaint()
-        onPaint: {
-            const c = getContext("2d"); c.reset(); c.scale(width / 24, height / 24)
-            c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1.65; c.lineCap = "round"; c.lineJoin = "round"; c.beginPath()
-            switch (name) {
-            case "more": c.arc(5,12,1,0,Math.PI*2); c.moveTo(13,12); c.arc(12,12,1,0,Math.PI*2); c.moveTo(20,12); c.arc(19,12,1,0,Math.PI*2); c.fill(); return
-            case "search": c.arc(10,10,6,0,Math.PI*2); c.moveTo(15,15); c.lineTo(21,21); break
-            case "home": c.moveTo(3,11); c.lineTo(12,3); c.lineTo(21,11); c.moveTo(5,10); c.lineTo(5,21); c.lineTo(10,21); c.lineTo(10,14); c.lineTo(14,14); c.lineTo(14,21); c.lineTo(19,21); c.lineTo(19,10); break
-            case "liked": case "heart": c.moveTo(12,21); c.bezierCurveTo(-5,10,5,-2,12,7); c.bezierCurveTo(19,-2,29,10,12,21); if (name === "liked") c.fill(); break
-            case "music": c.moveTo(9,17); c.lineTo(9,5); c.lineTo(20,3); c.lineTo(20,15); c.moveTo(9,8); c.lineTo(20,6); c.moveTo(9,17); c.ellipse(6,18,3,2,0,0,Math.PI*2); c.moveTo(20,15); c.ellipse(17,16,3,2,0,0,Math.PI*2); break
-            case "grid": for(let y=4;y<20;y+=9) for(let x=4;x<20;x+=9) c.rect(x,y,6,6); break
-            case "list": for(let y=6;y<21;y+=6) { c.moveTo(8,y); c.lineTo(21,y); c.moveTo(3,y); c.lineTo(3.2,y) } break
-            case "clock": c.arc(12,12,9,0,Math.PI*2); c.moveTo(12,6); c.lineTo(12,12); c.lineTo(16,14); break
-            case "profile": c.arc(12,8,3.5,0,Math.PI*2); c.moveTo(4,21); c.bezierCurveTo(4,12,20,12,20,21); break
-            case "settings": for(let y=5;y<22;y+=7) { const x=y===12?15:8; c.moveTo(3,y); c.lineTo(x-2,y); c.moveTo(x+2,y); c.lineTo(21,y); c.moveTo(x+2,y); c.arc(x,y,2,0,Math.PI*2) } break
-            case "play": c.moveTo(8,4); c.lineTo(20,12); c.lineTo(8,20); c.closePath(); c.fill(); return
-            case "pause": c.rect(6,4,4,16); c.rect(14,4,4,16); c.fill(); return
-            case "next": c.moveTo(4,5); c.lineTo(14,12); c.lineTo(4,19); c.closePath(); c.fill(); c.moveTo(16,5); c.lineTo(16,19); break
-            case "previous": c.moveTo(20,5); c.lineTo(10,12); c.lineTo(20,19); c.closePath(); c.fill(); c.moveTo(8,5); c.lineTo(8,19); break
-            case "plus": c.moveTo(12,5); c.lineTo(12,19); c.moveTo(5,12); c.lineTo(19,12); break
-            case "close": c.moveTo(6,6); c.lineTo(18,18); c.moveTo(6,18); c.lineTo(18,6); break
-            case "volume": c.moveTo(4,9); c.lineTo(8,9); c.lineTo(13,5); c.lineTo(13,19); c.lineTo(8,15); c.lineTo(4,15); c.closePath(); c.moveTo(17,8); c.quadraticCurveTo(22,12,17,16); break
-            case "repeat": c.moveTo(5,9); c.lineTo(5,6); c.lineTo(19,6); c.lineTo(19,10); c.moveTo(16,7); c.lineTo(19,10); c.lineTo(22,7); c.moveTo(19,15); c.lineTo(19,18); c.lineTo(5,18); c.lineTo(5,14); c.moveTo(2,17); c.lineTo(5,14); c.lineTo(8,17); break
-            case "shuffle": c.moveTo(3,6); c.bezierCurveTo(12,6,12,18,21,18); c.moveTo(18,15); c.lineTo(21,18); c.lineTo(18,21); c.moveTo(3,18); c.bezierCurveTo(12,18,12,6,21,6); c.moveTo(18,3); c.lineTo(21,6); c.lineTo(18,9); break
-            case "cloud": c.moveTo(6,18); c.bezierCurveTo(-1,18,0,10,6,10); c.bezierCurveTo(6,1,19,1,19,10); c.bezierCurveTo(25,10,25,18,19,18); c.closePath(); break
-            case "back": c.translate(24,0); c.scale(-1,1);
-            case "arrow": c.moveTo(5,12); c.lineTo(19,12); c.moveTo(14,7); c.lineTo(19,12); c.lineTo(14,17); break
-            }
-            c.stroke()
-        }
-    }
     component Action: Button {
         id: control
         property bool primary: false
@@ -204,7 +137,7 @@ ApplicationWindow {
         contentItem: Item {
             implicitWidth: control.symbol ? 16 : label.implicitWidth
             implicitHeight: 22
-            Glyph { anchors.centerIn: parent; visible: !!control.symbol; name: control.symbol; ink: control.primary ? "white" : app.ink; width: 22; height: 22 }
+            AndroidGlyph { anchors.centerIn: parent; visible: !!control.symbol; name: control.symbol; ink: control.primary ? "white" : app.ink; width: 22; height: 22 }
             Text { id: label; visible: !control.symbol; anchors.fill: parent; text: control.text; font: control.font; color: control.primary ? "white" : app.ink; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
         }
         background: Rectangle { radius: height / 2; color: control.down ? (control.primary ? Qt.darker(app.accent, 1.12) : "#e7e3e7") : control.primary ? app.accent : "#f0edef"; opacity: control.enabled ? 1 : 0.45; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
@@ -225,7 +158,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.preferredWidth: 44; Layout.preferredHeight: 44
                 radius: app.page === 2 && app.searchKind === "users" ? width / 2 : app.coverRadius; color: "#efe8eb"; clip: true
-                RoundedImage { anchors.fill: parent; source: app.page === 2 && app.searchKind === "users" ? row.modelData.avatar_url || "" : app.cover(row.modelData); avatar: app.page === 2 && app.searchKind === "users" }
+                RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.page === 2 && app.searchKind === "users" ? row.modelData.avatar_url || "" : app.cover(row.modelData); avatar: app.page === 2 && app.searchKind === "users" }
             }
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
@@ -266,8 +199,8 @@ ApplicationWindow {
                 scale: down ? 0.94 : 1
                 Behavior on scale { NumberAnimation { duration: app.motion / 2 } }
                 contentItem: Item {
-                    RoundedImage { anchors.centerIn: parent; width: 36; height: 36; avatar: true; source: app.api.profile?.avatar_url || ""; visible: app.page !== 4 }
-                    Glyph { anchors.centerIn: parent; name: "settings"; visible: app.page === 4 }
+                    RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.centerIn: parent; width: 36; height: 36; avatar: true; source: app.api.profile?.avatar_url || ""; visible: app.page !== 4 }
+                    AndroidGlyph { anchors.centerIn: parent; name: "settings"; visible: app.page === 4 }
                 }
                 background: Rectangle { radius: 24; color: accountButton.down ? "#e9e2e7" : "transparent"; Behavior on color { ColorAnimation { duration: app.motion } } }
                 onClicked: app.page === 4 ? app.page = 5 : app.openProfile(null)
@@ -363,7 +296,7 @@ ApplicationWindow {
                                     spacing: 7
                                     Rectangle {
                                         width: 120; height: 120; radius: app.coverRadius; color: "#eee7ea"; clip: true
-                                        RoundedImage { anchors.fill: parent; source: app.cover(modelData) }
+                                        RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.cover(modelData) }
                                     }
                                     Caption { width: 120; text: modelData.title || ""; font.bold: true; font.pixelSize: 13 }
                                     Caption { width: 120; text: modelData.user?.username || ""; color: app.muted; font.pixelSize: 12 }
@@ -446,7 +379,7 @@ ApplicationWindow {
                         anchors.centerIn: parent; spacing: 10
                         Rectangle {
                             anchors.horizontalCenter: parent.horizontalCenter; width: 72; height: 72; radius: 36; color: "#eee5eb"; clip: true
-                            RoundedImage { anchors.fill: parent; source: app.profile?.avatar_url || ""; avatar: true }
+                            RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.profile?.avatar_url || ""; avatar: true }
                         }
                         Caption { anchors.horizontalCenter: parent.horizontalCenter; text: app.profile?.username || "Твой профиль"; font.pixelSize: 19; font.bold: true }
                         Caption { anchors.horizontalCenter: parent.horizontalCenter; text: (app.profile?.followers_count || 0) + " подписчиков · " + (app.profile?.track_count || 0) + " треков"; color: app.muted; font.pixelSize: 12 }
@@ -488,7 +421,7 @@ ApplicationWindow {
             TapHandler { onTapped: player.open() }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 10
-                RoundedImage { Layout.preferredWidth: 44; Layout.preferredHeight: 44; source: app.cover(app.api.current); radius: 10 }
+                RoundedImage { Layout.preferredWidth: 44; Layout.preferredHeight: 44; source: app.cover(app.api.current); radius: 10; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0 }
                 ColumnLayout {
                     Layout.fillWidth: true
                     Caption { text: app.api.current?.title || ""; Layout.fillWidth: true; font.bold: true }
@@ -555,7 +488,7 @@ ApplicationWindow {
                                 Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
                                 contentItem: Column {
                                     spacing: 3
-                                    Glyph {
+                                    AndroidGlyph {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         width: 22; height: 22
                                         name: navigationTab.modelData.symbol
@@ -592,7 +525,7 @@ ApplicationWindow {
                         }
                     }
                     contentItem: Item {
-                        Glyph { anchors.centerIn: parent; name: "search"; width: 25; height: 25; ink: "white" }
+                        AndroidGlyph { anchors.centerIn: parent; name: "search"; width: 25; height: 25; ink: "white" }
                     }
                     onClicked: { app.page = 2; search.forceActiveFocus() }
                 }
@@ -625,7 +558,7 @@ ApplicationWindow {
                 Layout.preferredWidth: Math.max(80, Math.min(player.availableWidth, player.availableHeight - 330))
                 Layout.preferredHeight: width
                 color: "#ece2e7"; radius: 24; clip: true
-                RoundedImage { anchors.fill: parent; source: app.cover(app.api.current); radius: 24 }
+                RoundedImage { anchors.fill: parent; source: app.cover(app.api.current); radius: 24; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0 }
             }
             Item { Layout.fillHeight: true }
             Label { text: app.api.current?.title || ""; color: app.ink; font.bold: true; font.pixelSize: 21; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; Layout.fillWidth: true }

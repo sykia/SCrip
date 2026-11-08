@@ -27,6 +27,9 @@ if(ANDROID)
 endif()
 qt_add_executable(scrip ${executable_options} src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/soundcloud.cpp src/soundcloud.h src/artworknetwork.cpp src/artworknetwork.h)
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
+set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)
+set_source_files_properties(qml/android/RoundedImage.qml PROPERTIES QT_RESOURCE_ALIAS RoundedImage.qml)
+set_source_files_properties(qml/android/AndroidGlyph.qml PROPERTIES QT_RESOURCE_ALIAS AndroidGlyph.qml)
 set_source_files_properties(qml/PluginAction.qml PROPERTIES QT_RESOURCE_ALIAS PluginAction.qml)
 set_source_files_properties(qml/PluginManagerView.qml PROPERTIES QT_RESOURCE_ALIAS PluginManagerView.qml)
 set_source_files_properties(qml/PluginToolsPopup.qml PROPERTIES QT_RESOURCE_ALIAS PluginToolsPopup.qml)
@@ -37,7 +40,7 @@ qt_add_qml_module(scrip
     URI SCrip
     VERSION 1.0
     RESOURCES qml/assets/blob.png
-    QML_FILES ${main_qml} qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
+    QML_FILES ${main_qml} qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
 )
 qt_add_resources(scrip callback_page PREFIX "/" FILES resources/callback.html)
 target_link_libraries(scrip PRIVATE Qt6::Quick Qt6::Network Qt6::Multimedia)
