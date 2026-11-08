@@ -145,7 +145,7 @@ FunctionEnd
   StrCpy $1 0
   retry:
   ClearErrors
-  System::Call 'KERNEL32::CreateFile(t "$INSTDIR\SCrip.exe", i 0x40000000, i 0, p 0, i 3, i 0x80, p 0) p.r0'
+  System::Call 'KERNEL32::CreateFile(t "$INSTDIR\SCrip.exe", i 0x40000000, i 7, p 0, i 3, i 0x80, p 0) p.r0'
   IntPtrCmp $0 -1 locked done done
   System::Call 'KERNEL32::CloseHandle(p r0)'
   Goto done
