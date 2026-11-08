@@ -58,6 +58,7 @@ Function .onInit
   IfErrors recovery_restore
   FileRead $4 $5
   FileClose $4
+  !insertmacro TestTrace "marker=$5"
   StrCmp $5 "COMMIT$\r$\n" recovery_committed recovery_restore
   recovery_committed:
   RMDir /r "$INSTDIR.__SCrip_stage"
