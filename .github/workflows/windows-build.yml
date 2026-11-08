@@ -9,7 +9,7 @@ on:
         description: SHA-256 windows-build-kit.tar.zst
         required: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: windows-2022
