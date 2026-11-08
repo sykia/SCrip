@@ -64,6 +64,7 @@ FunctionEnd
   nsExec::ExecToStack /OEM '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq SCrip.exe" /NH'
   Pop $0
   Pop $1
+  !insertmacro TestTrace "process_check=$0;output=$1"
   StrCmp $0 "0" 0 check_closed_prompt
   StrCpy $2 $1 9
   StrCmp $2 "SCrip.exe" check_closed_prompt check_closed_done
