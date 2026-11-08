@@ -1,15 +1,47 @@
 {
-  "api": 1,
+  "api": 2,
+  "kind": "declarative",
   "id": "sea-glass",
   "name": "Морское стекло",
-  "groups": [
+  "version": "1.0.0",
+  "requiresHost": {
+    "min": "0.0.0",
+    "maxExclusive": "65535.65535.65535"
+  },
+  "permissions": [
+    "ui.theme"
+  ],
+  "settings": [
     {
+      "id": "legacy-group-0",
+      "type": "boolean",
       "label": "Морской акцент",
-      "accent": "#18736C"
+      "default": true
     },
     {
+      "id": "legacy-group-1",
+      "type": "boolean",
       "label": "Мягкие углы обложек",
-      "coverRadius": 20
+      "default": true
     }
-  ]
+  ],
+  "contributions": [
+    {
+      "id": "legacy-theme-0",
+      "type": "theme",
+      "values": {
+        "accent": "#18736C"
+      },
+      "enabledSetting": "legacy-group-0"
+    },
+    {
+      "id": "legacy-theme-1",
+      "type": "theme",
+      "values": {
+        "coverRadius": 20
+      },
+      "enabledSetting": "legacy-group-1"
+    }
+  ],
+  "rules": []
 }

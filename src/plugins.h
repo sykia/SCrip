@@ -22,13 +22,10 @@ class Plugins : public QObject {
     QVariantMap theme() const;
     QVariantList panels() const;
     QString error() const { return m_error; }
-    // Синхронная совместимость v1. UI использует prepareInstall/commitInstall.
-    Q_INVOKABLE QString install(const QUrl &file);
     Q_INVOKABLE QVariantMap prepareInstall(const QUrl &file);
     Q_INVOKABLE QString commitInstall(const QString &operationId, const QStringList &acceptedPermissions);
     Q_INVOKABLE void cancelInstall(const QString &operationId);
     Q_INVOKABLE QString enable(const QString &id, bool value);
-    Q_INVOKABLE QString configure(const QString &id, int group, bool value);
     Q_INVOKABLE QString setPermission(const QString &id, const QString &permission, bool value);
     Q_INVOKABLE QString setSetting(const QString &id, const QString &key, const QVariant &value);
     Q_INVOKABLE QString remove(const QString &id, bool keepData = false);

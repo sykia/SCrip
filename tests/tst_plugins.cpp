@@ -115,7 +115,7 @@ class PluginTests : public QObject {
         QVERIFY(PluginManifest::compareVersions("1.9.0", "1.10.0") < 0);
         QVERIFY(!PluginManifest::version("01.0.0"));
     }
-    void v2PermissionsCommandsAndSettings() {
+    void apiTwoPermissionsCommandsAndSettings() {
         Plugins host;
         auto p = basic();
         p["permissions"] = QJsonArray{"ui.panels", "player.control"};
@@ -330,7 +330,7 @@ class PluginTests : public QObject {
         Plugins restored;
         QCOMPARE(restored.installed()[0].toMap()["data"].toMap()["bookmark"].toString(), QString("saved"));
         const auto path =
-            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins-v2.json";
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins.json";
         QVERIFY(QFile::remove(path));
         QVERIFY(QDir().mkdir(path));
         QVERIFY(!host.enable("test", false).isEmpty());
@@ -402,7 +402,7 @@ class PluginTests : public QObject {
     void corruptedRegistryDoesNotFallback() {
         const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
         QVERIFY(QDir().mkpath(dir));
-        QFile file(dir + "/plugins-v2.json");
+        QFile file(dir + "/plugins.json");
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.write("broken");
         file.close();
@@ -513,15 +513,10 @@ class PluginTests : public QObject {
     void migrationPreservesV1AndRejectsConcurrentWrites() {
         const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
         QVERIFY(QDir().mkpath(dir));
-        QFile sample(QString(SCRIP_SOURCE_DIR) + "/examples/plugins/studio.json");
-        QVERIFY(sample.open(QIODevice::ReadOnly));
-        const auto p = QJsonDocument::fromJson(sample.readAll()).object();
-        QJsonArray flags;
-        for (auto g : p["groups"].toArray()) {
-            Q_UNUSED(g);
-            flags.append(true);
-        }
-        flags[0] = false;
+        const QJsonObject p{{"api", 1}, {"id", "studio"}, {"name", "Студия"},
+            {"groups", QJsonArray{QJsonObject{{"label", "Акцент"}, {"accent", "#614899"}},
+                                  QJsonObject{{"label", "Портреты"}, {"covers", "artist"}}}}};
+        QJsonArray flags{false, true};
         QFile file(dir + "/plugins-v1.json");
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.write(QJsonDocument(QJsonArray{QJsonObject{{"plugin", p}, {"enabled", true}, {"flags", flags}}})
@@ -532,10 +527,85 @@ class PluginTests : public QObject {
         QCOMPARE(migrated.installed().size(), 1);
         QVERIFY(!migrated.theme().contains("accent"));
         QVERIFY(QFile::exists(dir + "/plugins-v1.json"));
+        QVERIFY(QFile::exists(dir + "/plugins-v1.json.bak"));
         Plugins concurrent;
-        QCOMPARE(migrated.configure("studio", 0, true), QString());
+        QCOMPARE(migrated.setSetting("studio", "legacy-group-0", true), QString());
         QVERIFY(!concurrent.enable("studio", false).isEmpty());
         QVERIFY(concurrent.installed()[0].toMap()["enabled"].toBool());
+    }
+    void unifiedMigrationPreservesBothRegistries() {
+        const auto dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QVERIFY(QDir().mkpath(dir));
+        const QJsonObject legacy{{"api", 1}, {"id", "studio"}, {"name", "Студия"},
+            {"groups", QJsonArray{QJsonObject{{"label", "Черничный акцент"}, {"accent", "#614899"},
+                                              {"coverRadius", 16}},
+                                  QJsonObject{{"label", "Портреты исполнителей"}, {"covers", "artist"}},
+                                  QJsonObject{{"label", "Моя музыка"}, {"page", "home"},
+                                    {"buttons", QJsonArray{QJsonObject{{"label", "Любимые треки"}, {"action", "likes"}}}}}}}};
+        QJsonArray flags{false, true, true};
+        QFile oldFile(dir + "/plugins-v1.json");
+        QVERIFY(oldFile.open(QIODevice::WriteOnly));
+        const auto oldBytes = QJsonDocument(QJsonArray{QJsonObject{{"plugin", legacy}, {"enabled", true}, {"flags", flags}}}).toJson();
+        QCOMPARE(oldFile.write(oldBytes), oldBytes.size());
+        oldFile.close();
+
+        auto modern = basic("preserved-data");
+        modern["permissions"] = QJsonArray{"storage", "ui.theme"};
+        modern["settings"] = QJsonArray{QJsonObject{{"id", "enabled-look"}, {"type", "boolean"},
+            {"label", "Оформление"}, {"default", false}}};
+        modern["contributions"] = QJsonArray{QJsonObject{{"id", "look"}, {"type", "theme"},
+            {"enabledSetting", "enabled-look"}, {"values", QJsonObject{{"accent", "#123456"}}}}};
+        QJsonObject modernRow{{"plugin", modern}, {"enabled", true}, {"retained", false},
+            {"grants", QJsonArray{"storage"}}, {"settings", QJsonObject{{"enabled-look", true}}},
+            {"orphanSettings", QJsonObject{{"old-setting", 7}}}, {"data", QJsonObject{{"bookmark", "saved"}}}};
+        const auto modernBytes = QJsonDocument(QJsonObject{{"format", 2}, {"registryRevision", 9},
+            {"entries", QJsonArray{modernRow}}}).toJson();
+        QFile currentFile(dir + "/plugins-v2.json");
+        QVERIFY(currentFile.open(QIODevice::WriteOnly));
+        QCOMPARE(currentFile.write(modernBytes), modernBytes.size());
+        currentFile.close();
+
+        Plugins migrated;
+        QVERIFY2(migrated.error().isEmpty(), qPrintable(migrated.error()));
+        QCOMPARE(migrated.installed().size(), 2);
+        QCOMPARE(migrated.installed()[0].toMap()["plugin"].toMap()["id"].toString(), QString("preserved-data"));
+        QCOMPARE(migrated.installed()[1].toMap()["plugin"].toMap()["id"].toString(), QString("studio"));
+        auto stored = migrated.installed()[0].toMap();
+        QCOMPARE(stored["settings"].toMap()["enabled-look"].toBool(), true);
+        QCOMPARE(stored["grants"].toList(), QVariantList{QString("storage")});
+        QCOMPARE(stored["orphanSettings"].toMap()["old-setting"].toInt(), 7);
+        QCOMPARE(stored["data"].toMap()["bookmark"].toString(), QString("saved"));
+        QVERIFY(!migrated.theme().contains("accent"));
+        QCOMPARE(migrated.theme()["covers"].toString(), QString("artist"));
+        QCOMPARE(migrated.setPermission("preserved-data", "ui.theme", true), QString());
+        QCOMPARE(migrated.theme()["accent"].toString(), QString("#123456"));
+        QCOMPARE(migrated.setSetting("studio", "legacy-group-0", true), QString());
+        QCOMPARE(migrated.theme()["accent"].toString(), QString("#614899"));
+        QFile legacyBackup(dir + "/plugins-v1.json.bak");
+        QVERIFY(legacyBackup.open(QIODevice::ReadOnly));
+        QCOMPARE(legacyBackup.readAll(), oldBytes);
+        QFile currentBackup(dir + "/plugins-v2.json.bak");
+        QVERIFY(currentBackup.open(QIODevice::ReadOnly));
+        QCOMPARE(currentBackup.readAll(), modernBytes);
+        QFile unified(dir + "/plugins.json");
+        QVERIFY(unified.open(QIODevice::ReadOnly));
+        const auto root = QJsonDocument::fromJson(unified.readAll()).object();
+        QCOMPARE(root["format"].toInt(), 2);
+        QCOMPARE(root["registryRevision"].toInteger(), 12);
+    }
+    void apiTwoSuiteManifestRemainsCompatible() {
+        auto suite = basic("scrip-probe-suite");
+        suite["name"] = "SCrip Probe Suite";
+        suite["permissions"] = QJsonArray{"ui.theme"};
+        QJsonArray themes;
+        for (int i = 0; i < 6; ++i)
+            themes.append(QJsonObject{{"id", QString("probe-theme-%1").arg(i)}, {"type", "theme"},
+                {"values", QJsonObject{{"coverRadius", i * 4}}}});
+        suite["contributions"] = themes;
+        QVERIFY2(PluginManifest::validate(suite).isEmpty(), qPrintable(PluginManifest::validate(suite)));
+        Plugins host;
+        QCOMPARE(add(host, suite), QString());
+        QCOMPARE(host.installed()[0].toMap()["plugin"].toMap(), suite.toVariantMap());
     }
     void androidHeaderReservesSpace() {
         QCoreApplication::setOrganizationName("SCripLayoutTests");
@@ -591,12 +661,15 @@ class PluginTests : public QObject {
         QCoreApplication::setApplicationName("SCrip-plugin-tests-" + QFileInfo(data.path()).fileName());
         const auto sample = QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/examples/plugins/studio.json");
         Plugins host;
-        QCOMPARE(host.install(sample), QString());
+        QFile pluginFile(sample.toLocalFile());
+        QVERIFY(pluginFile.open(QIODevice::ReadOnly));
+        const auto plugin = QJsonDocument::fromJson(pluginFile.readAll()).object();
+        QCOMPARE(add(host, plugin), QString());
         QVERIFY(host.theme().isEmpty());
-        QVERIFY(!host.install(sample).isEmpty());
+        QVERIFY(!add(host, plugin).isEmpty());
         QCOMPARE(host.enable("studio", true), QString());
         QCOMPARE(host.theme()["accent"].toString(), QString("#614899"));
-        QCOMPARE(host.configure("studio", 0, false), QString());
+        QCOMPARE(host.setSetting("studio", "legacy-group-0", false), QString());
         Plugins restored;
         QVERIFY(!restored.theme().contains("accent"));
         QCOMPARE(restored.theme()["covers"].toString(), QString("artist"));
@@ -627,8 +700,11 @@ class PluginTests : public QObject {
             R"({"api":1,"id":"test","name":"Test","groups":[{"label":"Test","page":"home","buttons":[{"label":"Open","action":"openExternal"}]}]})");
         file.close();
         Plugins host;
-        QVERIFY(!host.install(QUrl::fromLocalFile(file.fileName())).isEmpty());
-        QVERIFY(!host.install(QUrl("https://example.org/plugin.json")).isEmpty());
+        QSignalSpy spy(&host, &Plugins::installPrepared);
+        QVERIFY(host.prepareInstall(QUrl::fromLocalFile(file.fileName()))["error"].toString().isEmpty());
+        QVERIFY(spy.wait(3000));
+        QVERIFY(!spy.first()[0].toMap()["error"].toString().isEmpty());
+        QVERIFY(host.prepareInstall(QUrl("https://example.org/plugin.json"))["error"].toString().isEmpty());
         QVERIFY(host.installed().isEmpty());
     }
 };

@@ -261,13 +261,9 @@ Result parse(const QByteArray &bytes) {
     auto doc = QJsonDocument::fromJson(bytes, &error);
     if (error.error != QJsonParseError::NoError || !doc.isObject())
         return {{}, "Ожидается JSON-объект."};
-    if (doc.object()["api"] == 1 && bytes.size() > 32768)
-        return {{}, "Файл v1 превышает 32 КиБ."};
     return {doc.object(), validate(doc.object())};
 }
 QString validate(const QJsonObject &o) {
-    if (o["api"] == 1)
-        return legacy(o);
     if (o["api"] != 2)
         return "Неподдерживаемая версия API.";
     if (o["kind"] != "declarative")
@@ -403,7 +399,7 @@ QString validate(const QJsonObject &o) {
                                              settings[c["enabledSetting"].toString()]["type"] != "boolean"))
             return "Неизвестный переключатель вклада.";
         if (type == "theme") {
-            if (!grants.contains("ui.theme") || ++themes > 1 ||
+            if (!grants.contains("ui.theme") || ++themes > 6 ||
                 !fields(c, {"id", "type", "values", "enabledSetting"}, {"id", "type", "values"}) ||
                 !c["values"].isObject() || !theme(c["values"].toObject()).isEmpty())
                 return "Некорректный вклад темы.";
@@ -470,5 +466,53 @@ QString validate(const QJsonObject &o) {
         if (!expired.contains(timer))
             return "Для таймера требуется правило timer.expired с его ID.";
     return {};
+}
+QJsonObject migrateLegacy(const QJsonObject &document) {
+    if (!document.contains("api") || document["api"] != 1 ||
+        QJsonDocument(document).toJson(QJsonDocument::Compact).size() > 32768 || !legacy(document).isEmpty())
+        return {};
+    QJsonArray permissions, settings, contributions;
+    bool hasTheme = false, hasPanels = false, hasNavigation = false;
+    const auto groups = document["groups"].toArray();
+    for (qsizetype i = 0; i < groups.size(); ++i) {
+        const auto group = groups[i].toObject();
+        const auto index = QString::number(i);
+        const auto settingId = "legacy-group-" + index;
+        settings.append(QJsonObject{{"id", settingId}, {"type", "boolean"},
+                                    {"label", group["label"]}, {"default", true}});
+        QJsonObject values;
+        for (auto key : {"accent", "covers", "coverRadius"})
+            if (group.contains(key)) values[key] = group[key];
+        if (!values.isEmpty()) {
+            hasTheme = true;
+            contributions.append(QJsonObject{{"id", "legacy-theme-" + index}, {"type", "theme"},
+                                             {"values", values}, {"enabledSetting", settingId}});
+        }
+        if (!group["page"].isUndefined()) {
+            hasPanels = true;
+            QJsonArray buttons;
+            for (const auto value : group["buttons"].toArray()) {
+                hasNavigation = true;
+                buttons.append(QJsonObject{
+                    {"label", value.toObject()["label"]},
+                    {"action", QJsonObject{{"command", "navigation.open"},
+                                            {"destination", value.toObject()["action"]}}}});
+            }
+            QJsonObject panel{{"id", "legacy-panel-" + index}, {"type", "panel"},
+                              {"slot", group["page"].toString() + ".panels"},
+                              {"title", group["label"]}, {"enabledSetting", settingId}};
+            if (group.contains("text")) panel["text"] = group["text"];
+            if (!buttons.isEmpty()) panel["buttons"] = buttons;
+            contributions.append(panel);
+        }
+    }
+    if (hasPanels) permissions.append("ui.panels");
+    if (hasTheme) permissions.append("ui.theme");
+    if (hasNavigation) permissions.append("navigation");
+    return {{"api", 2}, {"kind", "declarative"}, {"id", document["id"]},
+            {"name", document["name"]}, {"version", "1.0.0"},
+            {"requiresHost", QJsonObject{{"min", "0.0.0"}, {"maxExclusive", "65535.65535.65535"}}},
+            {"permissions", permissions}, {"settings", settings},
+            {"contributions", contributions}, {"rules", QJsonArray{}}};
 }
 } // namespace PluginManifest

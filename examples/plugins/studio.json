@@ -1,24 +1,79 @@
 {
-  "api": 1,
+  "api": 2,
+  "kind": "declarative",
   "id": "studio",
   "name": "Студия",
-  "groups": [
+  "version": "1.0.0",
+  "requiresHost": {
+    "min": "0.0.0",
+    "maxExclusive": "65535.65535.65535"
+  },
+  "permissions": [
+    "ui.panels",
+    "ui.theme",
+    "navigation"
+  ],
+  "settings": [
     {
+      "id": "legacy-group-0",
+      "type": "boolean",
       "label": "Черничный акцент",
-      "accent": "#614899",
-      "coverRadius": 16
+      "default": true
     },
     {
+      "id": "legacy-group-1",
+      "type": "boolean",
       "label": "Портреты исполнителей",
-      "covers": "artist"
+      "default": true
     },
     {
+      "id": "legacy-group-2",
+      "type": "boolean",
       "label": "Моя музыка",
-      "page": "home",
+      "default": true
+    }
+  ],
+  "contributions": [
+    {
+      "id": "legacy-theme-0",
+      "type": "theme",
+      "values": {
+        "accent": "#614899",
+        "coverRadius": 16
+      },
+      "enabledSetting": "legacy-group-0"
+    },
+    {
+      "id": "legacy-theme-1",
+      "type": "theme",
+      "values": {
+        "covers": "artist"
+      },
+      "enabledSetting": "legacy-group-1"
+    },
+    {
+      "id": "legacy-panel-2",
+      "type": "panel",
+      "slot": "home.panels",
+      "title": "Моя музыка",
+      "enabledSetting": "legacy-group-2",
       "buttons": [
-        {"label": "Любимые треки", "action": "likes"},
-        {"label": "Недавние", "action": "history"}
+        {
+          "label": "Любимые треки",
+          "action": {
+            "command": "navigation.open",
+            "destination": "likes"
+          }
+        },
+        {
+          "label": "Недавние",
+          "action": {
+            "command": "navigation.open",
+            "destination": "history"
+          }
+        }
       ]
     }
-  ]
+  ],
+  "rules": []
 }

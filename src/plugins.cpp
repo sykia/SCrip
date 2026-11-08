@@ -19,10 +19,7 @@
 
 namespace {
 QString storage() {
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins-v2.json";
-}
-QString legacyStorage() {
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins-v1.json";
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins.json";
 }
 QString hostVersion() {
     auto v = QCoreApplication::applicationVersion();
@@ -107,6 +104,8 @@ class ImportReader final : public QObject {
         if (error.isEmpty()) {
             result = PluginManifest::parse(bytes);
             error = result.error;
+            if (error.isEmpty() && result.document["api"] != 2)
+                error = "Поддерживается только декларативный формат плагинов.";
         }
         readers.deref();
         emit finished(
@@ -128,89 +127,179 @@ Plugins::Plugins(QObject *parent) : QObject(parent) {
             if (!permitted(pluginId(row), "player.observe"))
                 continue;
             for (auto r : manifest(row)["rules"].toArray())
-                if (r.toObject()["event"] == "player.progress")
-                    subscribed = true;
+                if (r.toObject()["event"] == "player.progress") subscribed = true;
         }
-        if (!subscribed)
-            return;
+        if (!subscribed) return;
         emit progressSnapshotRequested();
         enqueueEvent("player.progress", {{"positionMs", m_player.value("position").toLongLong()},
-                                         {"durationMs", m_player.value("duration").toLongLong()}});
+                                          {"durationMs", m_player.value("duration").toLongLong()}});
     });
     m_progressTimer.start();
-    QFile file(storage());
-    const bool v2 = file.exists();
-    if (!v2)
-        file.setFileName(legacyStorage());
-    if (!file.exists())
-        return;
-    if (!file.open(QIODevice::ReadOnly) || file.size() > (v2 ? 16 * 1024 * 1024 : 4 * 1024 * 1024)) {
-        m_error = "Не удалось прочитать реестр плагинов. Восстановите файл из резервной копии.";
-        return;
-    }
-    const auto registryBytes = file.readAll();
-    if (v2)
-        m_diskHash = QCryptographicHash::hash(registryBytes, QCryptographicHash::Sha256);
-    QJsonParseError parseError;
-    const auto doc = QJsonDocument::fromJson(registryBytes, &parseError);
-    if (parseError.error != QJsonParseError::NoError ||
-        (v2 && (!doc.isObject() || doc.object()["format"] != 2 || !doc.object()["entries"].isArray())) ||
-        (!v2 && !doc.isArray())) {
-        m_error = "Повреждён реестр плагинов; автоматический откат к v1 запрещён. Сохраните копию и "
-                  "восстановите файл вручную.";
-        return;
-    }
-    if (v2)
-        m_revision = quint64(qMax<qint64>(0, doc.object()["registryRevision"].toInteger()));
-    const auto rows = v2 ? doc.object()["entries"].toArray() : doc.array();
-    bool corrupt = rows.size() > 24;
-    for (auto value : rows) {
-        auto row = value.toObject().toVariantMap();
-        auto plugin = manifest(row);
-        bool valid = (!row.contains("retained") || row["retained"].metaType().id() == QMetaType::Bool) &&
-                     value.isObject() &&
-                     QJsonDocument(plugin).toJson(QJsonDocument::Compact).size() <=
-                         (plugin["api"] == 1 ? 32768 : 131072) &&
-                     PluginManifest::validate(plugin).isEmpty() && indexOf(plugin["id"].toString()) < 0 &&
-                     row["enabled"].metaType().id() == QMetaType::Bool;
-        if (plugin["api"] == 1) {
-            const auto flags = row["flags"].toList();
-            valid &= flags.size() == plugin["groups"].toArray().size();
-            for (auto flag : flags)
-                valid &= flag.metaType().id() == QMetaType::Bool;
-        } else {
-            valid &= row["settings"].metaType().id() == QMetaType::QVariantMap &&
-                     row["grants"].metaType().id() == QMetaType::QVariantList;
-            const auto requested = strings(plugin["permissions"].toArray());
-            QSet<QString> granted;
-            for (auto g : row["grants"].toList()) {
-                valid &= g.metaType().id() == QMetaType::QString && requested.contains(g.toString()) &&
-                         !granted.contains(g.toString());
-                granted.insert(g.toString());
+
+    auto normalize = [this](QVariantMap row) -> QVariantMap {
+        auto p = manifest(row);
+        if (!row.contains("retained")) row["retained"] = false;
+        if (p["api"] == 1) {
+            const auto flags = row.value("flags").toList();
+            if (flags.size() != p["groups"].toArray().size()) return {};
+            for (const auto &flag : flags)
+                if (flag.metaType().id() != QMetaType::Bool) return {};
+            const auto upgraded = PluginManifest::migrateLegacy(p);
+            if (upgraded.isEmpty()) return {};
+            QVariantMap settings;
+            for (qsizetype i = 0; i < upgraded["settings"].toArray().size(); ++i) {
+                const auto id = "legacy-group-" + QString::number(i);
+                settings[id] = i < flags.size() ? flags[i].toBool() : true;
             }
-            const auto values = QJsonObject::fromVariantMap(row["settings"].toMap());
-            valid &= values.size() == plugin["settings"].toArray().size();
-            for (auto setting : plugin["settings"].toArray()) {
-                auto s = setting.toObject();
-                valid &= PluginManifest::settingValue(s, values[s["id"].toString()]);
-            }
-            valid &= dataValid(row);
+            QVariantList grants;
+            for (auto value : upgraded["permissions"].toArray()) grants.append(value.toString());
+            row["plugin"] = upgraded.toVariantMap();
+            row["settings"] = settings;
+            row["orphanSettings"] = QVariantMap{};
+            row["grants"] = grants;
+            row["data"] = row.value("data", QVariantMap{});
+            row.remove("flags");
         }
-        if (valid && entries.size() < 24)
+        return row;
+    };
+    auto validRow = [this](const QVariantMap &row) {
+        const auto p = manifest(row);
+        if (p["api"] != 2 || !PluginManifest::validate(p).isEmpty() ||
+            row.value("enabled").metaType().id() != QMetaType::Bool ||
+            (row.contains("retained") && row["retained"].metaType().id() != QMetaType::Bool) ||
+            row.value("settings").metaType().id() != QMetaType::QVariantMap ||
+            row.value("grants").metaType().id() != QMetaType::QVariantList || !dataValid(row)) return false;
+        const auto requested = strings(p["permissions"].toArray());
+        QSet<QString> granted;
+        for (auto g : row["grants"].toList()) {
+            if (g.metaType().id() != QMetaType::QString || !requested.contains(g.toString()) ||
+                granted.contains(g.toString())) return false;
+            granted.insert(g.toString());
+        }
+        const auto values = QJsonObject::fromVariantMap(row["settings"].toMap());
+        if (values.size() != p["settings"].toArray().size()) return false;
+        for (auto setting : p["settings"].toArray()) {
+            const auto definition = setting.toObject();
+            if (!PluginManifest::settingValue(definition, values[definition["id"].toString()])) return false;
+        }
+        return true;
+    };
+    const auto canonicalPath = storage();
+    if (QFileInfo::exists(canonicalPath)) {
+        QFile file(canonicalPath);
+        if (!file.open(QIODevice::ReadOnly) || file.size() > 16 * 1024 * 1024) {
+            m_error = "Не удалось прочитать реестр плагинов. Восстановите файл из резервной копии.";
+            return;
+        }
+        const auto bytes = file.readAll();
+        m_diskHash = QCryptographicHash::hash(bytes, QCryptographicHash::Sha256);
+        QJsonParseError parseError;
+        const auto doc = QJsonDocument::fromJson(bytes, &parseError);
+        if (parseError.error != QJsonParseError::NoError || !doc.isObject() || doc.object()["format"] != 2 ||
+            !doc.object()["entries"].isArray()) {
+            m_error = "Повреждён реестр плагинов. Автоматический откат запрещён; сохраните копию файла.";
+            return;
+        }
+        m_revision = quint64(qMax<qint64>(0, doc.object()["registryRevision"].toInteger()));
+        const auto rows = doc.object()["entries"].toArray();
+        if (rows.size() > 24) {
+            m_error = "Реестр плагинов превышает лимит или содержит недопустимые записи.";
+            return;
+        }
+        for (const auto value : rows) {
+            const auto row = value.toObject().toVariantMap();
+            if (!value.isObject() || !validRow(row) || indexOf(pluginId(row)) >= 0) {
+                entries.clear();
+                m_error = "Реестр плагинов содержит недопустимые записи. Плагины не активированы.";
+                return;
+            }
             entries.append(row);
-        else
-            corrupt = true;
-    }
-    if (v2 && (corrupt || hasCycle(entries))) {
-        entries.clear();
-        m_error =
-            "Реестр v2 содержит недопустимые записи. Плагины не активированы; восстановите файл вручную.";
+        }
+        if (hasCycle(entries)) {
+            entries.clear();
+            m_error = "В реестре обнаружен цикл зависимостей. Плагины не активированы.";
+            return;
+        }
+        reconcile();
         return;
     }
-    if (!v2) {
-        auto error = save(entries);
-        if (!error.isEmpty())
-            m_error = "Ошибка миграции v1: " + error;
+
+    const QStringList oldPaths{
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins-v1.json",
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins-v2.json"};
+    QList<QByteArray> sourceBytes;
+    QList<bool> sourceExists;
+    for (const auto &path : oldPaths) {
+        QFile source(path);
+        sourceExists.append(source.exists());
+        if (!source.exists()) { sourceBytes.append(QByteArray{}); continue; }
+        if (!source.open(QIODevice::ReadOnly) || source.size() > 16 * 1024 * 1024) {
+            m_error = "Не удалось прочитать старый реестр плагинов; исходные данные сохранены.";
+            return;
+        }
+        sourceBytes.append(source.readAll());
+    }
+    if (!sourceExists[0] && !sourceExists[1]) return;
+
+    bool corrupt = false;
+    auto appendSource = [&](const QByteArray &bytes, bool oldFormat, bool exists) {
+        if (!exists) return;
+        QJsonParseError error;
+        const auto doc = QJsonDocument::fromJson(bytes, &error);
+        if (error.error != QJsonParseError::NoError ||
+            (oldFormat ? !doc.isArray() : (!doc.isObject() || doc.object()["format"] != 2 ||
+                                           !doc.object()["entries"].isArray()))) {
+            corrupt = true;
+            return;
+        }
+        if (!oldFormat) m_revision = quint64(qMax<qint64>(0, doc.object()["registryRevision"].toInteger()));
+        const auto rows = oldFormat ? doc.array() : doc.object()["entries"].toArray();
+        if (rows.size() > 24 || entries.size() + rows.size() > 48) { corrupt = true; return; }
+        for (const auto value : rows) {
+            auto row = normalize(value.toObject().toVariantMap());
+            if (!value.isObject() || row.isEmpty() || !validRow(row)) { corrupt = true; continue; }
+            const auto duplicate = indexOf(pluginId(row));
+            if (duplicate >= 0) {
+                if (entries[duplicate].toMap() != row) corrupt = true;
+                continue;
+            }
+            entries.append(row);
+        }
+    };
+    appendSource(sourceBytes[1], false, sourceExists[1]);
+    appendSource(sourceBytes[0], true, sourceExists[0]);
+    if (corrupt || entries.size() > 24 || hasCycle(entries)) {
+        entries.clear();
+        m_error = "Старые реестры содержат повреждённые данные, конфликтующие копии или зависимости; "
+                  "исходники не изменены.";
+        return;
+    }
+
+    for (qsizetype i = 0; i < oldPaths.size(); ++i) {
+        if (!sourceExists[i]) continue;
+        const auto backupPath = oldPaths[i] + ".bak";
+        if (QFileInfo::exists(backupPath)) {
+            QFile backup(backupPath);
+            if (!backup.open(QIODevice::ReadOnly) || backup.readAll() != sourceBytes[i]) {
+                m_error = "Резервная копия старого реестра отличается; миграция остановлена без изменений.";
+                entries.clear();
+                return;
+            }
+        } else {
+            QSaveFile backup(backupPath);
+            if (!backup.open(QIODevice::WriteOnly) || backup.write(sourceBytes[i]) != sourceBytes[i].size() ||
+                !backup.commit()) {
+                m_error = "Не удалось создать резервную копию старого реестра; миграция остановлена.";
+                entries.clear();
+                return;
+            }
+        }
+    }
+    const auto error = save(entries);
+    if (!error.isEmpty()) {
+        entries.clear();
+        m_error = "Ошибка атомарной миграции реестра: " + error;
+        return;
     }
     reconcile();
 }
@@ -313,8 +402,6 @@ QString Plugins::reason(const QString &id, QSet<QString> &visiting) const {
         return "Отключён пользователем.";
     if (m_errors.contains(id))
         return m_errors.value(id);
-    if (p["api"] == 1)
-        return {};
     for (auto perm : strings(p["permissions"].toArray()))
         if (!row["grants"].toList().contains(perm))
             return "Требуется разрешение: " + perm;
@@ -418,7 +505,7 @@ QVariantList Plugins::installed() const {
         row["reason"] = why;
         row["lastError"] = m_logs.value(id).isEmpty() ? QString() : m_logs.value(id).last();
         row["log"] = m_logs.value(id);
-        row["version"] = p["api"] == 1 ? "v1" : p["version"].toString();
+        row["version"] = p["version"].toString();
         QVariantList settingRows;
         for (auto s : p["settings"].toArray()) {
             auto setting = s.toObject().toVariantMap();
@@ -459,14 +546,11 @@ QString Plugins::candidate(const QJsonObject &p, QVariantList *next, QStringList
     auto previous = manifest(old);
     if (i < 0 && entries.size() >= 24)
         return "Достигнут предел 24 записей, включая сохранённые конфигурации.";
-    if (i >= 0 && previous["api"] == 2 && p["api"] != 2)
-        return "Переход с v2 на v1 запрещён.";
-    if (i >= 0 && old.value("retained").toBool() && previous["api"] == 2 &&
+    if (i >= 0 && old.value("retained").toBool() &&
         PluginManifest::compareVersions(p["version"].toString(), previous["version"].toString()) < 0)
         return "Понижение сохранённой версии запрещено.";
     if (i >= 0 && !old.value("retained").toBool()) {
-        if (previous["api"] == 2 &&
-            PluginManifest::compareVersions(p["version"].toString(), previous["version"].toString()) <= 0)
+        if (PluginManifest::compareVersions(p["version"].toString(), previous["version"].toString()) <= 0)
             return "Новая версия должна быть больше установленной.";
         changes->append("Замена установленного пакета. Совпадение ID не подтверждает автора.");
     }
@@ -482,20 +566,7 @@ QString Plugins::candidate(const QJsonObject &p, QVariantList *next, QStringList
     }
     QVariantMap row{
         {"plugin", p.toVariantMap()}, {"enabled", old.value("enabled", false)}, {"retained", false}};
-    if (p["api"] == 1) {
-        QVariantList flags;
-        if (previous["groups"] == p["groups"])
-            flags = old["flags"].toList();
-        else {
-            for (auto unused : p["groups"].toArray()) {
-                Q_UNUSED(unused);
-                flags.append(true);
-            }
-            if (i >= 0)
-                changes->append("Переключатели групп v1 сброшены: состав групп изменился.");
-        }
-        row["flags"] = flags;
-    } else {
+    {
         QVariantMap values;
         auto orphan = old["orphanSettings"].toMap();
         const auto oldValues = old["settings"].toMap();
@@ -540,30 +611,11 @@ QString Plugins::candidate(const QJsonObject &p, QVariantList *next, QStringList
             for (auto d : manifest(dependent)["dependencies"].toArray()) {
                 auto dep = d.toObject();
                 if (dep["id"] == id &&
-                    (p["api"] != 2 || !PluginManifest::compatible(dep, p["version"].toString())))
+                    !PluginManifest::compatible(dep, p["version"].toString()))
                     return "Сначала отключите зависимый плагин: " + pluginId(dependent);
             }
         }
     return {};
-}
-QString Plugins::install(const QUrl &url) {
-    QByteArray bytes;
-    auto error = readFile(url, &bytes);
-    if (!error.isEmpty())
-        return error;
-    auto parsed = PluginManifest::parse(bytes);
-    if (!parsed.error.isEmpty())
-        return parsed.error;
-    if (parsed.document["api"] != 1)
-        return "Для v2 используйте установку с просмотром разрешений.";
-    if (indexOf(parsed.document["id"].toString()) >= 0)
-        return "Этот идентификатор уже установлен.";
-    QVariantList next;
-    QStringList changes;
-    error = candidate(parsed.document, &next, &changes);
-    if (!error.isEmpty())
-        return error;
-    return save(next);
 }
 QVariantMap Plugins::prepareInstall(const QUrl &url) {
     if (!m_error.isEmpty())
@@ -659,20 +711,6 @@ QString Plugins::enable(const QString &id, bool value) {
         emit changed();
     }
     return result;
-}
-QString Plugins::configure(const QString &id, int group, bool value) {
-    int i = indexOf(id);
-    if (i < 0 || manifest(entries[i].toMap())["api"] != 1)
-        return "Группа v1 не найдена.";
-    auto next = entries;
-    auto row = next[i].toMap();
-    auto flags = row["flags"].toList();
-    if (group < 0 || group >= flags.size())
-        return "Группа не найдена.";
-    flags[group] = value;
-    row["flags"] = flags;
-    next[i] = row;
-    return save(next);
 }
 QString Plugins::setPermission(const QString &id, const QString &permission, bool value) {
     int i = indexOf(id);
@@ -799,17 +837,6 @@ QVariantList Plugins::panels() const {
         if (!reason(id).isEmpty())
             continue;
         const auto p = manifest(row);
-        if (p["api"] == 1) {
-            auto groups = p["groups"].toArray();
-            auto flags = row["flags"].toList();
-            for (int i = 0; i < groups.size(); ++i)
-                if (flags.value(i).toBool()) {
-                    auto g = groups[i].toObject().toVariantMap();
-                    g["pluginId"] = id;
-                    g["contributionId"] = QString::number(i);
-                    result.append(g);
-                }
-        } else
             for (auto contribution : p["contributions"].toArray()) {
                 auto c = contribution.toObject();
                 if (c.contains("enabledSetting") &&
@@ -856,18 +883,6 @@ QString Plugins::invokeButton(const QString &id, const QString &contribution, in
         return "Плагин не активен.";
     auto row = entries[indexOf(id)].toMap();
     auto p = manifest(row);
-    if (p["api"] == 1) {
-        bool ok = false;
-        int group = contribution.toInt(&ok);
-        auto groups = p["groups"].toArray();
-        if (!ok || group < 0 || group >= groups.size() || !row["flags"].toList().value(group).toBool())
-            return "Панель недоступна.";
-        auto buttons = groups[group].toObject()["buttons"].toArray();
-        if (button < 0 || button >= buttons.size())
-            return "Кнопка не найдена.";
-        emit navigationRequested(buttons[button].toObject()["action"].toString());
-        return {};
-    }
     for (auto value : p["contributions"].toArray()) {
         auto c = value.toObject();
         if (c["id"] != contribution || c["type"] != "panel")

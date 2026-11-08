@@ -15,7 +15,7 @@
 
 ## Версия 1.4.2
 
-Актуальные сборки для Windows, Linux и Android с исправлениями Android-плеера и Plugin API v2. Android APK поддерживает ARM64, ARMv7 и x86-64; устанавливайте его поверх прежней версии, чтобы сохранить данные.
+Актуальные сборки для Windows, Linux и Android с исправлениями Android-плеера и системой плагинов. Android APK поддерживает ARM64, ARMv7 и x86-64; устанавливайте его поверх прежней версии, чтобы сохранить данные.
 
 <p align="center">
   <img src="docs/screenshots/android-home-frame.svg" width="32%" alt="Главная SCrip на Android">

@@ -57,8 +57,7 @@ Column {
             clip: true; contentWidth: availableWidth
             Column {
                 width: parent.width; spacing: 12
-                Label { width: parent.width; text: root.preview.plugin ? root.preview.plugin.name + " · " + (root.preview.plugin.version || "API v1") : "Читаем и проверяем файл…"; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true }
-                Label { width: parent.width; text: root.preview.plugin ? root.preview.plugin.id + " · API " + root.preview.plugin.api : ""; textFormat: Text.PlainText; wrapMode: Text.Wrap }
+                Label { width: parent.width; text: root.preview.plugin ? root.preview.plugin.name + " · " + root.preview.plugin.version : "Читаем и проверяем файл…"; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true }
                 Label { width: parent.width; text: root.preview.plugin?.description || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text }
                 Label { width: parent.width; text: root.preview.previousVersion ? "Предыдущая версия: " + root.preview.previousVersion : "Новый плагин будет установлен выключенным."; textFormat: Text.PlainText; wrapMode: Text.Wrap }
                 Label { width: parent.width; text: "Файл не подписан. Совпадение ID не подтверждает автора. Устанавливайте пакеты из источника, которому доверяете."; wrapMode: Text.Wrap }
@@ -118,7 +117,7 @@ Column {
     }
     Label { width: parent.width; text: root.manager ? root.manager.error : "Менеджер недоступен"; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: "#a22c39" }
     Label { width: parent.width; text: root.message; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
-    Label { width: parent.width; text: "API v1 и декларативный API v2. Исполняемые расширения не поддерживаются. Обновления устанавливаются из файла."; wrapMode: Text.Wrap; color: root.muted }
+    Label { width: parent.width; text: "Поддерживаются декларативные плагины. Исполняемые расширения не поддерживаются. Обновления устанавливаются из файла."; wrapMode: Text.Wrap; color: root.muted }
     Label { width: parent.width; text: root.appearanceHint; wrapMode: Text.Wrap; visible: !!text; color: root.muted }
     Repeater {
         model: root.manager ? root.manager.installed : []
@@ -132,7 +131,6 @@ Column {
                 id: body
                 x: 12; y: 12; width: parent.width - 24; spacing: 10
                 Label { width: parent.width; text: card.modelData.plugin.name + " · " + card.modelData.version; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true; color: root.ink }
-                Label { width: parent.width; text: card.modelData.plugin.id + " · API " + card.modelData.plugin.api; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.muted }
                 Label { width: parent.width; text: card.modelData.plugin.description || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
                 Label { width: parent.width; text: ({"active":"Работает", "disabled":"Отключён", "removed":"Пакет удалён, конфигурация сохранена", "awaiting-permissions":"Нужны разрешения", "blocked":"Заблокирован", "error":"Ошибка"})[card.modelData.status] + (card.modelData.reason ? ": " + card.modelData.reason : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
                 Label { width: parent.width; text: card.modelData.lastError || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: "#a22c39" }
@@ -168,19 +166,8 @@ Column {
                         ComboBox { palette.base: "#ffffff"; palette.text: root.ink; palette.button: "#ede7ee"; palette.buttonText: root.ink; visible: setting.modelData.type === "enum"; width: Math.min(280, parent.width); model: setting.modelData.options || []; currentIndex: (setting.modelData.options || []).indexOf(setting.modelData.value); onActivated: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, currentText)) }
                     }
                 }
-                Repeater {
-                    model: card.modelData.plugin.groups || []
-                    CheckBox {
-                        required property var modelData
-                        required property int index
-                        width: body.width
-                        text: modelData.label; checked: card.modelData.flags[index]
-                        onToggled: root.showResult(root.manager.configure(card.modelData.plugin.id, index, checked))
-                        contentItem: Label { text: parent.text; color: root.ink; textFormat: Text.PlainText; wrapMode: Text.Wrap; leftPadding: parent.indicator.width + parent.spacing }
-                    }
-                }
-                Label { width: parent.width; text: "Собственные данные: " + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: card.modelData.plugin.api === 2 && Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }
-                PluginAction { width: Math.min(implicitWidth, parent.width); visible: card.modelData.plugin.api === 2; text: "Очистить данные"; onClicked: root.showResult(root.manager.clearData(card.modelData.plugin.id)) }
+                Label { width: parent.width; text: "Собственные данные: " + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }
+                PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить данные"; onClicked: root.showResult(root.manager.clearData(card.modelData.plugin.id)) }
             }
         }
     }
