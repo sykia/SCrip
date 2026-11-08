@@ -45,7 +45,10 @@ try {
 
     & $output1 '/S'
     Assert ($LASTEXITCODE -eq 0) 'Initial install failed.'
-    Assert (Test-Path (Join-Path $install 'Uninstall.exe')) 'Installer did not use the isolated /D test directory.'
+    if (!(Test-Path (Join-Path $install 'Uninstall.exe'))) {
+        Get-ChildItem -LiteralPath $work -Force | Format-Table FullName, Length | Out-String | Write-Host
+        throw 'Installer did not use the isolated test directory.'
+    }
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
     Assert (Test-Path (Join-Path $install 'obsolete.dll')) 'Legacy-only file was not installed for the upgrade test.'
 

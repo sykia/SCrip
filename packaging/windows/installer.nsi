@@ -59,7 +59,9 @@ Function .onInit
   recovery_restore:
   ; A prior setup was interrupted after taking its recovery copy.
   IfFileExists "$2\*.*" 0 recovery_failed
-  ExecWait '"$SYSDIR\robocopy.exe" "$2" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  ClearErrors
+  ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$2" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  IfErrors recovery_failed
   IntCmp $0 8 recovery_failed recovery_done recovery_failed
   Delete "$3"
   RMDir /r "$2"
@@ -87,7 +89,9 @@ Var HadPrevious
 
 Function RestorePrevious
   StrCmp $RecoveryReady 1 0 restore_done
-  ExecWait '"$SYSDIR\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  ClearErrors
+  ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  IfErrors restore_failed
   IntCmp $0 8 restore_failed restore_cleanup restore_failed
   restore_failed:
   SetErrorLevel 3
@@ -168,7 +172,9 @@ Section
   IfErrors staging_failed
   ; Keep an exact copy until the new payload and metadata are installed.
   IfFileExists "$INSTDIR\*.*" 0 no_previous_files
-  ExecWait '"$SYSDIR\robocopy.exe" "$INSTDIR" "$BackupDir" /E /COPY:DAT /R:1 /W:1' $0
+  ClearErrors
+  ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$INSTDIR" "$BackupDir" /E /COPY:DAT /R:1 /W:1' $0
+  IfErrors backup_failed
   IntCmp $0 8 backup_failed backup_ready backup_failed
   backup_failed:
   RMDir /r "$StageDir"
@@ -204,7 +210,9 @@ Section
   !endif
   Goto copy_staged
   copy_staged:
-  ExecWait '"$SYSDIR\robocopy.exe" "$StageDir" "$INSTDIR" /E /COPY:DAT /R:1 /W:1' $0
+  ClearErrors
+  ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$StageDir" "$INSTDIR" /E /COPY:DAT /R:1 /W:1' $0
+  IfErrors new_copy_failed
   IntCmp $0 8 new_copy_failed write_new_uninstaller new_copy_failed
   new_copy_failed:
   Call RestorePrevious
