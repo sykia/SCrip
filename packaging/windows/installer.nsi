@@ -46,37 +46,43 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "SCrip"
 !insertmacro MUI_LANGUAGE "Russian"
 
 Function .onInit
-  !insertmacro TestTrace "onInit"
   ${IfNot} ${RunningX64}
     MessageBox MB_OK|MB_ICONSTOP "Для SCrip требуется 64-разрядная Windows."
     Abort
   ${EndIf}
-  StrCpy $2 "$INSTDIR.__SCrip_backup"
-  StrCpy $3 "$INSTDIR.__SCrip_marker"
-  IfFileExists "$3" 0 recovery_done
-  FileOpen $4 "$3" r
+FunctionEnd
+
+Var BackupDir
+Var StageDir
+Var Marker
+Var RecoveryReady
+Var HadPrevious
+
+Function RecoverInterruptedUpdate
+  IfFileExists "$Marker" 0 recovery_done
+  FileOpen $4 "$Marker" r
   IfErrors recovery_restore
   FileRead $4 $5
   FileClose $4
-  !insertmacro TestTrace "marker=$5"
   StrCmp $5 "COMMIT$\r$\n" recovery_committed recovery_restore
   recovery_committed:
-  RMDir /r "$INSTDIR.__SCrip_stage"
-  RMDir /r "$2"
-  IfFileExists "$2\*.*" recovery_failed
-  Delete "$3"
+  RMDir /r "$StageDir"
+  RMDir /r "$BackupDir"
+  IfFileExists "$BackupDir\*.*" recovery_failed
+  Delete "$Marker"
   Goto recovery_done
   recovery_restore:
   ; A prior setup was interrupted after taking its recovery copy.
-  IfFileExists "$2\*.*" 0 recovery_failed
+  IfFileExists "$BackupDir\*.*" 0 recovery_failed
   ClearErrors
-  ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$2" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
   IfErrors recovery_failed
-  !insertmacro TestTrace "recovery_copy_exit=$0"
   IntCmp $0 8 recovery_failed recovery_recovered recovery_failed
   recovery_recovered:
-  Delete "$3"
-  RMDir /r "$2"
+  RMDir /r "$StageDir"
+  RMDir /r "$BackupDir"
+  IfFileExists "$BackupDir\*.*" recovery_failed
+  Delete "$Marker"
   CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
@@ -86,19 +92,12 @@ Function .onInit
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   Goto recovery_done
-  recovery_done:
-  Goto recovery_end
   recovery_failed:
-  MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию SCrip. Файлы восстановления сохранены в $2."
+  SetErrorLevel 3
+  MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию SCrip. Файлы восстановления сохранены в $BackupDir."
   Abort
-  recovery_end:
+  recovery_done:
 FunctionEnd
-
-Var BackupDir
-Var StageDir
-Var Marker
-Var RecoveryReady
-Var HadPrevious
 
 Function RestorePrevious
   StrCmp $RecoveryReady 1 0 restore_done
@@ -163,13 +162,13 @@ FunctionEnd
 !macroend
 
 Section
-  !insertmacro TestTrace "section"
   !insertmacro CheckClosed
   StrCpy $BackupDir "$INSTDIR.__SCrip_backup"
   StrCpy $StageDir "$INSTDIR.__SCrip_stage"
   StrCpy $Marker "$INSTDIR.__SCrip_marker"
   StrCpy $RecoveryReady 0
   StrCpy $HadPrevious 0
+  Call RecoverInterruptedUpdate
   IfFileExists "$Marker" preexisting_backup
   ; Never remove an unmarked sibling directory: it may contain user data.
   IfFileExists "$BackupDir\*.*" preexisting_backup

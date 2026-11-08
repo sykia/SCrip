@@ -13,7 +13,8 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertIn('"$INSTDIR.__SCrip_marker"', script)
         self.assertIn('Function .onInstFailed', script)
         self.assertIn('Function RestorePrevious', script)
-        self.assertIn('"$WINDIR\\Sysnative\\robocopy.exe" "$2" "$INSTDIR" /MIR', script)
+        recovery = script.split("Function RecoverInterruptedUpdate", 1)[1].split("FunctionEnd", 1)[0]
+        self.assertIn('"$WINDIR\\Sysnative\\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR', recovery)
 
     def test_uninstall_only_removes_manifest_entries_and_empty_directories(self):
         script = (ROOT / "packaging/windows/installer.nsi").read_text(encoding="utf-8")
