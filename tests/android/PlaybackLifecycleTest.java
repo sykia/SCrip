@@ -70,6 +70,30 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         require(session.getController().getPlaybackState().getState() == state, "Неверное состояние медиасессии");
         require(!session.getController().getPlaybackState().getCustomActions().isEmpty(), "Нет действия полной остановки");
     }
+    private void testDeferredPlay() throws Exception {
+        Method record = bridge.getDeclaredMethod("recordDeferredAction", int.class); record.setAccessible(true);
+        Method consume = bridge.getDeclaredMethod("consumePendingPlay", boolean.class); consume.setAccessible(true);
+        Field ready = bridge.getDeclaredField("ready"); ready.setAccessible(true);
+        Field pending = bridge.getDeclaredField("pendingPlay"); pending.setAccessible(true);
+        pending.setBoolean(null, false);
+        require(!(Boolean) consume.invoke(null, true), "Обычный запуск сам запросил Play");
+        ready.setBoolean(null, false);
+        record.invoke(null, 0); record.invoke(null, 0);
+        require((Boolean) pending.get(null), "Холодный Play не сохранён");
+        require(!(Boolean) consume.invoke(null, true), "Play выполнен до готовности Qt");
+        ready.setBoolean(null, true);
+        require(!(Boolean) consume.invoke(null, false), "Play выполнен без трека");
+        require((Boolean) pending.get(null), "Намерение Play потеряно без трека");
+        require((Boolean) consume.invoke(null, true), "Отложенный Play не выполнен после готовности и появления трека");
+        require(!(Boolean) consume.invoke(null, true), "Play выполнен повторно");
+        ready.setBoolean(null, false); record.invoke(null, 0); record.invoke(null, 5);
+        ready.setBoolean(null, true);
+        require(!(Boolean) consume.invoke(null, true), "Play сработал после явной отмены");
+        ready.setBoolean(null, true);
+        Method dispatch = bridge.getDeclaredMethod("dispatch", Context.class, int.class, long.class); dispatch.setAccessible(true);
+        dispatch.invoke(null, getTargetContext(), 5, 0L);
+        require(!(Boolean) pending.get(null), "Тёплая команда ошибочно стала отложенным Play");
+    }
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); testArguments = arguments; start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
@@ -81,6 +105,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             activity = startActivitySync(launch);
             for (int i = 0; i < 100 && !(Boolean) field(bridge, null, "ready"); ++i) SystemClock.sleep(100);
             require((Boolean) field(bridge, null, "ready"), "Qt-мост не готов");
+            testDeferredPlay();
             int previewStyle = -1;
             if (testArguments != null && testArguments.containsKey("previewStyle"))
                 previewStyle = Integer.parseInt(testArguments.getString("previewStyle"));

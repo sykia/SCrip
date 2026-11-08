@@ -17,6 +17,7 @@ public final class MediaBridge {
     static volatile boolean ready;
     private static volatile boolean shuttingDown;
     private static volatile int lifecycle;
+    private static boolean pendingPlay;
     static volatile boolean preparing;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
     static boolean playing, active, buffering, hasTrack, liked;
@@ -48,6 +49,7 @@ public final class MediaBridge {
     }
     public static void shutdown() {
         ready = false; shuttingDown = true; ++lifecycle;
+        synchronized (MediaBridge.class) { pendingPlay = false; }
         MAIN.post(() -> {
             playing = active = buffering = hasTrack = preparing = false;
             if (context != null) {
@@ -75,6 +77,7 @@ public final class MediaBridge {
                 title = nextTitle.isEmpty() ? "SCrip" : nextTitle; artist = nextArtist;
                 playing = nextPlaying; buffering = nextBuffering; active = nextActive; hasTrack = nextHasTrack; liked = nextLiked;
                 position = nextPosition; duration = nextDuration;
+                if (consumePendingPlay(nextHasTrack)) nativeAction(4, 0);
                 if (!nextArtwork.equals(artwork)) {
                     artwork = nextArtwork;
                     cover = null; roundedCover = null; blurredCover = null;
@@ -144,11 +147,24 @@ public final class MediaBridge {
         MAIN.post(() -> MusicWidget.refresh(context));
     }
     static void dispatch(Context ctx, int action, long value) {
-        if (ready) nativeAction(action, value);
+        if (ready) {
+            if (action == 5 || action == 6) recordDeferredAction(action);
+            nativeAction(action, value);
+        }
         else {
+            recordDeferredAction(action);
             Intent launch = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
             if (launch != null) { launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); ctx.startActivity(launch); }
         }
+    }
+    static synchronized void recordDeferredAction(int action) {
+        if (action == 0 || action == 4) pendingPlay = true;
+        else if (action == 5 || action == 6) pendingPlay = false;
+    }
+    static synchronized boolean consumePendingPlay(boolean trackAvailable) {
+        if (!trackAvailable || !pendingPlay || !ready) return false;
+        pendingPlay = false;
+        return true;
     }
     static int generation() { return lifecycle; }
     static PendingIntent openApp(Context ctx) {
