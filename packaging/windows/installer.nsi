@@ -39,6 +39,9 @@ Function .onInit
     MessageBox MB_OK|MB_ICONSTOP "Для SCrip требуется 64-разрядная Windows."
     Abort
   ${EndIf}
+  !ifdef TEST_INSTALL_DIR
+    StrCpy $INSTDIR "${TEST_INSTALL_DIR}"
+  !endif
   StrCpy $2 "$INSTDIR.__SCrip_backup"
   StrCpy $3 "$INSTDIR.__SCrip_marker"
   IfFileExists "$3" 0 recovery_done

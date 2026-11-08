@@ -28,7 +28,7 @@ function Build-Installer($payload, $output, $version, $pauseAfterUninstall = $fa
             'RMDir "$INSTDIR\' + $relative.Replace('$', '$$') + '"'
         }
     Set-Content -LiteralPath $fileList -Value $entries -Encoding utf8
-    $args = @("-DPAYLOAD=$payload", "-DOUTPUT=$output", "-DFILELIST=$fileList")
+    $args = @("-DPAYLOAD=$payload", "-DOUTPUT=$output", "-DFILELIST=$fileList", "-DTEST_INSTALL_DIR=$install")
     if ($pauseAfterUninstall) { $args += '-DTEST_PAUSE_AFTER_UNINSTALL' }
     & makensis @args 'installer.nsi'
     if ($LASTEXITCODE -ne 0) { throw "makensis failed for $version ($LASTEXITCODE)" }
@@ -43,7 +43,7 @@ try {
     Build-Installer $payload1 $output1 'v1'
     Build-Installer $payload2 $output2 'v2' $true
 
-    & $output1 '/S' "/D=$install"
+    & $output1 '/S'
     Assert ($LASTEXITCODE -eq 0) 'Initial install failed.'
     Assert (Test-Path (Join-Path $install 'Uninstall.exe')) 'Installer did not use the isolated /D test directory.'
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
@@ -56,7 +56,7 @@ try {
     # Pause after the old uninstaller has removed version 1. Kill setup to model
     # power loss in the exact interval that used to leave no working version.
     Set-Content "$install.__SCrip_test_pause" 'pause once'
-    $upgrade = Start-Process -FilePath $output2 -ArgumentList @('/S', "/D=$install") -PassThru
+    $upgrade = Start-Process -FilePath $output2 -ArgumentList '/S' -PassThru
     $marker = "$install.__SCrip_marker"
     $deadline = (Get-Date).AddSeconds(45)
     while ((Get-Date) -lt $deadline) {
@@ -72,7 +72,7 @@ try {
     Remove-Item -LiteralPath "$install.__SCrip_test_pause" -Force -ErrorAction SilentlyContinue
 
     # The next real setup must recover v1 first, then finish upgrading to v2.
-    & $output2 '/S' "/D=$install"
+    & $output2 '/S'
     Assert ($LASTEXITCODE -eq 0) 'Recovery and upgrade failed.'
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-two') 'Version 2 was not installed after recovery.'
     Assert (!(Test-Path (Join-Path $install 'obsolete.dll'))) 'Stale application file survived the upgrade.'
@@ -82,14 +82,14 @@ try {
 
     # Reinstalling the same version must be safe and idempotent.
     Build-Installer $payload2 $output2 'v2-repeat'
-    & $output2 '/S' "/D=$install"
+    & $output2 '/S'
     Assert ($LASTEXITCODE -eq 0) 'Repeated installation failed.'
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'Repeated installation removed a user file.'
 
     # Hold the executable exclusively: setup must time out and leave v2 intact.
     $lock = [IO.File]::Open((Join-Path $install 'SCrip.exe'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     try {
-        & $output2 '/S' "/D=$install"
+        & $output2 '/S'
         Assert ($LASTEXITCODE -ne 0) 'Setup unexpectedly succeeded while SCrip.exe was locked.'
     } finally { $lock.Dispose() }
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-two') 'Locked-executable failure damaged the installed version.'
