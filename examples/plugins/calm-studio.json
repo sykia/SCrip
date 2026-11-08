@@ -1,0 +1,67 @@
+{
+  "api": 2,
+  "kind": "declarative",
+  "version": "1.0.0",
+  "requiresHost": {
+    "min": "1.4.1",
+    "maxExclusive": "2.0.0"
+  },
+  "settings": [
+    {
+      "id": "theme",
+      "type": "boolean",
+      "label": "Применять оформление",
+      "default": true
+    },
+    {
+      "id": "shortcuts",
+      "type": "boolean",
+      "label": "Показывать переходы",
+      "default": true
+    }
+  ],
+  "contributions": [
+    {
+      "id": "colors",
+      "type": "theme",
+      "values": {
+        "accent": "#238579",
+        "coverRadius": 20,
+        "covers": "artwork"
+      },
+      "enabledSetting": "theme"
+    },
+    {
+      "id": "library",
+      "type": "panel",
+      "slot": "profile.panels",
+      "title": "Моя коллекция",
+      "buttons": [
+        {
+          "label": "Любимые",
+          "action": {
+            "command": "navigation.open",
+            "destination": "likes"
+          }
+        },
+        {
+          "label": "Плейлисты",
+          "action": {
+            "command": "navigation.open",
+            "destination": "playlists"
+          }
+        }
+      ],
+      "enabledSetting": "shortcuts"
+    }
+  ],
+  "rules": [],
+  "id": "calm-studio",
+  "name": "Спокойная студия",
+  "description": "Зелёный акцент и быстрые переходы в профиль. Тему и панель можно отключать независимо.",
+  "permissions": [
+    "ui.theme",
+    "ui.panels",
+    "navigation"
+  ]
+}

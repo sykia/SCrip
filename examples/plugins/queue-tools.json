@@ -1,0 +1,40 @@
+{
+  "api": 2,
+  "kind": "declarative",
+  "version": "1.0.0",
+  "requiresHost": {
+    "min": "1.4.1",
+    "maxExclusive": "2.0.0"
+  },
+  "settings": [],
+  "contributions": [
+    {
+      "id": "queue",
+      "type": "panel",
+      "slot": "player.tools",
+      "title": "Очередь",
+      "buttons": [
+        {
+          "label": "Предыдущий",
+          "action": {
+            "command": "player.previous"
+          }
+        },
+        {
+          "label": "Следующий",
+          "action": {
+            "command": "player.next"
+          }
+        }
+      ]
+    }
+  ],
+  "rules": [],
+  "id": "queue-tools",
+  "name": "Управление очередью",
+  "description": "Предыдущий и следующий трек в разделе дополнений плеера.",
+  "permissions": [
+    "ui.panels",
+    "player.control"
+  ]
+}

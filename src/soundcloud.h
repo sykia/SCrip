@@ -24,6 +24,7 @@ class SoundCloud : public QObject {
 public:
     explicit SoundCloud(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr);
     bool signedIn() const { return m_state.value("signedIn").toBool(); }
+    bool seekable() const { return m_activePlayer->isSeekable(); }
     QVariantMap state() const { return m_state; }
     qint64 position() const { return m_state.value("position").toLongLong(); }
     qint64 duration() const { return m_state.value("duration").toLongLong(); }

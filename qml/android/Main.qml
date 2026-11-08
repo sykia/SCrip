@@ -16,12 +16,21 @@ ApplicationWindow {
     title: "SCrip · Android"
     color: "#faf9fa"
     readonly property var api: sc.catalogState
-    readonly property color accent: pluginManager.theme.accent || prefs.accent
+    readonly property color accent: prefs.accentOverride ? prefs.accent : pluginManager.theme.accent || prefs.accent
+    readonly property real coverRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginManager.theme.coverRadius ?? prefs.coverRadius
     readonly property color ink: "#242426"
     readonly property color muted: "#858589"
     Settings {
         id: prefs
         category: "androidInterface"
+        property bool themePreferencesMigrated: false
+        Component.onCompleted: if (!themePreferencesMigrated) {
+            accentOverride = accent !== "#f43756"
+            coverRadiusOverride = coverRadius !== 16
+            themePreferencesMigrated = true
+        }
+        property bool accentOverride: false
+        property bool coverRadiusOverride: false
         property string accent: "#f43756"
         property bool motion: true
         property bool autoLoad: true
@@ -32,12 +41,7 @@ ApplicationWindow {
     property int profileTab: 0
     readonly property var profile: guest ? (api.visitedProfile?.urn === guest.urn ? api.visitedProfile : guest) : api.profile
     function openProfile(user) { guest = user || null; profileTab = 0; page = 4; refresh() }
-    Dialogs.FileDialog {
-        id: pluginPicker
-        title: "Установить плагин"
-        nameFilters: ["Плагины SCrip (*.json)"]
-        onAccepted: app.message = pluginManager.install(selectedFile) || "Плагин установлен"
-    }
+
     property int page: 0
     property string library: "likes"
     property string searchKind: "tracks"
@@ -100,7 +104,7 @@ ApplicationWindow {
     component RoundedImage: Item {
         id: rounded
         property alias source: picture.source
-        property real radius: pluginManager.theme.coverRadius ?? prefs.coverRadius
+        property real radius: app.coverRadius
         property bool avatar: false
         Rectangle { anchors.fill: parent; radius: rounded.avatar ? width / 2 : rounded.radius; color: "#eee7ec" }
         Glyph { anchors.centerIn: parent; visible: rounded.avatar && picture.status !== Image.Ready; name: "profile"; ink: app.muted }
@@ -218,7 +222,7 @@ ApplicationWindow {
             spacing: 12
             Rectangle {
                 Layout.preferredWidth: 44; Layout.preferredHeight: 44
-                radius: app.page === 2 && app.searchKind === "users" ? width / 2 : pluginManager.theme.coverRadius ?? prefs.coverRadius; color: "#efe8eb"; clip: true
+                radius: app.page === 2 && app.searchKind === "users" ? width / 2 : app.coverRadius; color: "#efe8eb"; clip: true
                 RoundedImage { anchors.fill: parent; source: app.page === 2 && app.searchKind === "users" ? row.modelData.avatar_url || "" : app.cover(row.modelData); avatar: app.page === 2 && app.searchKind === "users" }
             }
             ColumnLayout {
@@ -356,7 +360,7 @@ ApplicationWindow {
                                 contentItem: Column {
                                     spacing: 7
                                     Rectangle {
-                                        width: 120; height: 120; radius: pluginManager.theme.coverRadius ?? prefs.coverRadius; color: "#eee7ea"; clip: true
+                                        width: 120; height: 120; radius: app.coverRadius; color: "#eee7ea"; clip: true
                                         RoundedImage { anchors.fill: parent; source: app.cover(modelData) }
                                     }
                                     Caption { width: 120; text: modelData.title || ""; font.bold: true; font.pixelSize: 13 }
@@ -369,19 +373,7 @@ ApplicationWindow {
                 }
                 Label { x: 18; width: parent.width - 36; visible: !(app.api.home || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
                 Action { x: 24; text: "Обновить подборки"; enabled: !app.api.homeBusy; onClicked: sc.loadHome(true) }
-                Repeater {
-                    model: pluginManager.panels.filter(p => p.page === "home")
-                    Column {
-                        required property var modelData
-                        x: 18; width: parent.width - 36; spacing: 10
-                        Caption { text: parent.modelData.label; font.bold: true; font.pixelSize: 20 }
-                        Label { width: parent.width; text: parent.modelData.text || ""; visible: !!text; wrapMode: Text.Wrap; color: app.muted }
-                        Repeater {
-                            model: parent.modelData.buttons || []
-                            Action { required property var modelData; width: parent.width; text: modelData.label; onClicked: { app.library = modelData.action; app.page = modelData.action === "profile" ? 4 : modelData.action === "search" ? 2 : modelData.action === "feed" ? 1 : 3; app.refresh() } }
-                        }
-                    }
-                }
+                PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: 16 }
             }
         }
@@ -410,12 +402,13 @@ ApplicationWindow {
                                 required property string modelData
                                 width: 42; height: 42; Accessible.name: "Цвет " + modelData
                                 background: Rectangle { color: modelData; radius: 21; border.width: prefs.accent === modelData ? 4 : 0; border.color: "#d6cbd2" }
-                                onClicked: prefs.accent = modelData
+                                onClicked: { prefs.accent = modelData; prefs.accentOverride = true }
                             }
                         }
                     }
                     Caption { text: "Скругление обложек"; color: app.muted }
-                    FineSlider { Layout.fillWidth: true; from: 0; to: 28; value: prefs.coverRadius; onMoved: prefs.coverRadius = value; Accessible.name: "Скругление обложек" }
+                    FineSlider { Layout.fillWidth: true; from: 0; to: 28; value: prefs.coverRadius; onMoved: { prefs.coverRadius = value; prefs.coverRadiusOverride = true } Accessible.name: "Скругление обложек" }
+                    Action { text: "Использовать оформление плагинов"; onClicked: { prefs.accentOverride = false; prefs.coverRadiusOverride = false } }
                     Switch { text: "Анимации"; checked: prefs.motion; onToggled: prefs.motion = checked }
                     Switch { text: "Загружать треки при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
                     Action { text: "Плагины"; Layout.fillWidth: true; onClicked: app.page = 6 }
@@ -426,38 +419,8 @@ ApplicationWindow {
                     Caption { text: "SCrip " + Qt.application.version + " · Android"; color: app.muted; font.pixelSize: 12 }
                 }
                 ColumnLayout {
-                    visible: app.page === 6
-                    Layout.fillWidth: true; Layout.margins: 18; spacing: 14
-                    Label { text: "Темы и дополнения"; font.pixelSize: 21; font.bold: true; color: app.ink; Layout.fillWidth: true }
-                    Label { text: "Установи JSON-плагин SCrip, чтобы добавить тему или быстрые действия."; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
-                    Action { text: "Установить из файла"; primary: true; Layout.fillWidth: true; onClicked: pluginPicker.open() }
-                    Label { text: app.message; visible: !!text; wrapMode: Text.Wrap; Layout.fillWidth: true; color: app.muted }
-                    Label { text: "Пока нет установленных плагинов"; visible: !pluginManager.installed.length; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
-                    Repeater {
-                        model: pluginManager.installed
-                        Rectangle {
-                            id: extension
-                            required property var modelData
-                            Layout.fillWidth: true; implicitHeight: extensionBody.implicitHeight + 32
-                            radius: 20; color: "white"; border.color: "#eae4e8"
-                            ColumnLayout {
-                                id: extensionBody
-                                anchors.fill: parent; anchors.margins: 16; spacing: 12
-                                Label { text: extension.modelData.plugin.name; font.bold: true; font.pixelSize: 18; wrapMode: Text.Wrap; Layout.fillWidth: true; color: app.ink }
-                                Switch { text: "Включён"; checked: extension.modelData.enabled; onToggled: app.message = pluginManager.enable(extension.modelData.plugin.id, checked) }
-                                Repeater {
-                                    model: extension.modelData.plugin.groups
-                                    CheckBox {
-                                        required property int index
-                                        required property var modelData
-                                        text: modelData.label; checked: extension.modelData.flags[index]
-                                        onToggled: app.message = pluginManager.configure(extension.modelData.plugin.id, index, checked)
-                                    }
-                                }
-                                Action { text: "Удалить"; onClicked: app.message = pluginManager.remove(extension.modelData.plugin.id) }
-                            }
-                        }
-                    }
+                    Layout.fillWidth: true; Layout.margins: 18
+                    PluginManagerView { Layout.fillWidth: true; manager: pluginManager; appearanceHint: prefs.accentOverride || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
                 }
             }
         }
@@ -493,6 +456,7 @@ ApplicationWindow {
                         Action { required property int index; required property string modelData; text: modelData; Layout.fillWidth: true; font.pixelSize: 12; leftPadding: 10; rightPadding: 10; implicitHeight: 44; primary: app.profileTab === index; onClicked: { app.profileTab = index; app.refresh() } }
                     }
                 }
+                PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "profile"; onReport: error => app.message = error }
                 Item { height: 8; width: 1 }
             }
             delegate: Track {}
@@ -643,6 +607,7 @@ ApplicationWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Action { text: "Свернуть"; symbol: "back"; Layout.preferredWidth: 48; Accessible.name: "Свернуть плеер"; onClicked: player.close() }
+                Action { text: "Дополнения плеера"; symbol: "grid"; Layout.preferredWidth: 48; visible: pluginManager.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
                 Caption { text: "СЕЙЧАС ИГРАЕТ"; font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                 Action { text: "Действия"; symbol: "more"; Layout.preferredWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = app.api.current; app.selectedQueue = -1; trackMenu.open() } }
             }
@@ -789,6 +754,19 @@ ApplicationWindow {
             Label { text: "SoundCloud для твоего ритма"; color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Action { text: sc.signedIn ? "Выйти из аккаунта" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.signedIn ? sc.logout() : sc.login(); account.close() } }
             Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: account.close() }
+        }
+    }
+    PluginToolsPopup { id: pluginTools; manager: pluginManager }
+    Connections {
+        target: pluginManager
+        function onNavigationRequested(destination) {
+            switch (destination) {
+            case "profile": app.openProfile(null); break
+            case "search": app.page = 2; search.forceActiveFocus(); break
+            case "feed": app.page = 1; break
+            case "likes": case "history": case "playlists": app.library = destination; app.page = 3; app.refresh(); break
+            }
+            pluginTools.close()
         }
     }
     Connections {

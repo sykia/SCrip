@@ -1,0 +1,69 @@
+{
+  "api": 2,
+  "kind": "declarative",
+  "version": "1.0.0",
+  "requiresHost": {
+    "min": "1.4.1",
+    "maxExclusive": "2.0.0"
+  },
+  "settings": [
+    {
+      "id": "minutes",
+      "type": "integer",
+      "label": "Минуты до паузы",
+      "default": 30,
+      "min": 1,
+      "max": 180
+    }
+  ],
+  "contributions": [
+    {
+      "id": "sleep",
+      "type": "panel",
+      "slot": "player.tools",
+      "title": "Таймер сна",
+      "buttons": [
+        {
+          "label": "Запустить",
+          "action": {
+            "command": "timer.start",
+            "timerId": "sleep",
+            "minutesSetting": "minutes"
+          }
+        },
+        {
+          "label": "Отменить",
+          "action": {
+            "command": "timer.cancel",
+            "timerId": "sleep"
+          }
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "pause",
+      "event": "timer.expired",
+      "conditions": [
+        {
+          "field": "timerId",
+          "equals": "sleep"
+        }
+      ],
+      "actions": [
+        {
+          "command": "player.pause"
+        }
+      ]
+    }
+  ],
+  "id": "sleep-timer",
+  "name": "Таймер сна",
+  "description": "Пауза через 1–180 минут. Время приблизительное: при сне Android срабатывание может задержаться до возобновления приложения.",
+  "permissions": [
+    "ui.panels",
+    "player.control",
+    "timers"
+  ]
+}

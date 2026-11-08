@@ -66,6 +66,31 @@ int main(int argc, char *argv[])
         if (!opened) soundcloud.browserFailed();
     });
     Plugins plugins;
+    plugins.setPlayerCommand([&soundcloud](const QString &command, const QJsonObject &args) -> QString {
+        const auto state = soundcloud.state();
+        const auto track = state.value("current").toMap();
+        if (command == "player.repeat") { soundcloud.setRepeat(args["enabled"].toBool()); return {}; }
+        if (command == "player.shuffle") { soundcloud.setShuffle(args["enabled"].toBool()); return {}; }
+        if (track.isEmpty()) return "Нет текущего трека.";
+        if (command == "player.pause") soundcloud.pausePlayback();
+        else if (command == "player.resume") soundcloud.resumePlayback();
+        else if (command == "player.next") {
+            if (state.value("queue").toList().size() < 2 || (!state.value("shuffle").toBool() && state.value("queueIndex").toInt() + 1 >= state.value("queue").toList().size())) return "Нет следующего трека.";
+            soundcloud.next();
+        } else if (command == "player.previous") {
+            if (soundcloud.position() <= 3000 && state.value("queueIndex").toInt() <= 0) return "Нет предыдущего трека.";
+            soundcloud.previous();
+        }
+        else if (command == "player.seek") {
+            if (!soundcloud.seekable() || soundcloud.duration() <= 0) return "Перемотка недоступна.";
+            soundcloud.seek(qMin(args["positionMs"].toInteger(), soundcloud.duration()));
+        } else return "Неизвестная команда плеера.";
+        return {};
+    });
+    plugins.updatePlayer(soundcloud.state());
+    QObject::connect(&soundcloud, &SoundCloud::catalogChanged, &plugins, [&] { plugins.updatePlayer(soundcloud.state()); });
+    // Получаем свежий прогресс только при наличии подписок, не на каждом тике backend.
+    QObject::connect(&plugins, &Plugins::progressSnapshotRequested, &plugins, [&] { plugins.updatePlayer(soundcloud.state()); });
     ArtworkNetworkFactory artwork;
 #ifdef Q_OS_ANDROID
     AndroidMedia androidMedia(&soundcloud, &artwork);

@@ -26,14 +26,9 @@ Window {
         function linear(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
         return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b) > 0.179 ? "#111113" : "#ffffff"
     }
-    readonly property int artworkRadius: pluginTheme.coverRadius ?? prefs.coverRadius
+    readonly property int artworkRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginTheme.coverRadius ?? prefs.coverRadius
     property string pluginMessage: ""
-    Dialogs.FileDialog {
-        id: pluginPicker
-        title: "Установить плагин SCrip"
-        nameFilters: ["Плагины SCrip (*.json)"]
-        onAccepted: app.pluginMessage = app.extensions.install(selectedFile) || "Плагин установлен. Включите его ниже."
-    }
+
     readonly property color ink: "#242426"
     readonly property color muted: "#858589"
     property int section: 5
@@ -66,6 +61,9 @@ Window {
         property string savedThemes: "[]"
         property string themeName: ""
         property int animationMs: 240
+        property bool themePreferencesMigrated: false
+        Component.onCompleted: if (!themePreferencesMigrated) { coverRadiusOverride = coverRadius !== 8; themePreferencesMigrated = true }
+        property bool coverRadiusOverride: false
         property int coverRadius: 8
         property int avatarRoundness: 50
         property int panelRadius: 12
@@ -379,35 +377,13 @@ Window {
                         Tool { symbol: "repeat"; text: "Обновить"; onClicked: app.refreshPage() }
                     }
                     Loader { width: parent.width; active: app.section === 4; visible: active; sourceComponent: app.settingGroup === 1 ? pluginsPage : settingsPage }
-                    Repeater {
-                        model: app.extensions ? app.extensions.panels.filter(g => g.page === (app.section === 5 ? "home" : app.section === 3 ? "profile" : "-")) : []
-                        FormBlock {
-                            id: extensionPanel
-                            required property var modelData
-                            width: pageBody.width
-                            heading: modelData.label
-                            Txt { width: parent.width; visible: !!text; text: extensionPanel.modelData.text || ""; wrapMode: Text.Wrap }
-                            Flow {
-                                width: parent.width; spacing: 8
-                                Repeater {
-                                    model: extensionPanel.modelData.buttons || []
-                                    Tool {
-                                        required property var modelData
-                                        text: modelData.label
-                                        width: Math.min(implicitWidth, extensionPanel.width)
-                                        onClicked: {
-                                            switch (modelData.action) {
-                                            case "profile": app.openProfile(null); break
-                                            case "playlists": app.section = 2; break
-                                            case "search": app.section = 0; searchField.forceActiveFocus(); break
-                                            case "likes": case "history": case "feed": app.selectLibrary(modelData.action); break
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    PluginPanels {
+                        width: pageBody.width
+                        manager: app.extensions
+                        slotName: app.section === 5 ? "home" : app.section === 3 ? "profile" : "-"
+                        onReport: error => app.pluginMessage = error
                     }
+                    Label { width: pageBody.width; text: app.pluginMessage; textFormat: Text.PlainText; visible: !!text; wrapMode: Text.Wrap }
                     Loader { width: parent.width; active: app.section === 5; visible: active; sourceComponent: homePage }
                     Loader { id: collectionLoader; width: parent.width; active: (app.section !== 4 && app.section !== 5); visible: active; sourceComponent: app.section === 0 && app.category === 2 ? userResults : prefs.gridView ? coverGrid : trackList }
                     BusyIndicator { visible: app.api.busy && (app.section !== 4 && app.section !== 5); running: visible; width: 32; height: 32; anchors.horizontalCenter: parent.horizontalCenter }
@@ -476,6 +452,7 @@ Window {
                         Layout.minimumWidth: implicitWidth
                         Layout.maximumWidth: implicitWidth
                         spacing: 12
+                        Tool { text: "Дополнения"; visible: !!app.extensions && app.extensions.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
                         Tool { showHint: false; symbol: "list"; text: "Очередь воспроизведения"; active: app.dockedInspector || queuePopup.opened; onClicked: app.toggleInspector() }
                         Glyph { visible: !player.narrow; name: "volume"; Layout.preferredWidth: 18; Layout.preferredHeight: 18; ink: app.muted }
                         VolumeSlider { visible: !player.narrow; Layout.minimumWidth: 96; Layout.preferredWidth: 96; Layout.maximumWidth: 96 }
@@ -763,40 +740,25 @@ Window {
         spacing: 12
         Txt { text: parent.heading; font.pixelSize: 18; font.weight: Font.DemiBold; bottomPadding: 6 }
     }
+    PluginToolsPopup { id: pluginTools; manager: app.extensions }
+    Connections {
+        target: app.extensions
+        function onNavigationRequested(destination) {
+            switch (destination) {
+            case "profile": app.openProfile(null); break
+            case "playlists": app.section = 2; break
+            case "search": app.section = 0; searchField.forceActiveFocus(); break
+            case "likes": case "history": case "feed": app.selectLibrary(destination); break
+            }
+            pluginTools.close()
+        }
+    }
     Component {
         id: pluginsPage
         Column {
             spacing: 18
-            Row {
-                spacing: 8
-                Tool { text: "‹ Настройки"; onClicked: app.settingGroup = 0 }
-                Tool { text: "Установить из файла…"; enabled: !!app.extensions; onClicked: pluginPicker.open() }
-            }
-            Txt { width: parent.width; wrapMode: Text.Wrap; visible: !!text; text: app.pluginMessage }
-            Txt { visible: !app.extensions || !app.extensions.installed.length; text: "Пока нет установленных плагинов"; color: app.muted }
-            Repeater {
-                model: app.extensions ? app.extensions.installed : []
-                FormBlock {
-                    id: extensionCard
-                    required property var modelData
-                    width: parent.width; heading: modelData.plugin.name
-                    Txt { text: extensionCard.modelData.plugin.id; color: app.muted }
-                    Row {
-                        spacing: 8
-                        Tool { text: extensionCard.modelData.enabled ? "Отключить" : "Включить"; onClicked: app.pluginMessage = app.extensions.enable(extensionCard.modelData.plugin.id, !extensionCard.modelData.enabled) }
-                        Tool { text: "Удалить"; onClicked: app.pluginMessage = app.extensions.remove(extensionCard.modelData.plugin.id) }
-                    }
-                    Repeater {
-                        model: extensionCard.modelData.plugin.groups
-                        CheckBox {
-                            required property int index
-                            required property var modelData
-                            text: modelData.label; checked: extensionCard.modelData.flags[index]
-                            onToggled: app.pluginMessage = app.extensions.configure(extensionCard.modelData.plugin.id, index, checked)
-                        }
-                    }
-                }
-            }
+            Tool { text: "‹ Настройки"; onClicked: app.settingGroup = 0 }
+            PluginManagerView { width: parent.width; manager: app.extensions; appearanceHint: app.chosenTheme || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
         }
     }
     Component {
@@ -833,13 +795,13 @@ Window {
                     Artwork { width: 64; height: 64; source: app.cover(app.api.current) }
                     Avatar { width: 64; height: 64; source: app.imageUrl(app.api.profile.avatar_url || "") }
                 }
-                SettingSlider { label: "Обложки"; suffix: " px"; maximum: 24; value: prefs.coverRadius; onEdited: v => prefs.coverRadius = v }
+                SettingSlider { label: "Обложки"; suffix: " px"; maximum: 24; value: prefs.coverRadius; onEdited: v => { prefs.coverRadius = v; prefs.coverRadiusOverride = true } }
                 SettingSlider { label: "Аватары"; suffix: " %"; maximum: 50; value: prefs.avatarRoundness; onEdited: v => prefs.avatarRoundness = v }
                 SettingSlider { label: "Панели"; suffix: " px"; maximum: 24; value: prefs.panelRadius; onEdited: v => prefs.panelRadius = v }
                 CheckBox { text: "Анимации и плавная прокрутка"; checked: prefs.motion; onToggled: prefs.motion = checked }
                 SettingSlider { label: "Длительность"; suffix: " мс"; minimum: 120; maximum: 500; value: prefs.animationMs; enabled: prefs.motion; onEdited: v => prefs.animationMs = v }
                 CheckBox { text: "Автоматически загружать ещё при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
-                Tool { text: "Сбросить оформление"; onClicked: { prefs.coverRadius = 8; prefs.avatarRoundness = 50; prefs.panelRadius = 12; prefs.animationMs = 240; prefs.motion = true; prefs.autoLoad = true } }
+                Tool { text: "Сбросить оформление"; onClicked: { prefs.coverRadius = 8; prefs.coverRadiusOverride = false; prefs.avatarRoundness = 50; prefs.panelRadius = 12; prefs.animationMs = 240; prefs.motion = true; prefs.autoLoad = true } }
             }
             Rectangle { width: parent.width; height: 1; color: "#efedef" }
             FormBlock {
