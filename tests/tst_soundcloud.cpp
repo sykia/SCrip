@@ -768,6 +768,7 @@ private slots:
         net.responses = {{200, R"([{"urn":"soundcloud:tracks:10","title":"Релиз"}])"}, {200, "[]"}, {200, R"([{"urn":"soundcloud:tracks:11","title":"Основа"}])"}, {200, R"([{"urn":"soundcloud:tracks:12","title":"Похожий"}])"}};
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty()); auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        QCOMPARE(window->property("api").toMap(), sc.state());
         QTRY_COMPARE(sc.state()["home"].toList().size(), 4);
         QTRY_VERIFY(!sc.state()["homeBusy"].toBool());
         QCOMPARE(window->property("section").toInt(), 5);
@@ -775,6 +776,7 @@ private slots:
         window->setWidth(1320); window->setHeight(820);
         net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Тестовый трек с длинным названием для проверки вёрстки\",\"duration\":185000,\"user\":{\"username\":\"Исполнитель\"}},{\"urn\":\"soundcloud:tracks:2\",\"title\":\"Второй трек\",\"duration\":220000,\"access\":\"preview\"}]}"}};
         sc.browse("tracks", "Тест интерфейса"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2);
+        QCOMPARE(window->property("api").toMap()["tracks"].toList(), sc.state()["tracks"].toList());
         QTest::qWait(450); QVERIFY(window->grabWindow().save("ui-catalog.png"));
         QVERIFY(window->property("dockedInspector").toBool());
         QJsonArray scrollTracks;

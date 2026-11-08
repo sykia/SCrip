@@ -14,7 +14,7 @@ Window {
     title: "SCrip"
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
-    readonly property var api: Object.assign({}, sc.state)
+    readonly property var api: sc.catalogState
     readonly property var extensions: typeof pluginManager === "undefined" ? null : pluginManager
     readonly property var pluginTheme: extensions ? extensions.theme : ({})
     readonly property var themes: JSON.parse(prefs.savedThemes)
@@ -440,9 +440,9 @@ Window {
                         }
                         RowLayout {
                             visible: player.hasTrack; Layout.fillWidth: true; spacing: 8
-                            Txt { text: app.time(app.api.position); color: app.muted; font.pixelSize: 10 }
-                            LineSlider { Layout.fillWidth: true; implicitHeight: 17; from: 0; to: Math.max(1, app.api.duration || 1); value: app.api.position || 0; onMoved: sc.seek(value); Accessible.name: "Позиция трека" }
-                            Txt { text: app.time(app.api.duration); color: app.muted; font.pixelSize: 10 }
+                            Txt { text: app.time(sc.position); color: app.muted; font.pixelSize: 10 }
+                            LineSlider { Layout.fillWidth: true; implicitHeight: 17; from: 0; to: Math.max(1, sc.duration || 1); value: sc.position || 0; onMoved: sc.seek(value); Accessible.name: "Позиция трека" }
+                            Txt { text: app.time(sc.duration); color: app.muted; font.pixelSize: 10 }
                         }
                     }
                     Item { Layout.fillWidth: true; Layout.preferredWidth: player.narrow ? 0 : 48 }
