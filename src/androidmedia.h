@@ -12,6 +12,8 @@ public:
     AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwork, QObject *parent = nullptr);
     ~AndroidMedia() override;
     Q_INVOKABLE bool addWidget();
+    Q_INVOKABLE int widgetStyle() const;
+    Q_INVOKABLE void setWidgetStyle(int style);
 private:
     void publish();
     SoundCloud *m_soundcloud;

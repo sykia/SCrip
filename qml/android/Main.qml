@@ -26,11 +26,16 @@ ApplicationWindow {
         id: prefs
         category: "androidInterface"
         property bool themePreferencesMigrated: false
-        Component.onCompleted: if (!themePreferencesMigrated) {
-            accentOverride = accent !== "#f43756"
-            coverRadiusOverride = coverRadius !== 16
-            themePreferencesMigrated = true
+        Component.onCompleted: {
+            if (!themePreferencesMigrated) {
+                accentOverride = accent !== "#f43756"
+                coverRadiusOverride = coverRadius !== 16
+                themePreferencesMigrated = true
+            }
+            widgetStyle = androidMedia.widgetStyle()
         }
+        property int widgetStyle: 0
+        onWidgetStyleChanged: androidMedia.setWidgetStyle(widgetStyle)
         property bool accentOverride: false
         property bool coverRadiusOverride: false
         property string accent: "#f43756"
@@ -325,6 +330,39 @@ ApplicationWindow {
                     Layout.fillWidth: true; Layout.margins: 18; spacing: 14
                     Caption { text: "Воспроизведение"; font.bold: true; font.pixelSize: 19 }
                     CheckBox { text: "Плавный переход между треками (3 секунды)"; checked: !!app.api.crossfade; Layout.fillWidth: true; onToggled: sc.setCrossfade(checked) }
+                    Caption { text: "Виджет"; font.bold: true; font.pixelSize: 19 }
+                    Caption { text: "Стиль для всех виджетов SCrip"; color: app.muted; font.pixelSize: 12 }
+                    Repeater {
+                        model: ["Blur Cover", "Dark Card", "Light Card"]
+                        delegate: AbstractButton {
+                            required property int index
+                            required property string modelData
+                            Layout.fillWidth: true
+                            implicitHeight: 76
+                            Accessible.name: "Стиль виджета: " + modelData
+                            background: Rectangle {
+                                radius: 16
+                                color: index === 2 ? "#f5f1f2" : index === 1 ? "#191a1d" : "#3a3438"
+                                border.width: prefs.widgetStyle === index ? 2 : 1
+                                border.color: prefs.widgetStyle === index ? app.accent : (index === 2 ? "#e6dfe2" : "#39383c")
+                            }
+                            contentItem: RowLayout {
+                                spacing: 12
+                                Rectangle {
+                                    Layout.leftMargin: 10; Layout.preferredWidth: 48; Layout.preferredHeight: 48
+                                    radius: 10; color: index === 2 ? "#d8d1d4" : index === 1 ? "#303237" : "#83616b"
+                                    Image { anchors.fill: parent; anchors.margins: 2; source: "qrc:/qt/qml/SCrip/assets/blob.png"; fillMode: Image.PreserveAspectFit }
+                                }
+                                ColumnLayout {
+                                    Layout.fillWidth: true; spacing: 3
+                                    Text { text: modelData; color: index === 2 ? "#242126" : "#fffaf9"; font.pixelSize: 14; font.bold: true }
+                                    Text { text: "Название трека · Исполнитель"; color: index === 2 ? "#77737a" : "#c8c3c8"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                                }
+                                Text { Layout.rightMargin: 14; text: prefs.widgetStyle === index ? "✓" : "▶   ❚❚"; color: index === 2 ? "#242126" : "#fffaf9"; font.pixelSize: 16 }
+                            }
+                            onClicked: prefs.widgetStyle = index
+                        }
+                    }
                     Caption { text: "SCrip"; font.bold: true; font.pixelSize: 19 }
                     Caption { text: "Версия " + Qt.application.version + (app.api.updateAvailable ? " · доступна " + app.api.latestVersion : ""); color: app.api.updateAvailable ? app.accent : app.muted; font.pixelSize: 13 }
                     Caption { text: app.api.updateError || app.api.updateResult || (app.api.updateChecking ? "Проверяем обновления…" : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }

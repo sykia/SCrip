@@ -10,6 +10,7 @@ import java.lang.reflect.*;
 public final class PlaybackLifecycleTest extends Instrumentation {
     private Class<?> bridge, service;
     private Activity activity;
+    private Bundle testArguments;
     private Object field(Class<?> type, Object instance, String name) throws Exception {
         Field f = type.getDeclaredField(name); f.setAccessible(true); return f.get(instance);
     }
@@ -32,7 +33,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         require(session.getController().getPlaybackState().getState() == state, "Неверное состояние медиасессии");
         require(!session.getController().getPlaybackState().getCustomActions().isEmpty(), "Нет действия полной остановки");
     }
-    @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
+    @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); testArguments = arguments; start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
@@ -43,6 +44,34 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             activity = startActivitySync(launch);
             for (int i = 0; i < 100 && !(Boolean) field(bridge, null, "ready"); ++i) SystemClock.sleep(100);
             require((Boolean) field(bridge, null, "ready"), "Qt-мост не готов");
+            int previewStyle = -1;
+            if (testArguments != null && testArguments.containsKey("previewStyle"))
+                previewStyle = Integer.parseInt(testArguments.getString("previewStyle"));
+            if (previewStyle >= 0) {
+                bridge.getMethod("setWidgetStyle", int.class).invoke(null, previewStyle);
+                waitForIdleSync(); SystemClock.sleep(250); waitForIdleSync();
+                result.putString("stream", "STYLE: " + previewStyle + "\n");
+                finish(Activity.RESULT_OK, result);
+                return;
+            }
+            Class<?> widget = ctx.getClassLoader().loadClass("org.scrip.app.MusicWidget");
+            Method setStyle = bridge.getMethod("setWidgetStyle", int.class);
+            Method getStyle = bridge.getMethod("getWidgetStyle");
+            Field hasTrack = bridge.getDeclaredField("hasTrack"); hasTrack.setAccessible(true);
+            Field title = bridge.getDeclaredField("title"); title.setAccessible(true);
+            Field artist = bridge.getDeclaredField("artist"); artist.setAccessible(true);
+            Method render = widget.getDeclaredMethod("views", Context.class, int.class, boolean.class); render.setAccessible(true);
+            title.set(null, "Очень длинное название композиции для проверки обрезания многоточием в границах карточки");
+            artist.set(null, "Исполнитель с длинным именем для проверки адаптивной ширины");
+            hasTrack.setBoolean(null, true);
+            for (int style = 0; style < 3; ++style) {
+                setStyle.invoke(null, style);
+                require((Integer) getStyle.invoke(null) == style, "Стиль виджета не сохранился: " + style);
+                require(render.invoke(null, getTargetContext(), style, false) != null, "Не создан полный вариант виджета: " + style);
+                require(render.invoke(null, getTargetContext(), style, true) != null, "Не создан компактный вариант виджета: " + style);
+            }
+            hasTrack.setBoolean(null, false);
+            require(render.invoke(null, getTargetContext(), 0, true) != null, "Не создан виджет без активного трека");
             SystemClock.sleep(2000);
             final boolean[] darkStatusIcons = {false};
             runOnMainSync(() -> {
