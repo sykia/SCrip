@@ -82,8 +82,9 @@ try {
     Remove-Item -LiteralPath "$install.__SCrip_test_pause" -Force -ErrorAction SilentlyContinue
 
     # The next real setup must recover v1 first, then finish upgrading to v2.
-    & $output2 '/S'
-    Assert ($LASTEXITCODE -eq 0) 'Recovery and upgrade failed.'
+    $recoveryInstall = Start-Process -FilePath $output2 -ArgumentList '/S' -PassThru -Wait
+    Write-Host "Recovery NSIS installer exit code: $($recoveryInstall.ExitCode)"
+    Assert ($recoveryInstall.ExitCode -eq 0) 'Recovery and upgrade failed.'
     if (Test-Path "$install.trace") { Write-Host 'Recovery trace:'; Get-Content -LiteralPath "$install.trace" -Raw | Write-Host }
     Get-ChildItem -LiteralPath $install -Recurse -Force | Select-Object FullName, Length | Format-Table | Out-String | Write-Host
     Assert ((Get-Content (Join-Path $install 'SCrip.exe') -Raw).Trim() -eq 'version-two') 'Version 2 was not installed after recovery.'
