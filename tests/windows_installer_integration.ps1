@@ -56,11 +56,11 @@ try {
         Get-ChildItem -LiteralPath $work -Force | Format-Table FullName, Length | Out-String | Write-Host
         $defaultInstall = Join-Path $env:LOCALAPPDATA 'Programs\SCrip'
         if (Test-Path $defaultInstall) { Get-ChildItem -LiteralPath $defaultInstall -Force | Format-Table FullName, Length | Out-String | Write-Host }
-        $trace = "$install.trace"
+        $trace = "${install}.trace"
         if (Test-Path $trace) { Get-Content -LiteralPath $trace -Raw | Write-Host }
         throw 'Installer did not use the isolated test directory.'
     }
-    if (Test-Path "$install.trace") { Get-Content -LiteralPath "$install.trace" -Raw | Write-Host }
+    if (Test-Path "${install}.trace") { Get-Content -LiteralPath "${install}.trace" -Raw | Write-Host }
     Get-ChildItem -LiteralPath $install -Recurse -Force | Select-Object FullName, Length | Format-Table | Out-String | Write-Host
     Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
     Assert (Test-Path (Join-Path $install 'obsolete.dll')) 'Legacy-only file was not installed for the upgrade test.'
@@ -71,9 +71,9 @@ try {
 
     # Pause after the old uninstaller has removed version 1. Kill setup to model
     # power loss in the exact interval that used to leave no working version.
-    Set-Content "$install.__SCrip_test_pause" 'pause once'
+    Set-Content "${install}.__SCrip_test_pause" 'pause once'
     $upgrade = Start-Process -FilePath $output2 -ArgumentList '/S' -PassThru
-    $marker = "$install.__SCrip_marker"
+    $marker = "${install}.__SCrip_marker"
     $deadline = (Get-Date).AddSeconds(45)
     while ((Get-Date) -lt $deadline) {
         $upgrade.Refresh()
@@ -85,13 +85,13 @@ try {
     Stop-Process -Id $upgrade.Id -Force
     try { $upgrade.WaitForExit() } catch { }
     Assert (!(Test-Path (Join-Path $install 'SCrip.exe'))) 'Fault injection did not interrupt setup after the old version was removed.'
-    Remove-Item -LiteralPath "$install.__SCrip_test_pause" -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "${install}.__SCrip_test_pause" -Force -ErrorAction SilentlyContinue
 
     # The next real setup must recover v1 first, then finish upgrading to v2.
     $recoveryInstall = Start-Process -FilePath $output2 -ArgumentList '/S' -PassThru -Wait
     Write-Host "Recovery NSIS installer exit code: $($recoveryInstall.ExitCode)"
     Assert ($recoveryInstall.ExitCode -eq 0) 'Recovery and upgrade failed.'
-    if (Test-Path "$install.trace") { Write-Host 'Recovery trace:'; Get-Content -LiteralPath "$install.trace" -Raw | Write-Host }
+    if (Test-Path "${install}.trace") { Write-Host 'Recovery trace:'; Get-Content -LiteralPath "${install}.trace" -Raw | Write-Host }
     Get-ChildItem -LiteralPath $install -Recurse -Force | Select-Object FullName, Length | Format-Table | Out-String | Write-Host
     Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-two') 'Version 2 was not installed after recovery.'
     Assert (!(Test-Path (Join-Path $install 'obsolete.dll'))) 'Stale application file survived the upgrade.'
