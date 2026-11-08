@@ -94,6 +94,19 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         dispatch.invoke(null, getTargetContext(), 5, 0L);
         require(!(Boolean) pending.get(null), "Тёплая команда ошибочно стала отложенным Play");
     }
+    private void testSavedTrackSnapshot() throws Exception {
+        Context ctx = getTargetContext();
+        android.content.SharedPreferences prefs = ctx.getSharedPreferences("music_widget", Context.MODE_PRIVATE);
+        prefs.edit().clear().putString("restore_track", "{\"urn\":\"soundcloud:tracks:42\",\"title\":\"Сохранённый\",\"duration\":90000,\"artwork_url\":\"https://i1.sndcdn.com/test.jpg\",\"user\":{\"username\":\"Автор\"}}")
+            .putLong("restore_position", 12345).apply();
+        Method read = bridge.getDeclaredMethod("readSavedTrack", Context.class); read.setAccessible(true);
+        org.json.JSONObject saved = (org.json.JSONObject) read.invoke(null, ctx);
+        require(saved != null && saved.getJSONObject("track").getString("urn").equals("soundcloud:tracks:42"), "Холодный снимок трека не восстановлен");
+        require(saved.getLong("position") == 12345, "Позиция холодного снимка потеряна");
+        require(!saved.toString().contains("token") && !saved.toString().contains("secret"), "Снимок содержит секреты");
+        Method clear = bridge.getDeclaredMethod("clearSavedTrack", Context.class); clear.setAccessible(true); clear.invoke(null, ctx);
+        require(read.invoke(null, ctx) == null, "Явная остановка не удалила снимок трека");
+    }
     private void testArtworkPublication() throws Exception {
         Object instance = field(service, null, "instance");
         require(instance != null, "Нет службы для теста обложки");
@@ -136,6 +149,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             for (int i = 0; i < 100 && !(Boolean) field(bridge, null, "ready"); ++i) SystemClock.sleep(100);
             require((Boolean) field(bridge, null, "ready"), "Qt-мост не готов");
             testDeferredPlay();
+            testSavedTrackSnapshot();
             int previewStyle = -1;
             if (testArguments != null && testArguments.containsKey("previewStyle"))
                 previewStyle = Integer.parseInt(testArguments.getString("previewStyle"));

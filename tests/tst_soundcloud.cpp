@@ -170,6 +170,61 @@ private slots:
         QCOMPARE(catalog.count(), 1);
         QCOMPARE(progress.count(), 2);
     }
+    void androidRestoreWaitsForSessionAndDoesNotAutoplay() {
+        Network net; net.responses = {{200, "{\"hls_aac_160_url\":\"https://cdn.soundcloud.com/test.m3u8\"}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        const QVariantMap track{{"urn", "soundcloud:tracks:restore"}, {"title", "Восстановленный трек"}, {"duration", 120000}};
+        sc.restoreAndroidTrack(track, 42000);
+        QVERIFY(sc.m_androidRestorePending); QVERIFY(sc.state()["current"].toMap().isEmpty());
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.set("connected", true); sc.set("signedIn", true);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), track["urn"].toString());
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 0);
+        QVERIFY(!sc.state()["playbackActive"].toBool()); QVERIFY(!sc.state()["playing"].toBool());
+        QVERIFY(sc.m_restoringPlayback); QCOMPARE(sc.m_restorePosition, qint64(42000));
+        QTRY_VERIFY(!net.requests.isEmpty());
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+    }
+    void androidRestoreWithoutSessionIsDiscarded() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.restoreAndroidTrack({{"urn", "soundcloud:tracks:restore"}, {"title", "Трек"}}, 9000);
+        QVERIFY(sc.m_androidRestorePending);
+        sc.set("connected", true); sc.tryRestoreAndroidTrack();
+        QVERIFY(!sc.m_androidRestorePending); QVERIFY(sc.state()["restoreCleared"].toBool());
+        QVERIFY(sc.state()["current"].toMap().isEmpty()); QVERIFY(!sc.state()["playbackActive"].toBool());
+    }
+    void androidRestoreFailureClearsTrackAndQueue() {
+        Network net; net.responses = {{500, "{}"}};
+        SoundCloud sc(nullptr, &net, secrets); sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.set("connected", true); sc.set("signedIn", true);
+        sc.restoreAndroidTrack({{"urn", "soundcloud:tracks:missing"}, {"title", "Удалённый трек"}}, 15000);
+        QTRY_VERIFY(sc.state()["restoreCleared"].toBool());
+        QVERIFY(sc.state()["current"].toMap().isEmpty()); QVERIFY(sc.state()["queue"].toList().isEmpty());
+        QCOMPARE(sc.state()["queueIndex"].toInt(), -1); QVERIFY(!sc.state()["buffering"].toBool());
+    }
+    void androidRestoreIsInvalidatedByNewSelectionAndStop() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.restoreAndroidTrack({{"urn", "soundcloud:tracks:old"}}, 0);
+        QVERIFY(sc.m_androidRestorePending);
+        sc.play({{"urn", "soundcloud:tracks:new"}, {"title", "Новый трек"}});
+        QVERIFY(!sc.m_androidRestorePending);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:new"));
+        sc.stopPlayback();
+        QVERIFY(sc.state()["restoreCleared"].toBool()); QVERIFY(sc.state()["current"].toMap().isEmpty());
+    }
+    void lateAndroidRestoreResponseCannotReplaceNewTrack() {
+        Network net; net.responses = {{200, "{\"hls_aac_160_url\":\"https://cdn.soundcloud.com/old.m3u8\"}", 100},
+            {200, "{\"hls_aac_160_url\":\"https://cdn.soundcloud.com/new.m3u8\"}"}};
+        SoundCloud sc(nullptr, &net, secrets); sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.set("connected", true); sc.set("signedIn", true);
+        sc.restoreAndroidTrack({{"urn", "soundcloud:tracks:old"}}, 2500);
+        QTRY_COMPARE(net.requests.size(), 1);
+        sc.play({{"urn", "soundcloud:tracks:new"}, {"title", "Новый"}});
+        QTRY_COMPARE(net.requests.size(), 2);
+        QTest::qWait(150);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:new"));
+        QVERIFY(!sc.state()["restoreCleared"].toBool());
+    }
     void initTestCase() {
 #ifdef Q_OS_WIN
         QStandardPaths::setTestModeEnabled(true);

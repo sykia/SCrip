@@ -18,6 +18,7 @@ public final class MediaBridge {
     private static volatile boolean shuttingDown;
     private static volatile int lifecycle;
     private static boolean pendingPlay;
+    private static boolean restorePending;
     static volatile boolean preparing;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
     static boolean playing, active, buffering, hasTrack, liked;
@@ -30,11 +31,19 @@ public final class MediaBridge {
     private static Bitmap placeholderRounded;
     private static final ExecutorService IMAGE_WORKER = Executors.newSingleThreadExecutor();
     private static String savedKey = "";
+    private static long savedPosition = -15000;
     private MediaBridge() {}
     private static native void nativeAction(int action, long position);
+    private static native void nativeRestore(String track, long position);
 
     public static void initialize(Context ctx) {
         context = ctx.getApplicationContext(); shuttingDown = false; ++lifecycle; ready = true;
+        JSONObject saved = readSavedTrack(context);
+        restorePending = saved != null;
+        if (saved != null) {
+            try { nativeRestore(saved.getJSONObject("track").toString(), saved.optLong("position")); }
+            catch (org.json.JSONException error) { clearSavedTrack(context); restorePending = false; }
+        } else currentUrn = currentArtworkUrl = "";
     }
     /** Start the foreground service while the activity is still visible, before Qt starts decoding audio. */
     public static void preparePlayback() {
@@ -71,6 +80,8 @@ public final class MediaBridge {
                 boolean nextLiked = data.optBoolean("liked");
                 long nextPosition = Math.max(0, data.optLong("position")), nextDuration = Math.max(0, data.optLong("duration"));
                 String nextArtwork = data.optString("artwork");
+                boolean restoreCleared = data.optBoolean("restoreCleared");
+                String nextUrn = data.optString("urn");
                 boolean widgetChanged = !title.equals(nextTitle.isEmpty() ? "SCrip" : nextTitle)
                     || !artist.equals(nextArtist) || playing != nextPlaying || buffering != nextBuffering
                     || active != nextActive || hasTrack != nextHasTrack || liked != nextLiked || !artwork.equals(nextArtwork);
@@ -79,7 +90,11 @@ public final class MediaBridge {
                 title = nextTitle.isEmpty() ? "SCrip" : nextTitle; artist = nextArtist;
                 playing = nextPlaying; buffering = nextBuffering; active = nextActive; hasTrack = nextHasTrack; liked = nextLiked;
                 position = nextPosition; duration = nextDuration;
-                if (consumePendingPlay(nextHasTrack)) nativeAction(4, 0);
+                if (nextHasTrack && !nextUrn.isEmpty()) currentUrn = nextUrn;
+                if (nextHasTrack) currentArtworkUrl = data.optString("artworkUrl");
+                if (restoreCleared) { clearSavedTrack(context); restorePending = false; }
+                if (nextHasTrack && !data.optString("urn").isEmpty()) restorePending = false;
+                if (consumePendingPlay(nextHasTrack && !restorePending)) nativeAction(4, 0);
                 if (artworkChanged) {
                     artwork = nextArtwork;
                     final int requestRevision = ++artworkRevision;
@@ -116,18 +131,50 @@ public final class MediaBridge {
     }
     private static void save() {
         // Диск обновляется при смене трека/паузы, а не каждую секунду.
-        String key = title + '\n' + artist + '\n' + artwork + '\n' + playing;
-        if (key.equals(savedKey)) return;
+        String key = currentUrn + '\n' + title + '\n' + artist + '\n' + artwork + '\n' + playing;
+        if (key.equals(savedKey) && Math.abs(position - savedPosition) < 15000) return;
         savedKey = key;
-        context.getSharedPreferences("music_widget", Context.MODE_PRIVATE).edit()
+        android.content.SharedPreferences.Editor edit = context.getSharedPreferences("music_widget", Context.MODE_PRIVATE).edit()
             .putString("title", title).putString("artist", artist).putString("artwork", artwork)
-            .putLong("position", position).putLong("duration", duration).apply();
+            .putLong("position", position).putLong("duration", duration);
+        // Сохраняем только публичные сведения о выбранном треке, никогда токены/секреты.
+        if (hasTrack && !currentUrn.isEmpty()) {
+            try {
+                JSONObject track = new JSONObject().put("urn", currentUrn).put("title", title).put("duration", duration)
+                    .put("artwork_url", currentArtworkUrl).put("user", new JSONObject().put("username", artist));
+                edit.putString("restore_track", track.toString()).putLong("restore_position", position);
+            } catch (org.json.JSONException ignored) {}
+        }
+        edit.apply();
+        savedPosition = position;
+    }
+    private static String currentUrn = "";
+    private static String currentArtworkUrl = "";
+    static JSONObject readSavedTrack(Context ctx) {
+        String json = ctx.getSharedPreferences("music_widget", Context.MODE_PRIVATE).getString("restore_track", "");
+        if (json.isEmpty()) return null;
+        try { return new JSONObject().put("track", new JSONObject(json)).put("position", ctx.getSharedPreferences("music_widget", Context.MODE_PRIVATE).getLong("restore_position", 0)); }
+        catch (org.json.JSONException error) { clearSavedTrack(ctx); return null; }
+    }
+    static void clearSavedTrack(Context ctx) {
+        ctx.getSharedPreferences("music_widget", Context.MODE_PRIVATE).edit().remove("restore_track").remove("restore_position")
+            .remove("title").remove("artist").remove("artwork").remove("position").remove("duration").apply();
+        currentUrn = currentArtworkUrl = ""; hasTrack = playing = active = buffering = false;
+        title = "SCrip"; artist = "Включи музыку в приложении"; artwork = ""; position = duration = 0;
+        savedKey = ""; savedPosition = -15000;
+        if (ctx == context) MusicWidget.refresh(ctx);
     }
     static void restore(Context ctx) {
         if (context == null) context = ctx.getApplicationContext();
         if (ready) return;
         android.content.SharedPreferences p = context.getSharedPreferences("music_widget", Context.MODE_PRIVATE);
         title = p.getString("title", "SCrip"); artist = p.getString("artist", "Включи музыку в приложении");
+        currentUrn = "";
+        JSONObject savedTrack = readSavedTrack(context);
+        if (savedTrack != null) {
+            JSONObject track = savedTrack.optJSONObject("track");
+            if (track != null) { currentUrn = track.optString("urn"); currentArtworkUrl = track.optString("artwork_url"); }
+        }
         hasTrack = !title.isEmpty() && !title.equals("SCrip");
         artwork = p.getString("artwork", "");
         if (!artwork.isEmpty()) {
@@ -159,6 +206,7 @@ public final class MediaBridge {
         MAIN.post(() -> MusicWidget.refresh(context));
     }
     static void dispatch(Context ctx, int action, long value) {
+        if (action == 6) { clearSavedTrack(ctx); restorePending = false; }
         if (ready) {
             if (action == 5 || action == 6) recordDeferredAction(action);
             nativeAction(action, value);

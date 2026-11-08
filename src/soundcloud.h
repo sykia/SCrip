@@ -56,6 +56,7 @@ public:
     Q_INVOKABLE void pausePlayback();
     Q_INVOKABLE void resumePlayback();
     Q_INVOKABLE void stopPlayback();
+    void restoreAndroidTrack(const QVariantMap &track, qint64 position);
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
     Q_INVOKABLE void seek(qint64 position);
@@ -92,7 +93,9 @@ private:
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
     void collection(const QString &path, bool append = false);
     void profile();
-    void startTrack(const QVariantMap &track);
+    void startTrack(const QVariantMap &track, bool autoplay = true, qint64 position = 0);
+    void tryRestoreAndroidTrack();
+    void failAndroidRestore();
     void resolveStream(const QUrl &url, int generation, int redirects = 0);
     void prepareNext();
     void holdPreloadedAudio(QMediaPlayer *media);
@@ -129,6 +132,9 @@ private:
     int m_homeGeneration = 0;
     int m_epoch = 0, m_listing = 0, m_playGeneration = 0, m_queueIndex = -1;
     int m_loginEpoch = 0;
+    QVariantMap m_androidRestoreTrack;
+    qint64 m_restorePosition = 0;
+    bool m_androidRestorePending = false, m_restoringPlayback = false;
     QList<std::function<void()>> m_waiting;
     bool m_forceNext = false;
     QVariantList m_queue;

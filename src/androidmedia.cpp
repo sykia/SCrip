@@ -33,12 +33,21 @@ void mediaAction(JNIEnv *, jclass, jint action, jlong position) {
         }
     }, Qt::QueuedConnection);
 }
+void restoreTrack(JNIEnv *env, jclass, jstring json, jlong position) {
+    if (!qApp || QCoreApplication::closingDown() || !json) return;
+    const auto bytes = QJniObject(json).toString().toUtf8();
+    const auto track = QJsonDocument::fromJson(bytes).object().toVariantMap();
+    QMetaObject::invokeMethod(qApp, [track, position] {
+        if (controller) controller->restoreAndroidTrack(track, position);
+    }, Qt::QueuedConnection);
+}
 }
 AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwork, QObject *parent)
     : QObject(parent), m_soundcloud(soundcloud), m_network(artwork->create(this)) {
     controller = soundcloud;
     QJniEnvironment env;
-    if (!env.registerNativeMethods("org/scrip/app/MediaBridge", {{"nativeAction", "(IJ)V", reinterpret_cast<void *>(mediaAction)}}))
+    if (!env.registerNativeMethods("org/scrip/app/MediaBridge", {{"nativeAction", "(IJ)V", reinterpret_cast<void *>(mediaAction)},
+        {"nativeRestore", "(Ljava/lang/String;J)V", reinterpret_cast<void *>(restoreTrack)}}))
         qWarning("Не удалось подключить системное управление музыкой");
     QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "initialize", "(Landroid/content/Context;)V",
         QNativeInterface::QAndroidApplication::context().object());
@@ -98,12 +107,13 @@ void AndroidMedia::publish() {
             });
         }
     }
-    const QJsonObject data{{"title", track.value("title").toString()}, {"artist", user.value("username").toString()},
-        {"artwork", m_artworkPath}, {"playing", state.value("playing").toBool()},
+    const QJsonObject data{{"urn", track.value("urn").toString()}, {"title", track.value("title").toString()}, {"artist", user.value("username").toString()},
+        {"artwork", m_artworkPath}, {"artworkUrl", m_artworkUrl}, {"playing", state.value("playing").toBool()},
         {"buffering", state.value("buffering").toBool()},
         {"liked", track.value("user_favorite").toBool()},
         {"active", state.value("playbackActive").toBool()}, {"hasTrack", !track.isEmpty()},
-        {"position", state.value("position").toLongLong()}, {"duration", state.value("duration").toLongLong()}};
+        {"position", state.value("position").toLongLong()}, {"duration", state.value("duration").toLongLong()},
+        {"restoreCleared", state.value("restoreCleared").toBool()}};
     const auto json = QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact));
     if (json == m_lastState) return;
     m_lastState = json;
