@@ -16,6 +16,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/check_licenses.py --repo .
+      - run: python scripts/check_secrets.py --mode tracked
       - run: python -m unittest discover -s tests -p 'test_*.py'
   release-materials:
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
