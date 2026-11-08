@@ -59,6 +59,23 @@ Function un.onInit
   un_init_done:
 FunctionEnd
 
+!macro CheckClosed
+  check_closed_retry:
+  nsExec::ExecToStack /OEM '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq SCrip.exe" /NH'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 check_closed_prompt
+  StrCpy $2 $1 9
+  StrCmp $2 "SCrip.exe" check_closed_prompt check_closed_done
+  check_closed_prompt:
+  IfSilent check_closed_abort
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Закройте SCrip, затем нажмите «Повторить»." IDRETRY check_closed_retry
+  check_closed_abort:
+  SetErrorLevel 2
+  Abort
+  check_closed_done:
+!macroend
+
 Var BackupDir
 Var StageDir
 Var Marker
@@ -150,6 +167,7 @@ Function .onInstFailed
 FunctionEnd
 
 Section
+  !insertmacro CheckClosed
   StrCpy $BackupDir "$INSTDIR.__SCrip_backup"
   StrCpy $StageDir "$INSTDIR.__SCrip_stage"
   StrCpy $Marker "$INSTDIR.__SCrip_marker"
@@ -287,6 +305,7 @@ Section
 SectionEnd
 
 Section "Uninstall"
+  !insertmacro CheckClosed
   !include "${FILELIST}"
   Delete "$DESKTOP\SCrip.lnk"
   Delete "$SMPROGRAMS\SCrip.lnk"
