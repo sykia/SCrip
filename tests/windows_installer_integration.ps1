@@ -19,13 +19,13 @@ function Build-Installer($payload, $output, $version, $pauseAfterUninstall = $fa
         Sort-Object { $_.FullName.Length } -Descending |
         ForEach-Object {
             $relative = [IO.Path]::GetRelativePath($payload, $_.FullName).Replace('/', '\')
-            'Delete "$INSTDIR\' + $relative.Replace('$', '$$') + '"'
+            'Delete "$EXEDIR\' + $relative.Replace('$', '$$') + '"'
         }
     $entries += Get-ChildItem -LiteralPath $payload -Recurse -Directory |
         Sort-Object { $_.FullName.Length } -Descending |
         ForEach-Object {
             $relative = [IO.Path]::GetRelativePath($payload, $_.FullName).Replace('/', '\')
-            'RMDir "$INSTDIR\' + $relative.Replace('$', '$$') + '"'
+            'RMDir "$EXEDIR\' + $relative.Replace('$', '$$') + '"'
         }
     Set-Content -LiteralPath $fileList -Value $entries -Encoding utf8
     Write-Host "$version uninstall manifest:`n$($entries -join "`n")"
