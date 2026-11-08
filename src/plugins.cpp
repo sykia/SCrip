@@ -1078,10 +1078,22 @@ void Plugins::drain() {
 }
 void Plugins::updatePlayer(const QVariantMap &state) {
     const auto old = m_player;
-    m_player = state;
+    // Передаём только поля Plugin API: профиль, URL и произвольные данные API
+    // не должны попадать в контекст правил и диагностику плагинов.
+    const auto track = state.value("current").toMap();
+    QVariantList queue;
+    for (const auto &item : state.value("queue").toList())
+        queue.append(QVariantMap{{"urn", item.toMap().value("urn")}});
+    m_player = {{"signedIn", state.value("signedIn").toBool()},
+        {"playing", state.value("playing")}, {"buffering", state.value("buffering")},
+        {"queue", queue}, {"queueIndex", state.value("queueIndex")},
+        {"position", state.value("position")}, {"duration", state.value("duration")},
+        {"current", QVariantMap{{"urn", track.value("urn")}, {"title", track.value("title")},
+            {"duration", track.value("duration", state.value("duration"))},
+            {"user", QVariantMap{{"username", track.value("user").toMap().value("username")}}}}}};
     if (old.isEmpty())
         return; // Начальный снимок не запускает автоматизацию.
-    if (old.value("signedIn").toBool() && !state.value("signedIn").toBool()) {
+    if (old.value("signedIn").toBool() && !m_player.value("signedIn").toBool()) {
         for (auto value : entries)
             stop(pluginId(value.toMap()));
         m_events.clear();
@@ -1089,19 +1101,19 @@ void Plugins::updatePlayer(const QVariantMap &state) {
         emit changed();
         return;
     }
-    if (old.value("current").toMap().value("urn") != state.value("current").toMap().value("urn")) {
-        auto t = state.value("current").toMap();
+    if (old.value("current").toMap().value("urn") != m_player.value("current").toMap().value("urn")) {
+        auto t = m_player.value("current").toMap();
         enqueueEvent("player.trackChanged",
                      {{"urn", t.value("urn").toString()},
                       {"title", t.value("title").toString()},
                       {"artist", t.value("user").toMap().value("username").toString()},
                       {"durationMs", t.value("duration", state.value("duration")).toLongLong()}});
     }
-    if (old.value("playing") != state.value("playing") || old.value("buffering") != state.value("buffering"))
-        enqueueEvent("player.playbackChanged", {{"playing", state.value("playing").toBool()},
-                                                {"buffering", state.value("buffering").toBool()}});
-    if (old.value("queue") != state.value("queue") || old.value("queueIndex") != state.value("queueIndex"))
-        enqueueEvent("player.queueChanged", {{"count", state.value("queue").toList().size()},
-                                             {"index", state.value("queueIndex").toInt()}});
+    if (old.value("playing") != m_player.value("playing") || old.value("buffering") != m_player.value("buffering"))
+        enqueueEvent("player.playbackChanged", {{"playing", m_player.value("playing").toBool()},
+                                                {"buffering", m_player.value("buffering").toBool()}});
+    if (old.value("queue") != m_player.value("queue") || old.value("queueIndex") != m_player.value("queueIndex"))
+        enqueueEvent("player.queueChanged", {{"count", m_player.value("queue").toList().size()},
+                                             {"index", m_player.value("queueIndex").toInt()}});
 }
 #include "plugins.moc"

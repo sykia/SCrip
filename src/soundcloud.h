@@ -1,5 +1,6 @@
 #pragma once
 #include <QObject>
+#include "secretstore.h"
 #include <QVariantMap>
 #include <QNetworkAccessManager>
 #include <QMediaPlayer>
@@ -12,7 +13,7 @@
 #include <QUrlQuery>
 #include <functional>
 
-// Все секреты загружаются из пользовательского каталога, а не из ресурсов приложения.
+// Секреты доступны только хосту через системное защищённое хранилище.
 class SoundCloud : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
@@ -22,7 +23,7 @@ class SoundCloud : public QObject {
     Q_PROPERTY(qint64 position READ position NOTIFY progressChanged)
     Q_PROPERTY(qint64 duration READ duration NOTIFY progressChanged)
 public:
-    explicit SoundCloud(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr);
+    explicit SoundCloud(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr, std::shared_ptr<SecretStore> secrets = {});
     bool signedIn() const { return m_state.value("signedIn").toBool(); }
     bool seekable() const { return m_activePlayer->isSeekable(); }
     QVariantMap state() const { return m_state; }
@@ -77,7 +78,8 @@ private:
     void set(const QString &key, const QVariant &value);
     void fail(const QString &message);
     bool loadConfig();
-    void saveSession();
+    bool saveSession();
+    void storageFailure();
     void ensureToken(std::function<void()> continuation);
     void token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed = {});
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
@@ -90,8 +92,11 @@ private:
     void prepareStream(const QUrl &url, int generation, int redirects = 0);
     void beginCrossfade();
     void callbackConnection();
-    void clearSession();
+    bool clearSession();
     static QString urn(const QVariantMap &item);
+    AuthStorage m_authStorage;
+    QJsonObject m_connection;
+    bool m_storageReady = false;
     QVariantMap m_state;
     QNetworkAccessManager *m_network;
     QMediaPlayer m_player;

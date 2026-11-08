@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OAuth старых версий; новое хранилище находится в noBackupFilesDir. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="settings/SCrip/" />
+        <exclude domain="root" path="settings/SCrip/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="settings/SCrip/" />
+        <exclude domain="root" path="settings/SCrip/" />
+    </device-transfer>
+</data-extraction-rules>

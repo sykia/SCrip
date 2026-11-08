@@ -58,10 +58,41 @@ protected:
     }
 };
 #endif
+class CaptureMessages {
+public:
+    QStringList messages;
+    static inline QStringList *destination = nullptr;
+    QtMessageHandler previous;
+    CaptureMessages() {
+        destination = &messages;
+        previous = qInstallMessageHandler([](QtMsgType, const QMessageLogContext &, const QString &message) {
+            if (destination) destination->append(message);
+        });
+    }
+    ~CaptureMessages() { qInstallMessageHandler(previous); destination = nullptr; }
+};
+class MemorySecrets final : public SecretStore {
+public:
+    QMap<QString, QByteArray> records;
+    bool readable = true, writable = true, removable = true, corrupt = false;
+    bool read(const QString &key, QByteArray &value) override {
+        if (!readable) return false;
+        value = records.value(key); return true;
+    }
+    bool write(const QString &key, const QByteArray &value) override {
+        if (!writable) return false;
+        records[key] = corrupt ? QByteArray("corrupt") : value; return true;
+    }
+    bool remove(const QString &key) override {
+        if (!removable) return false;
+        records.remove(key); return true;
+    }
+};
 class SoundCloudTest : public QObject {
     Q_OBJECT
     QTemporaryDir directory;
     QString config;
+    std::shared_ptr<MemorySecrets> secrets;
     QUrl authorizationUrl;
     quint16 callbackPort = 0;
 public slots:
@@ -69,6 +100,7 @@ public slots:
 private:
     static Response guest() { return {200, "{\"access_token\":\"test-access\",\"refresh_token\":\"test-refresh\",\"expires_in\":3600}"}; }
     void prepare() {
+        secrets = std::make_shared<MemorySecrets>();
         QFile::remove(config + "/session.json");
         QFile file(config + "/soundcloud.json"); QVERIFY(file.open(QIODevice::WriteOnly));
         QTcpServer freePort; QVERIFY(freePort.listen(QHostAddress::LocalHost, 0)); callbackPort = freePort.serverPort();
@@ -77,7 +109,7 @@ private:
 private slots:
     void playbackProgressDoesNotInvalidateCatalog() {
         Network net;
-        SoundCloud sc(nullptr, &net);
+        SoundCloud sc(nullptr, &net, secrets);
         QSignalSpy legacy(&sc, &SoundCloud::changed);
         QSignalSpy catalog(&sc, &SoundCloud::catalogChanged);
         QSignalSpy progress(&sc, &SoundCloud::progressChanged);
@@ -111,9 +143,121 @@ private slots:
         QVERIFY(QDir().mkpath(config));
     }
     void init() { qputenv("SCRIP_AUTH_MODE", "local"); prepare(); }
+    void migratesSecretsAndRestoresSession() {
+        const QJsonObject session{{"client_id", "test-client"}, {"access_token", "old-access"}, {"refresh_token", "old-refresh"},
+            {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
+        QFile file(config + "/session.json"); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QJsonDocument(session).toJson()); file.close();
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        QCOMPARE(sc.m_access, QString("old-access")); QCOMPARE(sc.m_refresh, QString("old-refresh"));
+        QVERIFY(sc.m_userSession);
+        QVERIFY(!QFile::exists(config + "/session.json")); QVERIFY(!QFile::exists(config + "/soundcloud.json"));
+        QCOMPARE(QJsonDocument::fromJson(secrets->records["session"]).object(), session);
+        QVERIFY(!QJsonDocument::fromVariant(sc.state()).toJson().contains("old-access"));
+        QVERIFY(!QJsonDocument::fromVariant(sc.state()).toJson().contains("test-secret"));
+        SoundCloud restored(nullptr, &net, secrets);
+        QCOMPARE(restored.m_refresh, QString("old-refresh"));
+    }
+    void migrationFailurePreservesLegacy_data() {
+        QTest::addColumn<int>("failure");
+        QTest::newRow("read") << 0; QTest::newRow("write") << 1; QTest::newRow("readback") << 2;
+    }
+    void migrationFailurePreservesLegacy() {
+        QFETCH(int, failure);
+        secrets->readable = failure != 0; secrets->writable = failure != 1; secrets->corrupt = failure == 2;
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        QVERIFY(QFile::exists(config + "/soundcloud.json"));
+        QVERIFY(!sc.m_storageReady); QVERIFY(sc.m_clientSecret.isEmpty());
+        sc.login(); sc.connectCatalog();
+        QCoreApplication::processEvents(); QVERIFY(net.requests.isEmpty());
+        QVERIFY(sc.state()["error"].toString().contains("хранилище"));
+        QVERIFY(!sc.state()["error"].toString().contains("test-secret"));
+    }
+    void sessionMigrationFailurePreservesTokens() {
+        AuthStorage storage(secrets);
+        QFile file(config + "/session.json"); QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray legacy = "{\"access_token\":\"old-access\",\"refresh_token\":\"old-refresh\"}";
+        file.write(legacy); file.close(); secrets->writable = false;
+        QJsonObject loaded;
+        QVERIFY(!storage.load("session", file.fileName(), loaded));
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), legacy); file.close();
+        QVERIFY(loaded.isEmpty());
+        secrets->writable = true;
+        QVERIFY(storage.load("session", file.fileName(), loaded));
+        QCOMPARE(loaded["refresh_token"].toString(), QString("old-refresh"));
+        QVERIFY(!file.exists());
+    }
+    void migrationCleanupFailureIsReported() {
+        AuthStorage storage(secrets);
+        QVERIFY(storage.save("session", {{"refresh_token", "new-refresh"}}));
+        QTemporaryDir legacy;
+        QJsonObject loaded;
+        QVERIFY(!storage.load("session", legacy.path(), loaded));
+        QVERIFY(QFileInfo::exists(legacy.path()));
+        QVERIFY(secrets->records.contains("session"));
+    }
+    void hostileOAuthErrorDoesNotExposeBody() {
+        QStringList logs;
+        QVariantMap state;
+        {
+            CaptureMessages capture;
+            Network net; net.responses = {{400, "{\"error_description\":\"private-server-detail\",\"access_token\":\"private-token\"}"}};
+            SoundCloud sc(nullptr, &net, secrets);
+            QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+            state = sc.state(); logs = capture.messages;
+        }
+        QVERIFY(!QJsonDocument::fromVariant(state).toJson().contains("private-"));
+        QVERIFY(!logs.join('\n').contains("private-"));
+        QVERIFY(!logs.join('\n').contains("test-secret"));
+    }
+    void interruptedMigrationPrefersSecureRecord() {
+        AuthStorage storage(secrets);
+        const QJsonObject latest{{"refresh_token", "latest"}};
+        QVERIFY(storage.save("session", latest));
+        QFile file(config + "/session.json"); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("{invalid"); file.close();
+        QJsonObject loaded;
+        QVERIFY(storage.load("session", file.fileName(), loaded)); QCOMPARE(loaded, latest);
+        QVERIFY(!file.exists());
+    }
+    void failedRefreshPersistenceNeverWritesPlaintext() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets);
+        secrets->writable = false;
+        QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+        QVERIFY(!sc.m_storageReady); QVERIFY(!sc.state()["connected"].toBool());
+        QVERIFY(!QFile::exists(config + "/session.json"));
+        QVERIFY(!sc.state()["error"].toString().contains("test-access"));
+        QVERIFY(!sc.state()["error"].toString().contains("test-refresh"));
+    }
+    void authenticatedLogoutRevokesAndErasesSession() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.m_userSession = true; sc.set("signedIn", true);
+        net.responses = {{200, "{}"}};
+        sc.logout();
+        QTRY_VERIFY(!sc.state()["connected"].toBool());
+        QCOMPARE(net.requests.last().url().path(), QString("/disconnect"));
+        QCOMPARE(net.requests.last().rawHeader("Authorization"), QByteArray("OAuth test-access"));
+        QVERIFY(!secrets->records.contains("session"));
+        QVERIFY(secrets->records.contains("connection"));
+        QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty());
+    }
+    void failedLogoutDeletionIsVisible() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        secrets->removable = false;
+        sc.logout();
+        QVERIFY(!sc.state()["connected"].toBool()); QVERIFY(sc.m_access.isEmpty());
+        QVERIFY(sc.state()["error"].toString().contains("хранилище"));
+        QVERIFY(secrets->records.contains("session"));
+        secrets->removable = true;
+        sc.logout(); QVERIFY(!secrets->records.contains("session"));
+    }
     void authenticatesAndSearches() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Real response\"}],\"next_href\":null}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         QCOMPARE(net.requests.size(), 1); QVERIFY(net.requests[0].rawHeader("Authorization").startsWith("Basic "));
         QCOMPARE(net.bodies[0], QByteArray("grant_type=client_credentials"));
         sc.browse("tracks", "rock & roll"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1);
@@ -123,20 +267,20 @@ private slots:
     }
     void rejectsForeignPagination() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[],\"next_href\":\"https://evil.example/steal\"}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.browse("tracks", "test"); QTRY_VERIFY(sc.state()["hasMore"].toBool()); sc.more();
         QCOMPARE(net.requests.size(), 2); QVERIFY(!sc.state()["error"].toString().isEmpty());
     }
     void deduplicatesPagination() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}],\"next_href\":\"https://api.soundcloud.com/tracks?cursor=2\"}"},
             {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"},{\"urn\":\"soundcloud:tracks:2\"}]}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.browse("tracks", "test"); QTRY_VERIFY(sc.state()["hasMore"].toBool()); sc.more();
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2); QVERIFY(!sc.state()["hasMore"].toBool());
     }
     void ignoresOutdatedResults() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}]}", 100}, {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:2\"}]}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.browse("tracks", "old"); sc.browse("tracks", "new");
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1); QTest::qWait(150);
         QCOMPARE(sc.state()["tracks"].toList()[0].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
@@ -145,30 +289,30 @@ private slots:
         QFile session(config + "/session.json"); QVERIFY(session.open(QIODevice::WriteOnly));
         session.write("{\"client_id\":\"test-client\",\"access_token\":\"old\",\"refresh_token\":\"refresh-once\",\"expires_at\":0,\"user_session\":false}"); session.close();
         Network net; auto token = guest(); token.delay = 50; net.responses = {token, {200,"[]"}, {200,"[]"}};
-        SoundCloud sc(nullptr, &net); sc.browse("tracks", "first"); sc.browse("tracks", "second");
+        SoundCloud sc(nullptr, &net, secrets); sc.browse("tracks", "first"); sc.browse("tracks", "second");
         QTRY_VERIFY(sc.state()["connected"].toBool()); QTRY_COMPARE(net.requests.size(), 3);
         int exchanges = 0; for (const auto &r : net.requests) if (r.url().host() == "secure.soundcloud.com") ++exchanges;
         QCOMPARE(exchanges, 1); QVERIFY(net.bodies[0].contains("grant_type=refresh_token"));
     }
     void failedAuthenticationIsVisible() {
         Network net; net.responses = {{401, "{\"error\":\"invalid_client\"}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
         QVERIFY(!sc.state()["connected"].toBool()); QVERIFY(!sc.state()["busy"].toBool());
         QVERIFY(!sc.state()["error"].toString().contains("test-secret"));
     }
     void rateLimitDoesNotRetryLoop() {
         Network net; net.responses = {guest(), {429,"{}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool()); sc.browse("tracks", "test");
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool()); sc.browse("tracks", "test");
         QTRY_VERIFY(!sc.state()["error"].toString().isEmpty()); QCOMPARE(net.requests.size(), 2); QVERIFY(!sc.state()["busy"].toBool());
     }
     void personalPagesRequireUser() {
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool()); sc.browse("likes");
         QCOMPARE(net.requests.size(), 1); QVERIFY(sc.state()["tracks"].toList().isEmpty());
         sc.like({{"urn","soundcloud:tracks:1"}}); QCOMPARE(net.requests.size(), 1);
     }
     void blockedTrackIsNotStreamed() {
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool()); sc.play({{"urn","soundcloud:tracks:1"},{"access","blocked"}});
         QCOMPARE(net.requests.size(), 1); QVERIFY(!sc.state()["error"].toString().isEmpty());
         sc.enqueue({{"urn","soundcloud:tracks:2"}}); QCOMPARE(sc.state()["queue"].toList().size(), 2);
@@ -176,7 +320,7 @@ private slots:
     }
     void pauseAndStopDuringTrackLoading() {
         Network net; net.responses = {guest(), {200, "{}", 150}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.play({{"urn", "soundcloud:tracks:1"}});
         QVERIFY(sc.state()["playbackActive"].toBool());
         QVERIFY(sc.state()["buffering"].toBool());
@@ -191,7 +335,7 @@ private slots:
     }
     void streamFailureEndsPlaybackSession() {
         Network net; net.responses = {guest(), {503, "{}"}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool());
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.play({{"urn", "soundcloud:tracks:1"}});
         QVERIFY(sc.state()["playbackActive"].toBool());
         QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
@@ -210,7 +354,7 @@ private slots:
     void updateFailuresHaveDistinctMessages() {
         QFETCH(int, status); QFETCH(int, networkError); QFETCH(QByteArray, body);
         QFETCH(int, expectedSize); QFETCH(QString, message);
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion();
         QCoreApplication::setApplicationVersion("1.0.0");
@@ -233,7 +377,7 @@ private slots:
         if (message != "SHA-256") QVERIFY(!sc.state()["error"].toString().contains("SHA-256"));
     }
     void movingQueuePreservesCurrentAndSetsNext() {
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         QVariantList tracks;
         for (int i = 0; i < 4; ++i)
@@ -249,7 +393,7 @@ private slots:
         QCOMPARE(sc.state()["current"], tracks[3]);
     }
     void refusesRemoteCallback() {
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool()); sc.configure("id", "secret", "https://evil.example/callback");
         QVERIFY(!sc.state()["error"].toString().isEmpty()); QCOMPARE(net.requests.size(), 1);
     }
@@ -262,7 +406,7 @@ private slots:
         QFETCH(bool, worker);
         if (worker) { qunsetenv("SCRIP_AUTH_MODE"); callbackPort = 43821; }
 
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         if (!worker) QTRY_VERIFY(sc.state()["connected"].toBool());
         QQmlApplicationEngine engine;
         engine.rootContext()->setContextProperty("sc", &sc);
@@ -302,7 +446,7 @@ private slots:
     void windowControls() {
         Network net;
         net.responses = {guest(), {200, "[]"}};
-        SoundCloud sc(nullptr, &net);
+        SoundCloud sc(nullptr, &net, secrets);
         QQmlApplicationEngine engine;
         engine.rootContext()->setContextProperty("sc", &sc);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
@@ -340,7 +484,7 @@ private slots:
     void qmlScreensRender() {
         QFile session(config + "/session.json"); QVERIFY(session.open(QIODevice::WriteOnly));
         session.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"access_token", "test-access"}, {"refresh_token", "test-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch()+3600}, {"user_session", true}}).toJson()); session.close();
-        Network net; net.responses = {{200, "{\"username\":\"Тестовый аккаунт\"}"}, {200, "[]"}}; SoundCloud sc(nullptr, &net);
+        Network net; net.responses = {{200, "{\"username\":\"Тестовый аккаунт\"}"}, {200, "[]"}}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         QTRY_VERIFY(!sc.state()["busy"].toBool());
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
@@ -385,7 +529,7 @@ private slots:
     }
     void logoutInvalidatesPendingResponses() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}]}", 100}};
-        SoundCloud sc(nullptr, &net); QTRY_VERIFY(sc.state()["connected"].toBool()); sc.browse("tracks", "test"); sc.logout();
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool()); sc.browse("tracks", "test"); sc.logout();
         QTest::qWait(150); QVERIFY(!sc.state()["connected"].toBool()); QVERIFY(sc.state()["tracks"].toList().isEmpty());
         QVERIFY(!QFile::exists(config + "/session.json"));
     }

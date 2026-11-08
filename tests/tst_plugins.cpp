@@ -605,6 +605,20 @@ class PluginTests : public QObject {
         Plugins empty;
         QVERIFY(empty.installed().isEmpty());
     }
+    void playerSnapshotExcludesPrivateData() {
+        Plugins host;
+        host.updatePlayer({{"signedIn", true}, {"access_token", "private-token"},
+            {"profile", QVariantMap{{"email", "private-email"}}},
+            {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Трек"},
+                {"stream_url", "private-url"}, {"user", QVariantMap{{"username", "Автор"}, {"email", "private-email"}}}}}});
+        const auto bytes = QJsonDocument::fromVariant(host.m_player).toJson();
+        QVERIFY(!bytes.contains("private-"));
+        QCOMPARE(host.m_player["current"].toMap()["title"].toString(), QString("Трек"));
+        for (const auto &permission : {"oauth", "secrets", "filesystem", "network"}) {
+            auto plugin = basic(); plugin["permissions"] = QJsonArray{permission};
+            QVERIFY(!PluginManifest::validate(plugin).isEmpty());
+        }
+    }
     void rejectsUnexpectedCapabilities() {
         QTemporaryDir dir;
         QFile file(dir.filePath("plugin.json"));

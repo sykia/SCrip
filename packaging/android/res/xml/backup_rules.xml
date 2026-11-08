@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OAuth старых версий; новое хранилище находится в noBackupFilesDir. -->
+<full-backup-content>
+    <exclude domain="file" path="settings/SCrip/" />
+    <exclude domain="root" path="settings/SCrip/" />
+</full-backup-content>
