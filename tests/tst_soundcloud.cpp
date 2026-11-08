@@ -523,6 +523,50 @@ private slots:
         sc.next();
         QCOMPARE(sc.state()["current"], tracks[3]);
     }
+    void removingQueueTracksPreservesPlaybackSelection() {
+        const QVariantList tracks{
+            QVariantMap{{"urn", "soundcloud:tracks:0"}, {"access", "blocked"}},
+            QVariantMap{{"urn", "soundcloud:tracks:1"}, {"access", "blocked"}},
+            QVariantMap{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}},
+            QVariantMap{{"urn", "soundcloud:tracks:3"}, {"access", "blocked"}},
+            QVariantMap{{"urn", "soundcloud:tracks:4"}, {"access", "blocked"}}
+        };
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+
+        sc.playMix(tracks, 2);
+        sc.removeQueue(0); // До текущего: индекс сдвигается, текущий трек сохраняется.
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+
+        sc.removeQueue(3); // После текущего: воспроизведение не меняется.
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+
+        sc.removeQueue(1); // Текущий удален: выбирается следующий.
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:3"));
+
+        sc.removeQueue(1); // Для последнего трека выбирается предыдущий.
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 0);
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+    }
+    void removingOnlyQueueTrackStopsAndResetsPlayback() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        const QVariantMap track{{"urn", "soundcloud:tracks:only"}, {"access", "blocked"}};
+        sc.playMix({track});
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:only"));
+        sc.removeQueue(0);
+        QVERIFY(sc.state()["queue"].toList().isEmpty());
+        QCOMPARE(sc.state()["queueIndex"].toInt(), -1);
+        QVERIFY(sc.state()["current"].toMap().isEmpty());
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QVERIFY(!sc.state()["playing"].toBool());
+        QVERIFY(!sc.state()["buffering"].toBool());
+        QCOMPARE(sc.state()["position"].toLongLong(), qint64(0));
+        QCOMPARE(sc.state()["duration"].toLongLong(), qint64(0));
+    }
     void refusesRemoteCallback() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool()); sc.configure("id", "secret", "https://evil.example/callback");

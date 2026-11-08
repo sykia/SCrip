@@ -608,12 +608,23 @@ void SoundCloud::queueNext(int index) {
 }
 void SoundCloud::removeQueue(int index) {
     if (index < 0 || index >= m_queue.size()) return;
-    m_queue.removeAt(index); if (index <= m_queueIndex) --m_queueIndex;
+    const bool removingCurrent = index == m_queueIndex;
+    m_queue.removeAt(index);
+    if (m_queue.isEmpty()) {
+        m_queueIndex = -1;
+        set("queue", m_queue); set("queueIndex", m_queueIndex);
+        stopPlayback();
+        prepareNext();
+        return;
+    }
+    if (index < m_queueIndex) --m_queueIndex;
+    else if (removingCurrent) m_queueIndex = qMin(index, int(m_queue.size()) - 1);
     set("queue", m_queue); set("queueIndex", m_queueIndex);
+    if (removingCurrent) startTrack(m_queue[m_queueIndex].toMap());
     prepareNext();
 }
 void SoundCloud::next() {
-    if (m_queue.isEmpty()) { set("playbackActive", false); return; }
+    if (m_queue.isEmpty()) { m_queueIndex = -1; set("queueIndex", -1); stopPlayback(); return; }
     int index = m_queueIndex + 1;
     if (!m_forceNext && m_state.value("shuffle").toBool() && m_queue.size() > 1) { do { index = QRandomGenerator::global()->bounded(int(m_queue.size())); } while (index == m_queueIndex); }
     if (m_preloadIndex >= 0 && m_preloadIndex < m_queue.size() && urn(m_queue[m_preloadIndex].toMap()) == m_preloadUrn) index = m_preloadIndex;
