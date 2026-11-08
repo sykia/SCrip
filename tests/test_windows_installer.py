@@ -28,7 +28,6 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertIn("item.is_symlink()", package)
         self.assertIn(".casefold(), reverse=True", package)
         self.assertIn('command = "RMDir" if item.is_dir() else "Delete"', package)
-        self.assertIn('"$EXEDIR\\\\{rel}"', package)
 
     def test_windows_workflow_runs_real_nsis_integration(self):
         workflow = (ROOT / ".github/workflows/windows-installer-test.yml").read_text(encoding="utf-8")

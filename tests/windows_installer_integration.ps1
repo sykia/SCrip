@@ -19,13 +19,13 @@ function Build-Installer($payload, $output, $version, $pauseAfterUninstall = $fa
         Sort-Object { $_.FullName.Length } -Descending |
         ForEach-Object {
             $relative = [IO.Path]::GetRelativePath($payload, $_.FullName).Replace('/', '\')
-            'Delete "$EXEDIR\' + $relative.Replace('$', '$$') + '"'
+            'Delete "$INSTDIR\' + $relative.Replace('$', '$$') + '"'
         }
     $entries += Get-ChildItem -LiteralPath $payload -Recurse -Directory |
         Sort-Object { $_.FullName.Length } -Descending |
         ForEach-Object {
             $relative = [IO.Path]::GetRelativePath($payload, $_.FullName).Replace('/', '\')
-            'RMDir "$EXEDIR\' + $relative.Replace('$', '$$') + '"'
+            'RMDir "$INSTDIR\' + $relative.Replace('$', '$$') + '"'
         }
     Set-Content -LiteralPath $fileList -Value $entries -Encoding utf8
     Write-Host "$version uninstall manifest:`n$($entries -join "`n")"
@@ -65,6 +65,9 @@ try {
     Get-ChildItem -LiteralPath $install -Recurse -Force | Select-Object FullName, Length | Format-Table | Out-String | Write-Host
     Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-one') 'Version 1 was not installed.'
     Assert (Test-Path (Join-Path $install 'obsolete.dll')) 'Legacy-only file was not installed for the upgrade test.'
+    $uninstallEntry = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SCrip'
+    Write-Host "Registry install location: $($uninstallEntry.InstallLocation)"
+    Assert ($uninstallEntry.InstallLocation -eq $install) 'Install location was not registered.'
 
     Set-Content (Join-Path $install 'user-notes.txt') 'keep this user file'
     New-Item -ItemType Directory -Path (Split-Path $settings) -Force | Out-Null

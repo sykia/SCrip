@@ -52,9 +52,7 @@ with filelist.open("w", encoding="utf-8-sig") as manifest:
             parser.error(f"Символические ссылки в каталоге приложения не поддерживаются: {item}")
         rel = str(PureWindowsPath(item.relative_to(payload))).replace("$", "$$")
         command = "RMDir" if item.is_dir() else "Delete"
-        # The uninstaller may not have a registry-backed $INSTDIR (especially
-        # on upgrades from older builds); it always lives beside the payload.
-        print(f'{command} "$EXEDIR\\{rel}"', file=manifest)
+        print(f'{command} "$INSTDIR\\{rel}"', file=manifest)
 with TemporaryDirectory(dir=output.parent) as staging:
     staging = Path(staging)
     if args.sign_certificate:

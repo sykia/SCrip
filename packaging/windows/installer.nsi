@@ -53,9 +53,10 @@ Function .onInit
 FunctionEnd
 
 Function un.onInit
-  ; The uninstaller is stored beside the installed application. Use that path
-  ; directly so cleanup does not depend on a registry value from older builds.
+  ReadRegStr $INSTDIR HKCU "${UNKEY}" "InstallLocation"
+  StrCmp $INSTDIR "" 0 un_init_done
   StrCpy $INSTDIR "$EXEDIR"
+  un_init_done:
 FunctionEnd
 
 Var BackupDir
@@ -199,18 +200,10 @@ Section
   ClearErrors
   ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
   !insertmacro TestTrace "old_uninstall_exit=$0"
-  IfErrors old_uninstall_launch_failed
   StrCmp $0 0 uninstall_exit_ok old_uninstall_exit_failed
   uninstall_exit_ok:
   IfFileExists "$INSTDIR\SCrip.exe" old_uninstall_file_remains
   Goto uninstall_ok
-  old_uninstall_launch_failed:
-  !ifdef TEST_INSTALL_DIR
-    FileOpen $8 "${TEST_INSTALL_DIR}.failure" w
-    FileWrite $8 "uninstaller launch failed; result=$0$\r$\n"
-    FileClose $8
-  !endif
-  Goto old_uninstall_restore
   old_uninstall_exit_failed:
   !ifdef TEST_INSTALL_DIR
     FileOpen $8 "${TEST_INSTALL_DIR}.failure" w
