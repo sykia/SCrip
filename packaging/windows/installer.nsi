@@ -104,6 +104,7 @@ Function RestorePrevious
   StrCmp $RecoveryReady 1 0 restore_done
   ClearErrors
   ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR /COPY:DAT /R:1 /W:1' $0
+  !insertmacro TestTrace "rollback_copy_exit=$0"
   IfErrors restore_failed
   IntCmp $0 8 restore_failed restore_cleanup restore_failed
   restore_failed:
@@ -190,6 +191,7 @@ Section
   IfFileExists "$INSTDIR\*.*" 0 no_previous_files
   ClearErrors
   ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$INSTDIR" "$BackupDir" /E /COPY:DAT /R:1 /W:1' $0
+  !insertmacro TestTrace "backup_copy_exit=$0"
   IfErrors backup_failed
   IntCmp $0 8 backup_failed backup_ready backup_failed
   backup_failed:
@@ -211,6 +213,7 @@ Section
   IfFileExists "$INSTDIR\Uninstall.exe" 0 copy_staged
   ClearErrors
   ExecWait '"$INSTDIR\Uninstall.exe" /S' $0
+  !insertmacro TestTrace "old_uninstall_exit=$0"
   IfErrors old_uninstall_failed
   StrCmp $0 0 uninstall_ok old_uninstall_failed
   old_uninstall_failed:
@@ -228,10 +231,12 @@ Section
   copy_staged:
   ClearErrors
   ExecWait '"$WINDIR\Sysnative\robocopy.exe" "$StageDir" "$INSTDIR" /E /COPY:DAT /R:1 /W:1' $0
+  !insertmacro TestTrace "payload_copy_exit=$0"
   IfErrors new_copy_failed
   !insertmacro TestTrace "payload_copy_exit=$0"
   IntCmp $0 8 new_copy_failed write_new_uninstaller new_copy_failed
   new_copy_failed:
+  !insertmacro TestTrace "new_copy_failed"
   Call RestorePrevious
   SetErrorLevel 2
   Abort
@@ -251,6 +256,7 @@ Section
   StrCpy $RecoveryReady 0
   Goto install_shortcuts
   marker_failed:
+  !insertmacro TestTrace "marker_failed"
   RMDir /r "$StageDir"
   RMDir /r "$BackupDir"
   SetErrorLevel 2
