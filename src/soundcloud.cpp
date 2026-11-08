@@ -358,7 +358,13 @@ void SoundCloud::callbackConnection() {
             form.addQueryItem("code", query.queryItemValue("code")); form.addQueryItem("code_verifier", verifier);
             token(form, false, [this, respond] {
                 m_userSession = true;
-                saveSession();
+                if (!saveSession()) {
+                    m_userSession = false;
+                    set("authBusy", false);
+                    set("authStep", "");
+                    respond(false);
+                    return;
+                }
                 set("signedIn", true);
                 set("authBusy", false);
                 set("authStep", "");

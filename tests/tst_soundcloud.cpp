@@ -75,12 +75,14 @@ class MemorySecrets final : public SecretStore {
 public:
     QMap<QString, QByteArray> records;
     bool readable = true, writable = true, removable = true, corrupt = false;
+    int writesBeforeFailure = -1;
     bool read(const QString &key, QByteArray &value) override {
         if (!readable) return false;
         value = records.value(key); return true;
     }
     bool write(const QString &key, const QByteArray &value) override {
-        if (!writable) return false;
+        if (!writable || writesBeforeFailure == 0) return false;
+        if (writesBeforeFailure > 0) --writesBeforeFailure;
         records[key] = corrupt ? QByteArray("corrupt") : value; return true;
     }
     bool remove(const QString &key) override {
@@ -442,6 +444,33 @@ private slots:
         QCOMPARE(exchange.queryItemValue("code"), QString("valid-code"));
         QVERIFY(exchange.queryItemValue("code_verifier").size() >= 43);
         QVERIFY(!sc.state()["authBusy"].toBool());
+    }
+    void oauthDoesNotConfirmLoginWhenFinalSessionSaveFails() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
+        bool confirmed = false;
+        connect(&sc, &SoundCloud::signedInChanged, this, [&] { confirmed |= sc.signedIn(); });
+        sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
+        // Обмен кода сохраняет токены, но фиксация пользовательской сессии отказывает.
+        secrets->writesBeforeFailure = 1;
+        net.responses = {guest()};
+        const int requestsBeforeCallback = net.requests.size();
+        QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost, callbackPort);
+        QVERIFY(socket.waitForConnected());
+        socket.write("GET /callback?code=valid-code&state=" + QUrlQuery(authorizationUrl).queryItemValue("state").toUtf8()
+                     + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); socket.flush();
+        QTRY_VERIFY(socket.bytesAvailable() > 0);
+        QVERIFY(socket.readAll().startsWith("HTTP/1.1 400"));
+        QVERIFY(!confirmed); QVERIFY(!sc.signedIn());
+        QVERIFY(!sc.state()["connected"].toBool());
+        QVERIFY(!sc.state()["authBusy"].toBool());
+        QVERIFY(sc.state()["authStep"].toString().isEmpty());
+        QCOMPARE(sc.state()["error"].toString(), AuthStorage::errorMessage());
+        QVERIFY(!sc.m_userSession); QVERIFY(!sc.m_storageReady);
+        QVERIFY(sc.state()["profile"].toMap().isEmpty());
+        QCOMPARE(net.requests.size(), requestsBeforeCallback + 1);
+        QVERIFY(!QFile::exists(config + "/session.json"));
     }
     void windowControls() {
         Network net;
