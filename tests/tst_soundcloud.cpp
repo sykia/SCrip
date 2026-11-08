@@ -316,6 +316,37 @@ private slots:
         SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.browse("tracks", "test"); QTRY_VERIFY(sc.state()["hasMore"].toBool()); sc.more();
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2); QVERIFY(!sc.state()["hasMore"].toBool());
+        const auto tracks = sc.state()["tracks"].toList();
+        QCOMPARE(tracks[0].toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+        QCOMPARE(tracks[1].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+    }
+    void deduplicatesWithinPageAndPreservesOrder() {
+        Network net; net.responses = {guest(), {200, R"({"collection":[
+            {"urn":"soundcloud:tracks:3","title":"Первый"},
+            {"urn":"soundcloud:tracks:1"},
+            {"urn":"soundcloud:tracks:3","title":"Дубликат"},
+            {"urn":"soundcloud:tracks:2"}]})"}};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.browse("tracks", "test"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 3);
+        const auto tracks = sc.state()["tracks"].toList();
+        QCOMPARE(tracks[0].toMap()["urn"].toString(), QString("soundcloud:tracks:3"));
+        QCOMPARE(tracks[0].toMap()["title"].toString(), QString("Первый"));
+        QCOMPARE(tracks[1].toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+        QCOMPARE(tracks[2].toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+    }
+    void deduplicatesLargeCollection() {
+        QJsonArray page;
+        for (int i = 0; i < 2000; ++i) {
+            const auto id = QString("soundcloud:tracks:%1").arg(i);
+            page.append(QJsonObject{{"urn", id}});
+            page.append(QJsonObject{{"urn", id}});
+        }
+        Network net; net.responses = {guest(), {200, QJsonDocument(QJsonObject{{"collection", page}}).toJson()}};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.browse("tracks", "large"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2000);
+        const auto tracks = sc.state()["tracks"].toList();
+        QCOMPARE(tracks.first().toMap()["urn"].toString(), QString("soundcloud:tracks:0"));
+        QCOMPARE(tracks.last().toMap()["urn"].toString(), QString("soundcloud:tracks:1999"));
     }
     void ignoresOutdatedResults() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}]}", 100}, {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:2\"}]}"}};

@@ -436,11 +436,15 @@ void SoundCloud::collection(const QString &path, bool append) {
     request(path, [this, generation, append](QJsonDocument doc) {
         if (generation != m_listing) return;
         auto list = append ? m_state.value("tracks").toList() : QVariantList{};
+        QSet<QString> seen;
+        for (const auto &old : list) seen.insert(urn(old.toMap()));
         for (auto item : items(doc)) {
             auto map = item.toMap();
             if (m_lastPath.startsWith("/me/likes/tracks")) map["user_favorite"] = true;
-            bool exists = false; for (const auto &old : list) if (urn(old.toMap()) == urn(map)) { exists = true; break; }
-            if (!exists) list.append(map);
+            const auto id = urn(map);
+            if (seen.contains(id)) continue;
+            seen.insert(id);
+            list.append(map);
         }
         set("tracks", list); const auto next = doc.object().value("next_href").toString(); m_nextHref = next == m_nextHref ? QString{} : next; set("hasMore", !m_nextHref.isEmpty()); set("busy", false);
     }, "GET", {}, true, [this, generation, append](QString error) {
