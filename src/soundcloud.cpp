@@ -1179,6 +1179,11 @@ void SoundCloud::downloadUpdate() {
             !(finalUrl.host() == "github.com" || finalUrl.host().endsWith(".githubusercontent.com"))) {
             set("updateError", "Сервер перенаправил загрузку на запрещённый адрес."); cancelUpdateDownload(); return;
         }
+        // Размер промежуточного ответа перенаправления не относится к APK.
+        // Само перенаправление проверяется политикой Qt; адрес и размер итогового
+        // ответа проверяем при получении его метаданных.
+        const int status = m_updateReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status != 200) return;
         const auto length = m_updateReply->header(QNetworkRequest::ContentLengthHeader);
         if (length.isValid()) {
             bool valid = false; const qint64 n = length.toString().toLongLong(&valid);

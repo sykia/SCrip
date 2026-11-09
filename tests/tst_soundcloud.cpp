@@ -21,7 +21,7 @@
 
 // Транспорт подменяется только в тестах. Рабочий клиент использует фиксированные HTTPS-хосты.
 #ifndef Q_MOC_RUN
-struct Response { int status = 200; QByteArray body; int delay = 0; QNetworkReply::NetworkError error = QNetworkReply::NoError; int chunkSize = 0; qint64 contentLength = -2; bool lateSignals = false; };
+struct Response { int status = 200; QByteArray body; int delay = 0; QNetworkReply::NetworkError error = QNetworkReply::NoError; int chunkSize = 0; qint64 contentLength = -2; bool lateSignals = false; bool redirectBeforeBody = false; };
 class Reply : public QNetworkReply {
 public:
     Reply(const QNetworkRequest &request, Response response, QObject *parent) : QNetworkReply(parent), bytes(response.body), chunkSize(response.chunkSize > 0 ? response.chunkSize : qMax(1, response.body.size())) {
@@ -34,7 +34,18 @@ public:
         auto *timer = new QTimer(this); timer->setInterval(1);
         connect(timer, &QTimer::timeout, this, [this, response, timer] {
             if (aborted) { timer->stop(); timer->deleteLater(); return; }
-            if (!metadataEmitted) { metadataEmitted = true; emit metaDataChanged(); }
+            if (!metadataEmitted) {
+                metadataEmitted = true;
+                if (response.redirectBeforeBody) {
+                    setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 302);
+                    setHeader(QNetworkRequest::ContentLengthHeader, 0);
+                    emit metaDataChanged();
+                    if (aborted) return;
+                    setAttribute(QNetworkRequest::HttpStatusCodeAttribute, response.status);
+                    setHeader(QNetworkRequest::ContentLengthHeader, response.contentLength != -2 ? response.contentLength : qint64(response.body.size()));
+                }
+                emit metaDataChanged();
+            }
             if (response.error != QNetworkReply::NoError) setError(response.error, "Test network failure");
             else if (response.status >= 400) setError(QNetworkReply::ContentAccessDenied, "Test failure");
             released = qMin(bytes.size(), released + chunkSize);
@@ -846,6 +857,12 @@ private slots:
         net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         net.responses = {{200, payload, 0, QNetworkReply::NoError, 3, payload.size(), true}}; sc.downloadUpdate(); QTRY_VERIFY(sc.state()["updateReady"].toBool());
         QVERIFY(QFileInfo::exists(sc.m_updatePath));
+        QCoreApplication::setApplicationVersion(previousVersion);
+
+        // GitHub отвечает 302 с Content-Length: 0, затем отдаёт APK с итоговым размером.
+        Network redirectNet; redirectNet.responses = {guest()}; SoundCloud redirected(nullptr, &redirectNet, secrets); QTRY_VERIFY(redirected.state()["connected"].toBool());
+        QCoreApplication::setApplicationVersion("1.0.0"); redirectNet.responses = {{200, metadata}}; redirected.checkForUpdates(); QTRY_VERIFY(!redirected.state()["updateChecking"].toBool());
+        redirectNet.responses = {{200, payload, 0, QNetworkReply::NoError, 3, payload.size(), false, true}}; redirected.downloadUpdate(); QTRY_VERIFY(redirected.state()["updateReady"].toBool());
         QCoreApplication::setApplicationVersion(previousVersion);
 
         Network badNet; badNet.responses = {guest()}; SoundCloud bad(nullptr, &badNet, secrets); QTRY_VERIFY(bad.state()["connected"].toBool());
