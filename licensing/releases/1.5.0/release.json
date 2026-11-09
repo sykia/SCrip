@@ -1,0 +1,42 @@
+{
+  "version": "1.5.0",
+  "platforms": [
+    "Windows",
+    "Android",
+    "Linux-DEB",
+    "Linux-Arch"
+  ],
+  "application_code_commit": "3d86ada00798d0c4c48cc4d5e57f24408825c5f4",
+  "application_source": "sources/SCrip-1.5.0-source.tar.gz",
+  "application_source_sha256": "e8bdf4a8c18debe92b7c68da350624a6548119c12b4a77d8ea6332e964eca065",
+  "artifacts": [
+    {
+      "name": "SCrip-1.5.0-Android-universal.apk",
+      "sha256": "ed183b885ba6c5b81a371de64c7437d5676c39f9bf81a56b15b2b0f7b1cc9393"
+    },
+    {
+      "name": "SCrip-1.5.0-Windows-x64.exe",
+      "sha256": "7e690f7253d8592f08e2ed49e3b4e28ecd93cef946658dd051fb2b702f7d3228"
+    },
+    {
+      "name": "SCrip-1.5.0-debian13-amd64.deb",
+      "sha256": "6647abe5539b5ea603b888aaf4dafefc570ef993111a834379b1f36085450060"
+    },
+    {
+      "name": "SCrip-1.5.0-source.tar.gz",
+      "sha256": "e8bdf4a8c18debe92b7c68da350624a6548119c12b4a77d8ea6332e964eca065"
+    },
+    {
+      "name": "scrip-1.5.0-1-x86_64.pkg.tar.zst",
+      "sha256": "436b5737739305038ccfb6def8181ca00f25184ffb77918f26b5a69a424aad7b"
+    }
+  ],
+  "base_materials": {
+    "url": "https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz",
+    "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
+  },
+  "windows_build": {
+    "commit": "00eaa7f4de64fb8ae85d6ed6633e4cc93ffd52a5",
+    "workflow_run": "https://github.com/sykia/SCrip/actions/runs/42652129488"
+  }
+}
