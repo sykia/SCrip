@@ -15,6 +15,9 @@
 #include <QUrlQuery>
 #include <functional>
 #include <memory>
+#ifdef Q_OS_LINUX
+#include <QFutureWatcher>
+#endif
 
 // Секреты доступны только хосту через системное защищённое хранилище.
 class SoundCloud : public QObject {
@@ -88,6 +91,9 @@ private:
     bool loadConfig();
     bool saveSession();
     void storageFailure();
+#ifdef Q_OS_LINUX
+    void finishStorageLoad(bool ok, const QJsonObject &connection, const QJsonObject &session, bool autoConnect);
+#endif
     void ensureToken(std::function<void()> continuation);
     void token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed = {}, int loginEpoch = -1);
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
@@ -104,7 +110,11 @@ private:
     void callbackConnection();
     bool clearSession();
     static QString urn(const QVariantMap &item);
+    bool m_systemStore = false;
     AuthStorage m_authStorage;
+#ifdef Q_OS_LINUX
+    QFutureWatcher<QVariantList> m_storageWatcher;
+#endif
     QJsonObject m_connection;
     bool m_storageReady = false;
     QVariantMap m_state;

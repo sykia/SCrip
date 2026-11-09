@@ -26,6 +26,9 @@
 #include <QUrlQuery>
 #include <QVersionNumber>
 #include <QProcess>
+#ifdef Q_OS_LINUX
+#include <QtConcurrent/QtConcurrentRun>
+#endif
 #include <QMediaDevices>
 #include <QAudioDevice>
 #ifdef Q_OS_ANDROID
@@ -79,6 +82,7 @@ QString apiPath(const QString &kind, const QString &urn) {
 }
 
 SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::shared_ptr<SecretStore> secrets) : QObject(parent),
+    m_systemStore(!secrets),
     m_authStorage(secrets ? std::move(secrets) : systemSecretStore()),
     m_network(network ? network : new QNetworkAccessManager(this)) {
     auto dir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/SCrip";
@@ -91,6 +95,34 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         {"playing", false}, {"playbackActive", false}, {"position", 0}, {"duration", 0}, {"hasMore", false},
         {"heading", "Откройте свою музыку"}, {"configPath", m_configPath}, {"repeat", false}, {"shuffle", false}, {"crossfade", false},
         {"updateChecking", false}, {"updateAvailable", false}, {"updateError", ""}, {"updateResult", ""}, {"updateManual", false}};
+#ifdef Q_OS_LINUX
+    if (m_systemStore) {
+        auto storage = m_authStorage;
+        const auto configPath = m_configPath, sessionPath = m_sessionPath;
+        m_storageWatcher.setFuture(QtConcurrent::run([storage, configPath, sessionPath]() mutable {
+            QJsonObject connection, session;
+            const bool ok = storage.load("connection", configPath, connection)
+                && storage.load("session", sessionPath, session);
+            return QVariantList{ok, QVariant::fromValue(connection), QVariant::fromValue(session)};
+        }));
+        connect(&m_storageWatcher, &QFutureWatcher<QVariantList>::finished, this, [this, network] {
+            const auto result = m_storageWatcher.result();
+            finishStorageLoad(result.value(0).toBool(), result.value(1).value<QJsonObject>(),
+                result.value(2).value<QJsonObject>(), !network);
+        });
+    } else {
+        QJsonObject connection, session;
+        m_storageReady = m_authStorage.load("connection", m_configPath, connection)
+            && m_authStorage.load("session", m_sessionPath, session);
+        if (m_storageReady) {
+            m_connection = connection; loadConfig();
+            if (session.value("client_id").toString() == m_clientId && (!m_useWorker || session.value("user_session").toBool())) {
+                m_access = session.value("access_token").toString(); m_refresh = session.value("refresh_token").toString();
+                m_expires = session.value("expires_at").toVariant().toLongLong(); m_userSession = session.value("user_session").toBool();
+            }
+        } else fail(AuthStorage::errorMessage());
+    }
+#else
     QJsonObject connection, session;
     m_storageReady = m_authStorage.load("connection", m_configPath, connection)
         && m_authStorage.load("session", m_sessionPath, session);
@@ -102,6 +134,7 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
             m_expires = session.value("expires_at").toVariant().toLongLong(); m_userSession = session.value("user_session").toBool();
         }
     } else fail(AuthStorage::errorMessage());
+#endif
     player().setAudioOutput(&m_audio);
     auto *devices = new QMediaDevices(this);
     const auto followOutput = [this] {
@@ -176,9 +209,28 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     connect(&m_loginTimeout, &QTimer::timeout, this, [this] { cancelLogin(); fail("Время ожидания входа истекло. Попробуйте снова."); });
     QTimer::singleShot(0, this, [this, network] {
         if (!network) checkForUpdates(false);
+#if !defined(Q_OS_LINUX)
         if (m_state.value("configured").toBool() && (!m_useWorker || m_userSession)) connectCatalog();
+#else
+        if (!m_systemStore && m_state.value("configured").toBool() && (!m_useWorker || m_userSession)) connectCatalog();
+#endif
     });
 }
+#ifdef Q_OS_LINUX
+void SoundCloud::finishStorageLoad(bool ok, const QJsonObject &connection, const QJsonObject &session, bool autoConnect) {
+    Q_ASSERT(QThread::currentThread() == thread());
+    m_storageReady = ok;
+    if (ok) {
+        m_connection = connection;
+        loadConfig();
+        if (session.value("client_id").toString() == m_clientId && (!m_useWorker || session.value("user_session").toBool())) {
+            m_access = session.value("access_token").toString(); m_refresh = session.value("refresh_token").toString();
+            m_expires = session.value("expires_at").toVariant().toLongLong(); m_userSession = session.value("user_session").toBool();
+        }
+    } else fail(AuthStorage::errorMessage());
+    if (autoConnect && m_state.value("configured").toBool() && (!m_useWorker || m_userSession)) connectCatalog();
+}
+#endif
 void SoundCloud::set(const QString &key, const QVariant &value) {
     if (m_state.value(key) == value) return;
     m_state[key] = value;

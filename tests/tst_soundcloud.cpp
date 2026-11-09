@@ -12,6 +12,7 @@
 #include <QQuickItem>
 #include <QDesktopServices>
 #include <QSettings>
+#include <QElapsedTimer>
 #include <QTcpSocket>
 #include <QWheelEvent>
 #ifdef Q_OS_WIN
@@ -120,6 +121,21 @@ private:
         file.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"client_secret", "test-secret"}, {"redirect_uri", QString("http://127.0.0.1:%1/callback").arg(callbackPort)}}).toJson());
     }
 private slots:
+#ifdef Q_OS_LINUX
+    void linuxSecretInitializationDoesNotBlockOrOutliveOwner() {
+        QElapsedTimer timer; timer.start();
+        {
+            Network net;
+            SoundCloud sc(nullptr, &net);
+            QVERIFY2(timer.elapsed() < 3000, "SoundCloud construction blocked on Secret Service");
+            sc.login(); sc.connectCatalog();
+            QCoreApplication::processEvents();
+            QVERIFY(net.requests.isEmpty());
+        }
+        // Completion may arrive after the owner is gone; the watcher is context-bound.
+        QTest::qWait(20);
+    }
+#endif
     void volumeAndCrossfadePreferencesRestore() {
         QSettings preferences;
         preferences.remove("player/volume"); preferences.remove("player/crossfade");
