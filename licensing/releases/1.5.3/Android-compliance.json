@@ -2677,7 +2677,7 @@
       "license": "GPL-3.0-only",
       "notice": "payload/assets/licenses/SCrip-LICENSE.txt",
       "source": "sources/SCrip-1.5.3-source.tar.gz",
-      "source_sha256": "64d78936180e25a6c8a6296a9fca613b4e15d73fa85a233d754ca372011aaf9b"
+      "source_sha256": "dee464768d37d162771dc89f23ea85b15bfbe2929196d295d0862a961c061ec3"
     },
     "Qt": {
       "license": "GPL-3.0-only",
