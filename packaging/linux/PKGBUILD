@@ -1,15 +1,15 @@
 pkgname=scrip
-pkgver=1.4.2
+pkgver=1.5.0
 pkgrel=1
 license=('GPL-3.0-only')
 pkgdesc='Настольный плеер для SoundCloud'
-# For each tagged release, set pkgver to the tag version and refresh with `updpkgsums`.
+# Для каждого выпуска обновляйте версию и SHA-256 архива исходников.
 arch=('x86_64')
 url='https://github.com/sykia/SCrip'
 depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
 makedepends=('cmake' 'ninja')
-source=("SCrip-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('ff14c3534210d6da8f9ef4e29b4c690c106c3803591bead9e18f30ca2b45ee0a')
+source=("$url/releases/download/v$pkgver/SCrip-$pkgver-source.tar.gz")
+sha256sums=('e8bdf4a8c18debe92b7c68da350624a6548119c12b4a77d8ea6332e964eca065')
 build() {
     cmake -S "SCrip-$pkgver" -B build -G Ninja -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     cmake --build build --parallel 2
