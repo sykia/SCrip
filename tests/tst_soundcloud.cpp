@@ -428,6 +428,61 @@ private slots:
         secrets->removable = true;
         sc.logout(); QVERIFY(!secrets->records.contains("session"));
     }
+    void trackModelUpdatesWithoutReset() {
+        TrackModel model;
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        QSignalSpy inserted(&model, &QAbstractItemModel::rowsInserted);
+        QSignalSpy changed(&model, &QAbstractItemModel::dataChanged);
+        const QVariantMap first{{"urn", "soundcloud:tracks:1"}, {"user_favorite", false}};
+        const QVariantMap second{{"urn", "soundcloud:tracks:2"}};
+        model.update({first}); model.update({first, second});
+        QCOMPARE(resets.size(), 0); QCOMPARE(inserted.size(), 2);
+        auto liked = first; liked["user_favorite"] = true;
+        model.update({liked, second});
+        QCOMPARE(resets.size(), 0); QCOMPARE(changed.size(), 1);
+        QCOMPARE(model.data(model.index(0), Qt::UserRole + 1).toMap(), liked);
+    }
+    void cachedPagesAvoidReloadAndSupportRefresh() {
+        Network net; net.responses = {guest(), {200, R"({"collection":[{"urn":"soundcloud:tracks:1"}]})"},
+            {200, R"({"collection":[{"urn":"soundcloud:tracks:2"}]})"},
+            {200, R"({"collection":[{"urn":"soundcloud:tracks:3"}]})"}};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.browse("tracks", "one"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1);
+        sc.browse("tracks", "two"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1); QCOMPARE(sc.state()["tracks"].toList().first().toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+        const int requests = net.requests.size();
+        sc.browse("tracks", "one"); QCOMPARE(net.requests.size(), requests);
+        QCOMPARE(sc.state()["tracks"].toList().first().toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
+        sc.browse("tracks", "one", true);
+        QTRY_COMPARE(sc.state()["tracks"].toList().size(), 1);
+        QCOMPARE(sc.state()["tracks"].toList().first().toMap()["urn"].toString(), QString("soundcloud:tracks:3"));
+    }
+    void playbackSnapshotRestoresOnlyForSameAccount() {
+        QSettings settings; settings.remove("playback/session");
+        const QVariantMap profile{{"urn", "soundcloud:users:1"}};
+        const QVariantMap first{{"urn", "soundcloud:tracks:1"}, {"title", "Первый"}, {"duration", 180000}};
+        const QVariantMap second{{"urn", "soundcloud:tracks:2"}, {"title", "Второй"}, {"duration", 200000}};
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.m_restoreChecked = true; sc.set("signedIn", true); sc.set("profile", profile);
+            sc.m_queue = {first, second}; sc.m_queueIndex = 1;
+            sc.set("current", second); sc.set("position", 42000); sc.savePlayback();
+        }
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.set("signedIn", true); sc.restorePlayback(profile);
+            QCOMPARE(sc.state()["queue"].toList(), QVariantList({first, second}));
+            QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+            QCOMPARE(sc.state()["current"].toMap(), second);
+            QCOMPARE(sc.position(), 42000); QVERIFY(!sc.state()["playbackActive"].toBool());
+            QVERIFY(net.requests.isEmpty());
+        }
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.set("signedIn", true); sc.restorePlayback({{"urn", "soundcloud:users:other"}});
+            QVERIFY(sc.state()["current"].toMap().isEmpty());
+        }
+        settings.remove("playback/session");
+    }
     void authenticatesAndSearches() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Real response\"}],\"next_href\":null}"}};
         SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());

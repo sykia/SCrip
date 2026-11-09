@@ -1,5 +1,7 @@
 #pragma once
 #include <QObject>
+#include <QAbstractListModel>
+#include <QHash>
 #include "secretstore.h"
 #include <QVariantMap>
 #include <QNetworkAccessManager>
@@ -19,9 +21,24 @@
 struct SoundCloudStorageCompletion;
 #endif
 
+class TrackModel : public QAbstractListModel {
+    Q_OBJECT
+public:
+    using QAbstractListModel::QAbstractListModel;
+    int rowCount(const QModelIndex &parent = {}) const override { return parent.isValid() ? 0 : m_items.size(); }
+    QVariant data(const QModelIndex &index, int role) const override {
+        return index.isValid() && index.row() >= 0 && index.row() < m_items.size() && role == Qt::UserRole + 1 ? m_items[index.row()] : QVariant{};
+    }
+    QHash<int, QByteArray> roleNames() const override { return {{Qt::UserRole + 1, "modelData"}}; }
+    void update(const QVariantList &items);
+private:
+    QVariantList m_items;
+};
+
 // Секреты доступны только хосту через системное защищённое хранилище.
 class SoundCloud : public QObject {
     Q_OBJECT
+    Q_PROPERTY(TrackModel* trackModel READ trackModel CONSTANT)
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
     // Каталог не инвалидируется при каждом обновлении позиции воспроизведения.
@@ -31,6 +48,7 @@ class SoundCloud : public QObject {
 public:
     explicit SoundCloud(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr, std::shared_ptr<SecretStore> secrets = {});
     ~SoundCloud() override;
+    TrackModel *trackModel() { return &m_trackModel; }
     bool signedIn() const { return m_state.value("signedIn").toBool(); }
     bool seekable() const { return m_activePlayer->isSeekable(); }
     QVariantMap state() const { return m_state; }
@@ -42,7 +60,7 @@ public:
     Q_INVOKABLE void browserFailed();
     Q_INVOKABLE void logout();
     Q_INVOKABLE void configure(const QString &id, const QString &secret, const QString &redirect);
-    Q_INVOKABLE void browse(const QString &page, const QString &query = {});
+    Q_INVOKABLE void browse(const QString &page, const QString &query = {}, bool force = false);
     Q_INVOKABLE void more();
     Q_INVOKABLE void loadHome(bool force = false);
     Q_INVOKABLE void playMix(const QVariantList &tracks, int index = 0);
@@ -104,6 +122,8 @@ private:
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
     void collection(const QString &path, bool append = false);
     void profile();
+    void savePlayback();
+    void restorePlayback(const QVariantMap &profile);
     void startTrack(const QVariantMap &track, bool autoplay = true, qint64 position = 0);
     void tryRestoreAndroidTrack();
     void failAndroidRestore();
@@ -120,6 +140,11 @@ private:
     QJsonObject m_connection;
     bool m_storageReady = false;
     QVariantMap m_state;
+    TrackModel m_trackModel;
+    struct CachedListing { QVariantList tracks; QString next; };
+    QHash<QString, CachedListing> m_listings;
+    QTimer m_saveTimer;
+    bool m_restoreChecked = false, m_snapshotPlayback = false, m_homeLoaded = false;
     QNetworkAccessManager *m_network;
     QMediaPlayer m_player;
     QMediaPlayer m_sparePlayer;

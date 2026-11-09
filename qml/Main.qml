@@ -46,6 +46,25 @@ Window {
         section = 3
         if (reload) refreshPage()
     }
+    readonly property string scrollKey: section + ":" + (section === 1 ? libraryPage : section === 0 ? category + ":" + query : section === 3 ? profileTab + ":" + (guest?.urn || "me") : "")
+    property var scrollPositions: ({})
+    property string activeScrollKey: scrollKey
+    property bool restoringScroll: false
+    function restorePageScroll() {
+        contentScroll.wheelTarget = 0
+        const saved = scrollPositions[activeScrollKey] || { outer: 0, inner: 0 }
+        Qt.callLater(function() {
+            contentScroll.contentY = saved.outer
+            if (collectionLoader.item && collectionLoader.item.contentY !== undefined)
+                collectionLoader.item.contentY = saved.inner
+            app.restoringScroll = false
+        })
+    }
+    onScrollKeyChanged: {
+        restoringScroll = true
+        activeScrollKey = scrollKey
+        restorePageScroll()
+    }
     property bool inspectorOpen: true
     readonly property bool dockedInspector: width >= 1100 && inspectorOpen
     readonly property int inspectorWidth: dockedInspector ? (width >= 1300 ? 280 : 256) : 0
@@ -70,13 +89,13 @@ Window {
         property bool autoLoad: true
     }
     function time(ms) { const s = Math.max(0, Math.floor((ms || 0) / 1000)); return Math.floor(s / 60) + ":" + (s % 60).toString().padStart(2, "0") }
-    function refreshPage() {
+    function refreshPage(force = false) {
         if (!sc.signedIn) return
-        if (section === 0) sc.browse(["tracks", "sets", "users"][category], query)
-        else if (section === 1) sc.browse(libraryPage)
-        else if (section === 2) sc.browse("playlists")
-        else if (section === 3) sc.browse(guest ? ["userTracks", "userSets"][profileTab] : ["mine", "playlists", "likes", "reposts"][profileTab], guest?.urn || "")
-        else if (section === 5) sc.loadHome()
+        if (section === 0) sc.browse(["tracks", "sets", "users"][category], query, force)
+        else if (section === 1) sc.browse(libraryPage, "", force)
+        else if (section === 2) sc.browse("playlists", "", force)
+        else if (section === 3) sc.browse(guest ? ["userTracks", "userSets"][profileTab] : ["mine", "playlists", "likes", "reposts"][profileTab], guest?.urn || "", force)
+        else if (section === 5) sc.loadHome(force)
     }
     function searchNow() { query = searchField.text; if (section !== 0) section = 0; else refreshPage() }
     function selectLibrary(page) { libraryPage = page; if (section !== 1) section = 1; else refreshPage() }
@@ -99,6 +118,7 @@ Window {
         function onSignedInChanged() {
             const newlySignedIn = sc.signedIn && !app.lastSignedIn
             app.lastSignedIn = sc.signedIn
+            if (!sc.signedIn) app.scrollPositions = ({})
             if (newlySignedIn) { app.section = 5; Qt.callLater(app.refreshPage); app.requestActivate() }
         }
     }
@@ -326,7 +346,13 @@ Window {
                 function maybeLoadVirtual(position, viewportSize, totalSize) {
                     if (totalSize > viewportSize && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && position + viewportSize >= totalSize - 240) sc.more()
                 }
-                onContentYChanged: autoLoadTimer.restart()
+                onContentYChanged: {
+                    autoLoadTimer.restart()
+                    if (!app.restoringScroll && app.activeScrollKey === app.scrollKey) {
+                        const old = app.scrollPositions[app.activeScrollKey] || { inner: 0 }
+                        app.scrollPositions[app.activeScrollKey] = { outer: contentY, inner: old.inner }
+                    }
+                }
                 onContentHeightChanged: autoLoadTimer.restart()
                 onHeightChanged: autoLoadTimer.restart()
                 Timer { id: autoLoadTimer; interval: 160; onTriggered: contentScroll.maybeLoad() }
@@ -350,7 +376,7 @@ Window {
                     }
                 }
                 ScrollBar.vertical: ScrollBar { id: pageBar }
-                Connections { target: app; function onSectionChanged() { wheelMotion.stop(); contentScroll.contentY = 0; contentScroll.wheelTarget = 0 } }
+
                 Column {
                     id: pageBody; width: Math.max(0, contentScroll.width - pageBar.implicitWidth - 4); spacing: app.gutter
                     property real entrance: 0
@@ -374,12 +400,12 @@ Window {
                         Tool { anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; symbol: "close"; text: "Закрыть сообщение"; onClicked: sc.clearError() }
                     }
                     Row {
-                        width: parent.width; spacing: 8; visible: app.section === 0 || app.section === 2
+                        width: parent.width; spacing: 8; visible: app.section === 0 || app.section === 1 || app.section === 2 || app.section === 3
                         Tool { visible: app.section === 0; text: "Треки"; active: app.category === 0; onClicked: app.category = 0 }
                         Tool { visible: app.section === 0; text: "Плейлисты"; active: app.category === 1; onClicked: app.category = 1 }
                         Tool { visible: app.section === 0; text: "Профили"; active: app.category === 2; onClicked: app.category = 2 }
                         Tool { visible: app.section === 2; text: "Создать плейлист"; onClicked: playlistDialog.open() }
-                        Tool { symbol: "repeat"; text: "Обновить"; onClicked: app.refreshPage() }
+                        Tool { symbol: "repeat"; text: "Обновить"; onClicked: app.refreshPage(true) }
                     }
                     Loader { width: parent.width; active: app.section === 4; visible: active; sourceComponent: app.settingGroup === 1 ? pluginsPage : settingsPage }
                     PluginPanels {
@@ -656,22 +682,28 @@ Window {
             objectName: "coverGridView"
             width: parent.width
             property int columns: Math.max(2, Math.floor((width + 24) / 184))
-            property real tileWidth: (width - (columns - 1) * 24) / columns
+            property real tileWidth: Math.max(0, width / columns - 24)
             property real tileHeight: tileWidth + 48
-            cellWidth: tileWidth + 24
+            cellWidth: width / columns
             cellHeight: tileHeight + 24
             height: Math.min(count > 0 ? Math.ceil(count / columns) * cellHeight - 24 : 0, Math.max(58, contentScroll.height - y - 110))
             clip: true
             cacheBuffer: Math.max(cellHeight * 2, height / 2)
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
-            model: app.api.tracks
+            model: sc.trackModel
             property int activeDelegateCount: 0
             function trackTitleAt(index) {
                 const item = itemAtIndex(index)
                 return item ? item.modelData.title : ""
             }
-            onContentYChanged: contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
+            onContentYChanged: {
+                contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
+                if (!app.restoringScroll && app.activeScrollKey === app.scrollKey) {
+                    const old = app.scrollPositions[app.activeScrollKey] || { outer: 0 }
+                    app.scrollPositions[app.activeScrollKey] = { outer: old.outer, inner: contentY }
+                }
+            }
             onContentHeightChanged: contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
             HoverHandler { onHoveredChanged: contentScroll.virtualCollectionHovered = hovered }
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
@@ -736,7 +768,7 @@ Window {
             cacheBuffer: Math.max(58 * 4, height / 2)
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
-            model: app.api.tracks
+            model: sc.trackModel
             property int activeDelegateCount: 0
             function lastTrackTitle() {
                 const item = count > 0 ? itemAtIndex(count - 1) : null
@@ -745,7 +777,13 @@ Window {
             function maybeLoad() {
                 contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
             }
-            onContentYChanged: maybeLoad()
+            onContentYChanged: {
+                maybeLoad()
+                if (!app.restoringScroll && app.activeScrollKey === app.scrollKey) {
+                    const old = app.scrollPositions[app.activeScrollKey] || { outer: 0 }
+                    app.scrollPositions[app.activeScrollKey] = { outer: old.outer, inner: contentY }
+                }
+            }
             onContentHeightChanged: maybeLoad()
             HoverHandler { onHoveredChanged: contentScroll.virtualCollectionHovered = hovered }
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }

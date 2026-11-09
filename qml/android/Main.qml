@@ -63,16 +63,26 @@ ApplicationWindow {
     property int selectedQueue: -1
     function cover(item) { return (pluginManager.theme.covers === "artist" ? item?.user?.avatar_url || item?.artwork_url || "" : item?.artwork_url || item?.tracks?.[0]?.artwork_url || item?.user?.avatar_url || "").replace("-large.", "-t500x500.") }
     function time(ms) { let s = Math.floor((ms || 0) / 1000); return Math.floor(s / 60) + ":" + (s % 60).toString().padStart(2, "0") }
-    function refresh() {
+    function refresh(force = false) {
         if (!sc.signedIn) return
-        if (page === 0) sc.loadHome()
-        else if (page === 1) sc.browse("feed")
-        else if (page === 2) sc.browse(searchKind, search.text)
-        else if (page === 3) sc.browse(library)
-        else if (page === 4) sc.browse(guest ? (profileTab ? "userSets" : "userTracks") : ["mine", "playlists", "likes", "reposts"][profileTab], guest?.urn || "")
+        if (page === 0) sc.loadHome(force)
+        else if (page === 1) sc.browse("feed", "", force)
+        else if (page === 2) sc.browse(searchKind, search.text, force)
+        else if (page === 3) sc.browse(library, "", force)
+        else if (page === 4) sc.browse(guest ? (profileTab ? "userSets" : "userTracks") : ["mine", "playlists", "likes", "reposts"][profileTab], guest?.urn || "", force)
     }
     readonly property int motion: prefs.motion ? 360 : 0
-    onPageChanged: { refresh(); pageArrival.restart(); Qt.callLater(function() { if (tracks.visible) tracks.positionViewAtBeginning() }) }
+    property var scrollPositions: ({})
+    readonly property string scrollKey: page + ":" + (page === 3 ? library : page === 2 ? searchKind + ":" + search.text : page === 4 ? profileTab + ":" + (guest?.urn || "me") : "")
+    property string activeScrollKey: scrollKey
+    property bool restoringScroll: false
+    onScrollKeyChanged: {
+        restoringScroll = true
+        activeScrollKey = scrollKey
+        const saved = scrollPositions[activeScrollKey] || 0
+        Qt.callLater(function() { tracks.contentY = saved; restoringScroll = false })
+    }
+    onPageChanged: { refresh(); pageArrival.restart() }
     ParallelAnimation {
         id: pageArrival
         NumberAnimation { target: body; property: "opacity"; from: 0; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
@@ -277,6 +287,12 @@ ApplicationWindow {
             }
         }
         Action {
+            visible: sc.signedIn && app.page > 0 && app.page < 5
+            text: "Обновить"; enabled: !app.api.busy
+            Layout.leftMargin: 20; Layout.bottomMargin: 8
+            onClicked: app.refresh(true)
+        }
+        Action {
             visible: sc.signedIn && app.page === 3 && app.library === "playlists"
             text: "Создать плейлист"; Layout.leftMargin: 20; Layout.bottomMargin: 12
             onClicked: createPlaylist.open()
@@ -416,8 +432,11 @@ ApplicationWindow {
             bottomMargin: navigationFooter.height
             visible: sc.signedIn && app.page > 0 && app.page < 5
             Layout.fillWidth: true; Layout.fillHeight: true
-            clip: true; model: app.api.tracks || []
-            onContentYChanged: if (prefs.autoLoad && app.api.hasMore && !app.api.busy && contentY + height >= contentHeight - 180) sc.more()
+            clip: true; model: sc.trackModel
+            onContentYChanged: {
+                if (!app.restoringScroll && app.activeScrollKey === app.scrollKey) app.scrollPositions[app.activeScrollKey] = contentY
+                if (prefs.autoLoad && app.api.hasMore && !app.api.busy && contentY + height >= contentHeight - 180) sc.more()
+            }
             header: Column {
                 width: tracks.width
                 visible: app.page === 4
@@ -765,7 +784,7 @@ ApplicationWindow {
     }
     Connections {
         target: sc
-        function onSignedInChanged() { app.page = 0; if (sc.signedIn) sc.loadHome(); else { player.close(); queue.close() } }
+        function onSignedInChanged() { app.page = 0; if (sc.signedIn) sc.loadHome(); else { app.scrollPositions = ({}); player.close(); queue.close() } }
     }
     Sheet {
         id: startup
