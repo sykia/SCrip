@@ -66,7 +66,7 @@ AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwor
     });
     m_timer.setInterval(1000);
     connect(&m_timer, &QTimer::timeout, this, &AndroidMedia::publish);
-    m_timer.start(); publish();
+    publish();
 }
 AndroidMedia::~AndroidMedia() {
     QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "shutdown", "()V");
@@ -74,6 +74,11 @@ AndroidMedia::~AndroidMedia() {
 }
 void AndroidMedia::publish() {
     const auto state = m_soundcloud->state();
+    if (state.value("playbackActive").toBool()) {
+        if (!m_timer.isActive()) m_timer.start();
+    } else {
+        m_timer.stop();
+    }
     const auto track = state.value("current").toMap();
     const auto user = track.value("user").toMap();
     QString artwork = track.value("artwork_url").toString();

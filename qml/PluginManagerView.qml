@@ -117,8 +117,6 @@ Column {
     }
     Label { width: parent.width; text: root.manager ? root.manager.error : "Менеджер недоступен"; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: "#a22c39" }
     Label { width: parent.width; text: root.message; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
-    Label { width: parent.width; text: "Поддерживаются декларативные плагины. Исполняемые расширения не поддерживаются. Обновления устанавливаются из файла."; wrapMode: Text.Wrap; color: root.muted }
-    Label { width: parent.width; text: root.appearanceHint; wrapMode: Text.Wrap; visible: !!text; color: root.muted }
     Repeater {
         model: root.manager ? root.manager.installed : []
         Rectangle {

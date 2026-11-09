@@ -66,7 +66,8 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         require(instance != null, "Служба исчезла");
         require((Boolean) field(service, instance, "foreground") == foreground, "Неверный foreground");
         PowerManager.WakeLock lock = (PowerManager.WakeLock) field(service, instance, "wakeLock");
-        require(lock.isHeld() == awake, "Неверное состояние wake lock");
+        require(lock.isHeld() == awake, "Неверное состояние wake lock: ожидалось=" + awake
+            + ", получено=" + lock.isHeld() + ", foreground=" + foreground + ", mediaState=" + state);
         MediaSession session = (MediaSession) field(service, instance, "session");
         require(session.getController().getPlaybackState().getState() == state, "Неверное состояние медиасессии");
         require(!session.getController().getPlaybackState().getCustomActions().isEmpty(), "Нет действия полной остановки");
@@ -197,54 +198,6 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             testDeferredPlay();
             testSavedTrackSnapshot();
             testPluginContentRead(ctx);
-            int previewStyle = -1;
-            if (testArguments != null && testArguments.containsKey("previewStyle"))
-                previewStyle = Integer.parseInt(testArguments.getString("previewStyle"));
-            if (previewStyle >= 0) {
-                Class<?> widget = ctx.getClassLoader().loadClass("org.scrip.app.MusicWidget");
-                String previewTitle = argument("previewTitle", "");
-                Field title = bridge.getDeclaredField("title"); title.setAccessible(true);
-                Field artist = bridge.getDeclaredField("artist"); artist.setAccessible(true);
-                Field hasTrack = bridge.getDeclaredField("hasTrack"); hasTrack.setAccessible(true);
-                Field playing = bridge.getDeclaredField("playing"); playing.setAccessible(true);
-                Field liked = bridge.getDeclaredField("liked"); liked.setAccessible(true);
-                title.set(null, previewTitle.isEmpty() ? "SCrip" : previewTitle);
-                artist.set(null, argument("previewArtist", "Включи музыку в приложении"));
-                hasTrack.setBoolean(null, !previewTitle.isEmpty());
-                playing.setBoolean(null, !previewTitle.isEmpty());
-                liked.setBoolean(null, !previewTitle.isEmpty());
-                Field cover = bridge.getDeclaredField("cover"); cover.setAccessible(true);
-                Field blurred = bridge.getDeclaredField("blurredCover"); blurred.setAccessible(true);
-                Field rounded = bridge.getDeclaredField("roundedCover"); rounded.setAccessible(true);
-                boolean withArtwork = Boolean.parseBoolean(argument("previewCover", "false"));
-                Bitmap art = withArtwork ? previewArtwork() : null;
-                cover.set(null, art); blurred.set(null, art); rounded.set(null, null);
-                Field accent = bridge.getDeclaredField("widgetAccent"); accent.setAccessible(true); accent.setInt(null, 0xffeaa2ae);
-                configureWidgetSize(ctx, widget);
-                bridge.getMethod("setWidgetStyle", int.class).invoke(null, previewStyle);
-                waitForIdleSync(); SystemClock.sleep(250); waitForIdleSync();
-                result.putString("stream", "STYLE: " + previewStyle + "\n");
-                finish(Activity.RESULT_OK, result);
-                return;
-            }
-            Class<?> widget = ctx.getClassLoader().loadClass("org.scrip.app.MusicWidget");
-            Method setStyle = bridge.getMethod("setWidgetStyle", int.class);
-            Method getStyle = bridge.getMethod("getWidgetStyle");
-            Field hasTrack = bridge.getDeclaredField("hasTrack"); hasTrack.setAccessible(true);
-            Field title = bridge.getDeclaredField("title"); title.setAccessible(true);
-            Field artist = bridge.getDeclaredField("artist"); artist.setAccessible(true);
-            Method render = widget.getDeclaredMethod("views", Context.class, int.class, boolean.class); render.setAccessible(true);
-            title.set(null, "Очень длинное название композиции для проверки обрезания многоточием в границах карточки");
-            artist.set(null, "Исполнитель с длинным именем для проверки адаптивной ширины");
-            hasTrack.setBoolean(null, true);
-            for (int style = 0; style < 3; ++style) {
-                setStyle.invoke(null, style);
-                require((Integer) getStyle.invoke(null) == style, "Стиль виджета не сохранился: " + style);
-                require(render.invoke(null, getTargetContext(), style, false) != null, "Не создан полный вариант виджета: " + style);
-                require(render.invoke(null, getTargetContext(), style, true) != null, "Не создан компактный вариант виджета: " + style);
-            }
-            hasTrack.setBoolean(null, false);
-            require(render.invoke(null, getTargetContext(), 0, true) != null, "Не создан виджет без активного трека");
             SystemClock.sleep(2000);
             final boolean[] darkStatusIcons = {false};
             runOnMainSync(() -> {

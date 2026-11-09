@@ -21,12 +21,6 @@ public class PlaybackService extends Service {
     private AudioFocusRequest focusRequest;
     private boolean hasFocus, resumeAfterFocus, focusPaused, destroyed;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Runnable focusTimeout = () -> {
-        if (!resumeAfterFocus) return;
-        resumeAfterFocus = false; focusPaused = false;
-        MediaBridge.dispatch(this, 5, 0);
-        publish();
-    };
     private String metadataKey = "";
     private String notificationKey = "";
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
@@ -61,17 +55,17 @@ public class PlaybackService extends Service {
     void handleAudioFocusChange(int change) {
                 if (destroyed) return;
                 if (change == AudioManager.AUDIOFOCUS_LOSS) {
-                    handler.removeCallbacks(focusTimeout); resumeAfterFocus = false; focusPaused = false; hasFocus = false;
+                    resumeAfterFocus = false; focusPaused = false; hasFocus = false;
                     MediaBridge.dispatch(this, 5, 0); publish();
                 } else if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-                    if (!focusPaused) resumeAfterFocus = MediaBridge.playing && MediaBridge.active;
+                    if (!focusPaused) resumeAfterFocus = MediaBridge.active || MediaBridge.preparing;
                     focusPaused = true; hasFocus = false;
-                    if (resumeAfterFocus) { handler.removeCallbacks(focusTimeout); handler.postDelayed(focusTimeout, 120000); }
                     MediaBridge.dispatch(this, 8, 0); publish();
                 } else if (change == AudioManager.AUDIOFOCUS_GAIN) {
                     hasFocus = true;
-                    if (resumeAfterFocus && focusPaused && MediaBridge.ready && MediaBridge.hasTrack) {
-                        handler.removeCallbacks(focusTimeout); resumeAfterFocus = false; focusPaused = false;
+                    boolean shouldResume = resumeAfterFocus && focusPaused && MediaBridge.ready && MediaBridge.hasTrack;
+                    resumeAfterFocus = false; focusPaused = false;
+                    if (shouldResume) {
                         MediaBridge.dispatch(this, 4, 0);
                     }
                 }
@@ -134,8 +128,9 @@ public class PlaybackService extends Service {
             if (!foreground) {
                 enterForeground(notification);
             } else if (notification != null) getSystemService(NotificationManager.class).notify(NOTIFICATION, notification);
-            if (!wakeLock.isHeld() && MediaBridge.playing && !MediaBridge.buffering) wakeLock.acquire();
-            if (!hasFocus) {
+            // Буферизация тоже требует работы сети и декодера при выключенном экране.
+            if (!wakeLock.isHeld()) wakeLock.acquire();
+            if (!hasFocus && !focusPaused) {
                 hasFocus = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
                 if (!hasFocus) { resumeAfterFocus = false; focusPaused = false; MediaBridge.dispatch(this, 5, 0); }
             }
@@ -174,14 +169,15 @@ public class PlaybackService extends Service {
         getSystemService(NotificationManager.class).cancel(NOTIFICATION);
         if (MediaBridge.ready) {
             MediaBridge.playing = MediaBridge.active = MediaBridge.buffering = MediaBridge.preparing = false;
-            MediaBridge.dispatch(this, 6, 0);
+            // Уничтожение службы не означает, что пользователь очистил очередь.
+            MediaBridge.dispatch(this, 5, 0);
         } else {
             MediaBridge.playing = MediaBridge.active = MediaBridge.buffering = MediaBridge.preparing = MediaBridge.hasTrack = false;
         }
         super.onDestroy();
     }
     private void cancelFocusResume() {
-        handler.removeCallbacks(focusTimeout); resumeAfterFocus = focusPaused = false;
+        resumeAfterFocus = focusPaused = false;
     }
     @Override public IBinder onBind(Intent intent) { return null; }
 }

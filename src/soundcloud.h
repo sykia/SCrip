@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QAbstractListModel>
 #include <QHash>
+#include <QSet>
 #include "secretstore.h"
 #include <QVariantMap>
 #include <QNetworkAccessManager>
@@ -121,8 +122,10 @@ private:
     void token(const QUrlQuery &form, bool basic, TokenFlow flow, std::function<void()> done, TokenFailure failed = {}, int loginEpoch = -1);
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
     void collection(const QString &path, bool append = false);
+    void resolveRepostLikes(const QString &path, int generation, int revision, QSet<QString> pending);
     void profile();
     void savePlayback();
+    void savePlaybackPosition();
     void restorePlayback(const QVariantMap &profile);
     void startTrack(const QVariantMap &track, bool autoplay = true, qint64 position = 0);
     void tryRestoreAndroidTrack();
@@ -167,6 +170,7 @@ private:
     bool m_userSession = false, m_refreshing = false;
     bool m_crossfadeStarted = false;
     int m_homeGeneration = 0;
+    int m_likeRevision = 0;
     int m_epoch = 0, m_listing = 0, m_playGeneration = 0, m_queueIndex = -1;
     int m_loginEpoch = 0;
     QVariantMap m_androidRestoreTrack;

@@ -50,8 +50,32 @@ ApplicationWindow {
     property var guest: null
     property int profileTab: 0
     readonly property var profile: guest ? (api.visitedProfile?.urn === guest.urn ? api.visitedProfile : guest) : api.profile
-    function openProfile(user) { guest = user || null; profileTab = 0; page = 4; refresh() }
+    function openProfile(user) {
+        pageHistory.push({page: page, guest: guest, profileTab: profileTab})
+        navigatingBack = true
+        guest = user && user.urn !== api.profile?.urn ? user : null
+        profileTab = 0; page = 4; previousPage = page
+        navigatingBack = false
+        refresh()
+    }
 
+    property var pageHistory: []
+    property int previousPage: 0
+    property bool navigatingBack: false
+    function goBack() {
+        if (player.visible) { player.close(); return true }
+        if (pageHistory.length) {
+            navigatingBack = true
+            const entry = pageHistory.pop()
+            guest = entry.guest; profileTab = entry.profileTab; page = entry.page
+            previousPage = page
+            navigatingBack = false
+            refresh()
+            return true
+        }
+        return false
+    }
+    onClosing: function(close) { if (goBack()) close.accepted = false }
     property int page: 0
     property string library: "likes"
     property string searchKind: "tracks"
@@ -85,7 +109,7 @@ ApplicationWindow {
             restoringScroll = false
         })
     }
-    onPageChanged: { refresh(); pageArrival.restart() }
+    onPageChanged: { if (!navigatingBack) pageHistory.push({page: previousPage, guest: guest, profileTab: profileTab}); previousPage = page; refresh(); pageArrival.restart() }
     ParallelAnimation {
         id: pageArrival
         NumberAnimation { target: body; property: "opacity"; from: 0; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
@@ -113,6 +137,7 @@ ApplicationWindow {
         property string symbol: ""
         property bool active: false
         property bool main: false
+        property bool loading: false
         implicitWidth: main ? 64 : 48
         implicitHeight: main ? 64 : 48
         Accessible.name: text
@@ -124,7 +149,8 @@ ApplicationWindow {
             Behavior on color { ColorAnimation { duration: prefs.motion ? 150 : 0 } }
         }
         contentItem: Item {
-            AndroidGlyph { anchors.centerIn: parent; width: transport.main ? 26 : 22; height: width; name: transport.symbol; ink: transport.main ? "white" : transport.active ? app.accent : app.ink }
+            AndroidGlyph { visible: !transport.loading; anchors.centerIn: parent; width: transport.main ? 26 : 22; height: width; name: transport.symbol; ink: transport.main ? "white" : transport.active ? app.accent : app.ink }
+            BusyIndicator { anchors.centerIn: parent; width: 32; height: 32; running: transport.loading; visible: running }
             Rectangle { visible: transport.active && !transport.main; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 3; height: 3; radius: 1.5; color: app.accent }
         }
     }
@@ -177,7 +203,7 @@ ApplicationWindow {
         height: 68
         leftPadding: 20
         rightPadding: 12
-        background: Rectangle { radius: 16; color: row.down ? "#eeeaed" : "transparent"; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
+        background: Rectangle { x: 8; width: parent.width - 16; radius: 16; color: row.down ? "#eaeaec" : "transparent" }
         contentItem: RowLayout {
             spacing: 12
             Rectangle {
@@ -188,8 +214,9 @@ ApplicationWindow {
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
                 Caption { text: row.modelData.title || row.modelData.username || "Без названия"; Layout.fillWidth: true; font.bold: true; color: row.modelData.urn === app.api.current?.urn ? app.accent : app.ink }
-                Caption { text: row.modelData.user?.username || (row.modelData.track_count ? row.modelData.track_count + " треков" : "SoundCloud"); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12 }
+                Caption { text: row.modelData.user?.username || (row.modelData.track_count ? row.modelData.track_count + " треков" : "SoundCloud"); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
             }
+            PlayerButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); implicitWidth: 40; implicitHeight: 40; active: !!row.modelData.user_favorite; symbol: active ? "liked" : "heart"; text: active ? "Убрать из любимых" : "Добавить в любимые"; onClicked: sc.like(row.modelData) }
             Action { text: "Действия"; symbol: "more"; implicitWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = row.modelData; app.selectedQueue = row.queued ? row.queueIndex : -1; trackMenu.open() } }
         }
         onClicked: {
@@ -514,8 +541,12 @@ ApplicationWindow {
         Rectangle {
             id: miniPlayer
             visible: !!app.api.current?.title
-            x: 16; width: parent.width - 32; height: 64; radius: 20; color: "#f0e9ed"
+            x: 16; width: parent.width - 32; height: 64; radius: 20; color: "#eeeeef"
             TapHandler { onTapped: player.open() }
+            DragHandler {
+                target: null
+                onActiveTranslationChanged: if (active && activeTranslation.y < -45 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.open()
+            }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 10
                 RoundedImage { Layout.preferredWidth: 44; Layout.preferredHeight: 44; source: app.cover(app.api.current); radius: 10; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0 }
@@ -524,7 +555,7 @@ ApplicationWindow {
                     Caption { text: app.api.current?.title || ""; Layout.fillWidth: true; font.bold: true }
                     Caption { text: app.api.current?.user?.username || ""; Layout.fillWidth: true; color: app.muted; font.pixelSize: 12 }
                 }
-                PlayerButton { text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; Accessible.name: app.api.playing ? "Пауза" : "Воспроизвести"; onClicked: sc.togglePlayback() }
+                PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; Accessible.name: app.api.playing ? "Пауза" : "Воспроизвести"; onClicked: sc.togglePlayback() }
                 PlayerButton { text: "Следующий"; symbol: "next"; Accessible.name: "Следующий трек"; onClicked: sc.next() }
             }
             Rectangle {
@@ -636,10 +667,14 @@ ApplicationWindow {
         id: player
         parent: Overlay.overlay
         width: parent.width; height: parent.height
-        modal: true; padding: 20
+        modal: true; focus: true; closePolicy: Popup.CloseOnEscape; padding: 20
         topPadding: 12 + app.safeAreaTop(parent)
         bottomPadding: 16 + app.safeAreaBottom(parent)
-        background: Rectangle { color: "#faf4f6" }
+        background: Rectangle { color: "#fafafa" }
+        DragHandler {
+            target: null
+            onActiveTranslationChanged: if (active && activeTranslation.y > 80 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.close()
+        }
         contentItem: ColumnLayout {
             spacing: 10
             RowLayout {
@@ -659,7 +694,7 @@ ApplicationWindow {
             }
             Item { Layout.fillHeight: true }
             Label { text: app.api.current?.title || ""; color: app.ink; font.bold: true; font.pixelSize: 21; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; Layout.fillWidth: true }
-            Caption { text: app.api.current?.user?.username || ""; color: app.muted; Layout.fillWidth: true }
+            Caption { text: app.api.current?.user?.username || ""; color: app.muted; Layout.fillWidth: true; TapHandler { enabled: !!app.api.current?.user?.urn; onTapped: { player.close(); app.openProfile(app.api.current.user) } } }
             FineSlider {
                 id: progress
                 Layout.fillWidth: true; to: Math.max(1, sc.duration || 0)
@@ -680,7 +715,7 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true }
                 PlayerButton { text: "Предыдущий трек"; symbol: "previous"; onClicked: sc.previous() }
                 Item { Layout.fillWidth: true }
-                PlayerButton { text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; main: true; onClicked: sc.togglePlayback() }
+                PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; main: true; onClicked: sc.togglePlayback() }
                 Item { Layout.fillWidth: true }
                 PlayerButton { text: "Следующий трек"; symbol: "next"; onClicked: sc.next() }
                 Item { Layout.fillWidth: true }

@@ -32,7 +32,7 @@ endif()
 qt_add_executable(scrip ${executable_options} src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/soundcloud.cpp src/soundcloud.h src/artworknetwork.cpp src/artworknetwork.h)
 set(SCRIP_APP_VERSION "${PROJECT_VERSION}")
 if(ANDROID)
-    set(SCRIP_APP_VERSION "1.5.2")
+    set(SCRIP_APP_VERSION "1.5.3")
 endif()
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
@@ -76,7 +76,7 @@ if(ANDROID)
         set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${android_ssl_dir}/${library}")
     endforeach()
     set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME SCrip
-        QT_ANDROID_VERSION_CODE 10502 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
+        QT_ANDROID_VERSION_CODE 10503 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android")

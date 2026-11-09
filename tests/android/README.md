@@ -1,6 +1,6 @@
 # Проверка фоновой службы Android
 
-После сборки `bash build/android-tools/build-universal.sh` запустите отдельный эмулятор Android 15 и выполните из корня проекта:
+После сборки `bash scripts/build_android.sh` запустите отдельный эмулятор Android 15 и выполните из корня проекта:
 
 ```bash
 bash tests/android/run_lifecycle.sh

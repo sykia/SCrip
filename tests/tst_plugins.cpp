@@ -28,7 +28,7 @@ public:
     QVariantMap state() const {
         return {{"home", QVariantList{QVariantMap{{"title", "Микс любимых"},
             {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}}}}}}},
-            {"profile", QVariantMap{}}, {"current", QVariantMap{}}};
+            {"profile", QVariantMap{}}, {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}}}};
     }
     Q_INVOKABLE void volume(double) {}
     Q_INVOKABLE void loadHome() {}
@@ -780,6 +780,30 @@ class PluginTests : public QObject {
         QTest::qWait(950);
         window->resize(412,860); QTest::qWait(40);
         QVERIFY(window->grabWindow().save("android-header.png"));
+        QQmlExpression miniExpression(QQmlEngine::contextForObject(object.data()), object.data(), "miniPlayer");
+        auto *mini = qobject_cast<QQuickItem *>(miniExpression.evaluate().value<QObject *>());
+        QVERIFY(mini);
+        QQmlExpression playerVisible(QQmlEngine::contextForObject(object.data()), object.data(), "player.visible");
+        const QPoint start = mini->mapToScene(QPointF(100, mini->height() / 2)).toPoint();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, start);
+        for (int y = 10; y <= 100; y += 10) QTest::mouseMove(window, start - QPoint(0, y), 5);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, start - QPoint(0, 100));
+        QTRY_VERIFY_WITH_TIMEOUT(playerVisible.evaluate().toBool(), 1500);
+        QTest::qWait(500);
+        const QPoint playerStart(200, 100);
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, playerStart);
+        for (int y = 10; y <= 130; y += 10) QTest::mouseMove(window, playerStart + QPoint(0, y), 5);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, playerStart + QPoint(0, 130));
+        QTRY_VERIFY_WITH_TIMEOUT(!playerVisible.evaluate().toBool(), 1500);
+        QQmlExpression navigate(QQmlEngine::contextForObject(object.data()), object.data(), "page = 1; page = 2; goBack(); page");
+        QCOMPARE(navigate.evaluate().toInt(), 1);
+        QVERIFY2(!navigate.hasError(), qPrintable(navigate.error().toString()));
+        QQmlExpression openPlayer(QQmlEngine::contextForObject(object.data()), object.data(), "player.open()");
+        openPlayer.evaluate();
+        QTRY_VERIFY(playerVisible.evaluate().toBool());
+        QTest::qWait(500);
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTRY_VERIFY_WITH_TIMEOUT(!playerVisible.evaluate().toBool(), 1500);
     }
     void lifecycle() {
         QTemporaryDir data;

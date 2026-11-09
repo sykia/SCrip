@@ -471,7 +471,7 @@ private slots:
         QCOMPARE(sc.state()["tracks"].toList().first().toMap()["urn"].toString(), QString("soundcloud:tracks:3"));
     }
     void playbackSnapshotRestoresOnlyForSameAccount() {
-        QSettings settings; settings.remove("playback/session");
+        QSettings settings; settings.remove("playback/session"); settings.remove("playback/position");
         const QVariantMap profile{{"urn", "soundcloud:users:1"}};
         const QVariantMap first{{"urn", "soundcloud:tracks:1"}, {"title", "Первый"}, {"duration", 180000}};
         const QVariantMap second{{"urn", "soundcloud:tracks:2"}, {"title", "Второй"}, {"duration", 200000}};
@@ -495,7 +495,42 @@ private slots:
             sc.set("signedIn", true); sc.restorePlayback({{"urn", "soundcloud:users:other"}});
             QVERIFY(sc.state()["current"].toMap().isEmpty());
         }
-        settings.remove("playback/session");
+        settings.remove("playback/session"); settings.remove("playback/position");
+    }
+    void playbackPositionAndQueueAreSavedIndependently() {
+        QSettings settings; settings.remove("playback/session"); settings.remove("playback/position");
+        const QVariantMap profile{{"urn", "soundcloud:users:position-test"}};
+        const QVariantMap first{{"urn", "soundcloud:tracks:101"}, {"title", "Первый"}};
+        const QVariantMap second{{"urn", "soundcloud:tracks:102"}, {"title", "Второй"}};
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.m_restoreChecked = true; sc.set("signedIn", true); sc.set("profile", profile);
+            sc.m_queue = {first}; sc.m_queueIndex = 0; sc.set("current", first); sc.set("position", 1000); sc.savePlayback();
+            sc.enqueue(second);
+            sc.set("position", 12750); sc.savePlaybackPosition();
+            const auto session = QJsonDocument::fromJson(settings.value("playback/session").toByteArray()).object();
+            QCOMPARE(session.value("queue").toArray().size(), 2);
+            QCOMPARE(session.value("position").toInt(), 1000);
+        }
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.set("signedIn", true); sc.restorePlayback(profile);
+            QCOMPARE(sc.state()["queue"].toList().size(), 2);
+            QCOMPARE(sc.position(), 12750);
+        }
+        settings.remove("playback/session"); settings.remove("playback/position");
+    }
+    void repostLikesAreMatchedAcrossPages() {
+        Network net;
+        net.responses = {guest(),
+            {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"},{\"urn\":\"soundcloud:tracks:2\"}]}"},
+            {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:9\"}],\"next_href\":\"https://api.soundcloud.com/me/likes/tracks?cursor=2\"}"},
+            {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:2\"}]}"}};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.set("signedIn", true); sc.browse("reposts");
+        QTRY_VERIFY(sc.state()["tracks"].toList().size() == 2 && sc.state()["tracks"].toList()[1].toMap().value("user_favorite").toBool());
+        QVERIFY(!sc.state()["tracks"].toList()[0].toMap().value("user_favorite").toBool());
+        QCOMPARE(net.requests.size(), 4);
     }
     void authenticatesAndSearches() {
         Network net; net.responses = {guest(), {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Real response\"}],\"next_href\":null}"}};
@@ -838,6 +873,8 @@ private slots:
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         QVERIFY(!sc.state()["updateAvailable"].toBool()); QVERIFY(!sc.state()["updateReady"].toBool());
+        QVERIFY(sc.state()["updateError"].toString().isEmpty());
+        QCOMPARE(sc.state()["updateResult"].toString(), QString("Обновление для этой системы пока недоступно"));
         QVERIFY(QFileInfo::exists(verifiedPath));
         const QString nextName = QFileInfo::exists("/etc/arch-release") ? "scrip-1000.0-x86_64.pkg.tar.zst" : "SCrip-1000.0-amd64.deb";
         const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v1000.0/" + nextName}};

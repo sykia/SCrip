@@ -461,10 +461,11 @@ Window {
                             Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "previous"; text: "Предыдущий трек"; enabled: player.hasTrack; onClicked: sc.previous() }
                             Tool {
                                 showHint: false
-                                symbol: app.api.playing ? "pause" : "play"; text: app.api.playing ? "Пауза" : "Воспроизвести"
+                                symbol: app.api.buffering ? "loading" : app.api.playing ? "pause" : "play"; text: app.api.buffering ? "Загрузка" : app.api.playing ? "Пауза" : "Воспроизвести"
                                 implicitWidth: 38; implicitHeight: 38; primary: true; round: true
                                 enabled: player.hasTrack; opacity: 1; onClicked: sc.togglePlayback()
                                 background: Rectangle { radius: width / 2; color: parent.enabled ? app.accent : "#a7a7af" }
+                                BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: app.api.buffering; visible: running }
                             }
                             Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!app.api.queue?.length; onClicked: sc.next() }
                             Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "repeat"; active: app.api.repeat; text: "Повтор трека"; onClicked: sc.setRepeat(!app.api.repeat) }
@@ -794,7 +795,7 @@ Window {
                 width: virtualTrackList.width; height: 58; radius: 5
                 Component.onCompleted: virtualTrackList.activeDelegateCount++
                 Component.onDestruction: virtualTrackList.activeDelegateCount--
-                color: app.api.current.urn === modelData.urn ? "#fff0f2" : rowHover.hovered ? "#f6f5f6" : index % 2 ? "#faf9fa" : "white"
+                color: app.api.current.urn === modelData.urn ? Qt.tint("white", Qt.alpha(app.accent, 0.09)) : rowHover.hovered ? "#f6f5f6" : index % 2 ? "#faf9fa" : "white"
                 HoverHandler { id: rowHover }
                 RowLayout {
                     anchors.fill: parent; anchors.margins: 7; spacing: 10
