@@ -27,13 +27,22 @@
 #include <QVersionNumber>
 #include <QProcess>
 #ifdef Q_OS_LINUX
-#include <QtConcurrent/QtConcurrentRun>
+#include <mutex>
+#include <thread>
+#include <QThread>
 #endif
 #include <QMediaDevices>
 #include <QAudioDevice>
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
 #include <QtCore/qcoreapplication_platform.h>
+#endif
+
+#ifdef Q_OS_LINUX
+struct SoundCloudStorageCompletion {
+    std::mutex mutex;
+    SoundCloud *owner = nullptr;
+};
 #endif
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -99,17 +108,22 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     if (m_systemStore) {
         auto storage = m_authStorage;
         const auto configPath = m_configPath, sessionPath = m_sessionPath;
-        m_storageWatcher.setFuture(QtConcurrent::run([storage, configPath, sessionPath]() mutable {
+        const bool autoConnect = !network;
+        m_storageCompletion = std::make_shared<SoundCloudStorageCompletion>();
+        m_storageCompletion->owner = this;
+        auto completion = m_storageCompletion;
+        std::thread([storage, configPath, sessionPath, completion, autoConnect]() mutable {
             QJsonObject connection, session;
             const bool ok = storage.load("connection", configPath, connection)
                 && storage.load("session", sessionPath, session);
-            return QVariantList{ok, QVariant::fromValue(connection), QVariant::fromValue(session)};
-        }));
-        connect(&m_storageWatcher, &QFutureWatcher<QVariantList>::finished, this, [this, network] {
-            const auto result = m_storageWatcher.result();
-            finishStorageLoad(result.value(0).toBool(), result.value(1).value<QJsonObject>(),
-                result.value(2).value<QJsonObject>(), !network);
-        });
+            std::lock_guard lock(completion->mutex);
+            if (completion->owner) {
+                auto *owner = completion->owner;
+                QMetaObject::invokeMethod(owner, [owner, ok, connection, session, autoConnect] {
+                    owner->finishStorageLoad(ok, connection, session, autoConnect);
+                }, Qt::QueuedConnection);
+            }
+        }).detach();
     } else {
         QJsonObject connection, session;
         m_storageReady = m_authStorage.load("connection", m_configPath, connection)
@@ -215,6 +229,14 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         if (!m_systemStore && m_state.value("configured").toBool() && (!m_useWorker || m_userSession)) connectCatalog();
 #endif
     });
+}
+SoundCloud::~SoundCloud() {
+#ifdef Q_OS_LINUX
+    if (m_storageCompletion) {
+        std::lock_guard lock(m_storageCompletion->mutex);
+        m_storageCompletion->owner = nullptr;
+    }
+#endif
 }
 #ifdef Q_OS_LINUX
 void SoundCloud::finishStorageLoad(bool ok, const QJsonObject &connection, const QJsonObject &session, bool autoConnect) {

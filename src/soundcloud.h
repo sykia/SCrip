@@ -16,7 +16,7 @@
 #include <functional>
 #include <memory>
 #ifdef Q_OS_LINUX
-#include <QFutureWatcher>
+struct SoundCloudStorageCompletion;
 #endif
 
 // Секреты доступны только хосту через системное защищённое хранилище.
@@ -30,6 +30,7 @@ class SoundCloud : public QObject {
     Q_PROPERTY(qint64 duration READ duration NOTIFY progressChanged)
 public:
     explicit SoundCloud(QObject *parent = nullptr, QNetworkAccessManager *network = nullptr, std::shared_ptr<SecretStore> secrets = {});
+    ~SoundCloud() override;
     bool signedIn() const { return m_state.value("signedIn").toBool(); }
     bool seekable() const { return m_activePlayer->isSeekable(); }
     QVariantMap state() const { return m_state; }
@@ -93,6 +94,7 @@ private:
     void storageFailure();
 #ifdef Q_OS_LINUX
     void finishStorageLoad(bool ok, const QJsonObject &connection, const QJsonObject &session, bool autoConnect);
+    std::shared_ptr<SoundCloudStorageCompletion> m_storageCompletion;
 #endif
     void ensureToken(std::function<void()> continuation);
     void token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed = {}, int loginEpoch = -1);
@@ -112,9 +114,6 @@ private:
     static QString urn(const QVariantMap &item);
     bool m_systemStore = false;
     AuthStorage m_authStorage;
-#ifdef Q_OS_LINUX
-    QFutureWatcher<QVariantList> m_storageWatcher;
-#endif
     QJsonObject m_connection;
     bool m_storageReady = false;
     QVariantMap m_state;
