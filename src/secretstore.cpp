@@ -158,8 +158,17 @@ QString AuthStorage::errorMessage() {
 }
 bool AuthStorage::save(const QString &key, const QJsonObject &value) {
     const auto bytes = QJsonDocument(value).toJson(QJsonDocument::Compact);
+    QByteArray previous;
+    if (!m_store->read(key, previous)) return false;
+    const bool hadPrevious = !previous.isEmpty();
     QByteArray verified;
-    return m_store->write(key, bytes) && m_store->read(key, verified) && bytes == verified;
+    if (m_store->write(key, bytes) && m_store->read(key, verified) && bytes == verified) return true;
+
+    // Store implementations may report a verification failure after changing the
+    // record. Restore the previous value so a rejected candidate cannot replace it.
+    if (hadPrevious) m_store->write(key, previous);
+    else m_store->remove(key);
+    return false;
 }
 bool AuthStorage::load(const QString &key, const QString &legacyPath, QJsonObject &value) {
     QByteArray bytes;

@@ -88,6 +88,7 @@ public:
     QMap<QString, QByteArray> records;
     bool readable = true, writable = true, removable = true, corrupt = false;
     int writesBeforeFailure = -1;
+    bool corruptNextWrite = false;
     bool read(const QString &key, QByteArray &value) override {
         if (!readable) return false;
         value = records.value(key); return true;
@@ -95,6 +96,7 @@ public:
     bool write(const QString &key, const QByteArray &value) override {
         if (!writable || writesBeforeFailure == 0) return false;
         if (writesBeforeFailure > 0) --writesBeforeFailure;
+        if (corruptNextWrite) { corruptNextWrite = false; records[key] = QByteArray("corrupt"); return true; }
         records[key] = corrupt ? QByteArray("corrupt") : value; return true;
     }
     bool remove(const QString &key) override {
@@ -342,7 +344,7 @@ private slots:
         secrets->writable = false;
         QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
         QCOMPARE(failures, 1);
-        QVERIFY(!sc.m_storageReady); QVERIFY(!sc.state()["connected"].toBool());
+        QVERIFY(sc.m_storageReady); QVERIFY(!sc.state()["connected"].toBool());
         QVERIFY(!QFile::exists(config + "/session.json"));
         QVERIFY(!sc.state()["error"].toString().contains("test-access"));
         QVERIFY(!sc.state()["error"].toString().contains("test-refresh"));
@@ -536,6 +538,13 @@ private slots:
             });
             QTRY_COMPARE(errors, 1);
             QCOMPARE(net.requests.size(), 1);
+            if (failure.status == 400 || failure.status == 401) {
+                QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty()); QVERIFY(!sc.m_userSession);
+                QVERIFY(!secrets->records.contains("session"));
+            } else {
+                QCOMPARE(sc.m_access, QString("old")); QCOMPARE(sc.m_refresh, QString("refresh-fails"));
+                QVERIFY(sc.m_userSession); QVERIFY(secrets->records.contains("session"));
+            }
             QTest::qWait(10);
             QCOMPARE(errors, 1);
         }
@@ -966,15 +975,80 @@ private slots:
         QVERIFY(exchange.queryItemValue("code_verifier").size() >= 43);
         QVERIFY(!sc.state()["authBusy"].toBool());
     }
-    void oauthDoesNotConfirmLoginWhenFinalSessionSaveFails() {
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+    void failedAccountSwitchPreservesExistingSession_data() {
+        QTest::addColumn<int>("status");
+        QTest::newRow("http-400") << 400;
+        QTest::newRow("http-401") << 401;
+    }
+    void failedAccountSwitchPreservesExistingSession() {
+        QFETCH(int, status);
+        AuthStorage storage(secrets);
+        const QJsonObject session{{"client_id", "test-client"}, {"access_token", "account-a-access"},
+            {"refresh_token", "account-a-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
+        QVERIFY(storage.save("session", session));
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("connected", true); sc.set("signedIn", true);
+        connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
+        sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
+        net.responses = {{status, "{\"error\":\"invalid_grant\"}"}};
+        QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost, callbackPort); QVERIFY(socket.waitForConnected());
+        socket.write("GET /callback?code=account-b-code&state=" + QUrlQuery(authorizationUrl).queryItemValue("state").toUtf8()
+                     + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); socket.flush();
+        QTRY_VERIFY(socket.bytesAvailable() > 0);
+        QVERIFY(socket.readAll().startsWith("HTTP/1.1 400"));
+        QCOMPARE(sc.m_access, QString("account-a-access"));
+        QCOMPARE(sc.m_refresh, QString("account-a-refresh"));
+        QVERIFY(sc.m_userSession); QVERIFY(sc.signedIn());
+        QCOMPARE(QJsonDocument::fromJson(secrets->records["session"]).object(), session);
+        QVERIFY(!sc.state()["authBusy"].toBool()); QVERIFY(sc.state()["authStep"].toString().isEmpty());
+        Network restoreNet; SoundCloud restored(nullptr, &restoreNet, secrets);
+        QCOMPARE(restored.m_access, QString("account-a-access"));
+        QCOMPARE(restored.m_refresh, QString("account-a-refresh")); QVERIFY(restored.m_userSession);
+    }
+    void successfulAccountSwitchReplacesCredentialsAndAccountData() {
+        AuthStorage storage(secrets);
+        const QJsonObject oldSession{{"client_id", "test-client"}, {"access_token", "account-a-access"},
+            {"refresh_token", "account-a-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
+        QVERIFY(storage.save("session", oldSession));
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("connected", true); sc.set("signedIn", true);
+        sc.set("profile", QVariantMap{{"username", "Account A"}});
+        sc.set("tracks", QVariantList{QVariantMap{{"urn", "soundcloud:tracks:account-a"}}});
+        sc.set("home", QVariantList{QVariantMap{{"title", "Account A shelf"}}});
+        sc.set("destinations", QVariantList{QVariantMap{{"urn", "soundcloud:playlists:account-a"}}});
+        connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
+        sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
+        net.responses = {
+            {200, "{\"access_token\":\"account-b-access\",\"refresh_token\":\"account-b-refresh\",\"expires_in\":3600}"},
+            {200, "{\"username\":\"Account B\"}"}, {200, "[]"}
+        };
+        QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost, callbackPort); QVERIFY(socket.waitForConnected());
+        socket.write("GET /callback?code=account-b-code&state=" + QUrlQuery(authorizationUrl).queryItemValue("state").toUtf8()
+                     + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); socket.flush();
+        QTRY_VERIFY(sc.signedIn());
+        QTRY_COMPARE(sc.state()["profile"].toMap()["username"].toString(), QString("Account B"));
+        QCOMPARE(sc.m_access, QString("account-b-access")); QCOMPARE(sc.m_refresh, QString("account-b-refresh"));
+        QVERIFY(sc.m_userSession); QVERIFY(!sc.state()["authBusy"].toBool());
+        QVERIFY(sc.state()["tracks"].toList().isEmpty()); QVERIFY(sc.state()["home"].toList().isEmpty());
+        QVERIFY(sc.state()["destinations"].toList().isEmpty());
+        const auto saved = QJsonDocument::fromJson(secrets->records["session"]).object();
+        QCOMPARE(saved["access_token"].toString(), QString("account-b-access"));
+        QCOMPARE(saved["refresh_token"].toString(), QString("account-b-refresh"));
+        QVERIFY(saved["user_session"].toBool());
+        Network restoreNet; SoundCloud restored(nullptr, &restoreNet, secrets);
+        QCOMPARE(restored.m_access, QString("account-b-access"));
+        QCOMPARE(restored.m_refresh, QString("account-b-refresh")); QVERIFY(restored.m_userSession);
+    }
+    void oauthSaveFailurePreservesExistingSession() {
+        AuthStorage storage(secrets);
+        const QJsonObject oldSession{{"client_id", "test-client"}, {"access_token", "old-access"},
+            {"refresh_token", "old-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
+        QVERIFY(storage.save("session", oldSession));
+        Network net; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
-        bool confirmed = false;
-        connect(&sc, &SoundCloud::signedInChanged, this, [&] { confirmed |= sc.signedIn(); });
         sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
-        // Обмен кода сохраняет токены, но фиксация пользовательской сессии отказывает.
-        secrets->writesBeforeFailure = 1;
+        secrets->corruptNextWrite = true;
         net.responses = {guest()};
         const int requestsBeforeCallback = net.requests.size();
         QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost, callbackPort);
@@ -983,26 +1057,32 @@ private slots:
                      + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); socket.flush();
         QTRY_VERIFY(socket.bytesAvailable() > 0);
         QVERIFY(socket.readAll().startsWith("HTTP/1.1 400"));
-        QVERIFY(!confirmed); QVERIFY(!sc.signedIn());
-        QVERIFY(!sc.state()["connected"].toBool());
+        QVERIFY(sc.signedIn()); QVERIFY(sc.state()["connected"].toBool());
         QVERIFY(!sc.state()["authBusy"].toBool());
         QVERIFY(sc.state()["authStep"].toString().isEmpty());
         QCOMPARE(sc.state()["error"].toString(), AuthStorage::errorMessage());
-        QVERIFY(!sc.m_userSession); QVERIFY(!sc.m_storageReady);
-        QVERIFY(sc.state()["profile"].toMap().isEmpty());
+        QVERIFY(sc.m_userSession); QVERIFY(sc.m_storageReady);
+        QCOMPARE(sc.m_access, QString("old-access")); QCOMPARE(sc.m_refresh, QString("old-refresh"));
+        QCOMPARE(QJsonDocument::fromJson(secrets->records["session"]).object(), oldSession);
         QCOMPARE(net.requests.size(), requestsBeforeCallback + 1);
-        QVERIFY(!QFile::exists(config + "/session.json"));
+        Network restoreNet; SoundCloud restored(nullptr, &restoreNet, secrets);
+        QCOMPARE(restored.m_access, QString("old-access")); QVERIFY(restored.m_userSession);
     }
     void oauthCancellationBeforeCallbackAndDuringExchange() {
-        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        AuthStorage storage(secrets);
+        const QJsonObject oldSession{{"client_id", "test-client"}, {"access_token", "old-access"},
+            {"refresh_token", "old-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
+        QVERIFY(storage.save("session", oldSession));
+        Network net; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
+        const int initialRequests = net.requests.size();
         connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
 
         sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
         sc.cancelLogin();
         QTest::qWait(20);
         QVERIFY(!sc.state()["authBusy"].toBool());
-        QCOMPARE(net.requests.size(), 1);
+        QCOMPARE(net.requests.size(), initialRequests);
 
         sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
         const QByteArray callback = "GET /callback?code=cancelled&state=" + QUrlQuery(authorizationUrl).queryItemValue("state").toUtf8()
@@ -1010,12 +1090,13 @@ private slots:
         net.responses = {{200, "{\"access_token\":\"late-access\",\"refresh_token\":\"late-refresh\",\"expires_in\":3600}", 150}};
         QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost, callbackPort); QVERIFY(socket.waitForConnected());
         socket.write(callback); socket.flush();
-        QTRY_COMPARE(net.requests.size(), 2);
+        QTRY_COMPARE(net.requests.size(), initialRequests + 1);
         QCOMPARE(sc.state()["authStep"].toString(), QString("exchange"));
         sc.cancelLogin();
         QTest::qWait(220);
-        QVERIFY(!sc.signedIn()); QVERIFY(!sc.state()["authBusy"].toBool());
-        QVERIFY(!sc.m_userSession); QVERIFY(!QFile::exists(config + "/session.json"));
+        QVERIFY(sc.signedIn()); QVERIFY(!sc.state()["authBusy"].toBool());
+        QVERIFY(sc.m_userSession); QCOMPARE(sc.m_access, QString("old-access"));
+        QCOMPARE(QJsonDocument::fromJson(secrets->records["session"]).object(), oldSession);
 
         net.responses = {{200, "{\"access_token\":\"fresh-access\",\"refresh_token\":\"fresh-refresh\",\"expires_in\":3600}", 1}, {200, "{\"username\":\"Fresh\"}"}, {200, "[]"}};
         sc.login(); QVERIFY(sc.state()["authBusy"].toBool());

@@ -90,16 +90,17 @@ private:
     void set(const QString &key, const QVariant &value);
     void fail(const QString &message);
     bool loadConfig();
-    bool saveSession();
+    bool saveSession(const QString &access, const QString &refresh, qint64 expires, bool userSession);
     void storageFailure();
 #ifdef Q_OS_LINUX
     void finishStorageLoad(bool ok, const QJsonObject &connection, const QJsonObject &session, bool autoConnect);
     std::shared_ptr<SoundCloudStorageCompletion> m_storageCompletion;
 #endif
     using TokenFailure = std::function<void(QString)>;
+    enum class TokenFlow { AuthorizationCode, Refresh, ClientCredentials };
     struct WaitingOperation { std::function<void()> continuation; TokenFailure failed; };
     void ensureToken(std::function<void()> continuation, TokenFailure failed = {});
-    void token(const QUrlQuery &form, bool basic, std::function<void()> done, TokenFailure failed = {}, int loginEpoch = -1);
+    void token(const QUrlQuery &form, bool basic, TokenFlow flow, std::function<void()> done, TokenFailure failed = {}, int loginEpoch = -1);
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
     void collection(const QString &path, bool append = false);
     void profile();
