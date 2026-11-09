@@ -1,0 +1,23 @@
+{
+  "version": "1.5.2",
+  "platforms": [
+    "Android"
+  ],
+  "application_code_commit": "f501bc784f708416786395704bb9b709bee032d7",
+  "application_source": "sources/SCrip-1.5.2-source.tar.gz",
+  "application_source_sha256": "a6e847b51fdf54323ad4e98c4d79dcdd04323934a6b29bff0b2b5be2b960f530",
+  "artifacts": [
+    {
+      "name": "SCrip-1.5.2-Android-universal.apk",
+      "sha256": "f6522e5c9fe7ee9b2e1f5d10f6c7753349a0ca607ca88f93e5ae36bd93b1f076"
+    },
+    {
+      "name": "SCrip-1.5.2-source.tar.gz",
+      "sha256": "a6e847b51fdf54323ad4e98c4d79dcdd04323934a6b29bff0b2b5be2b960f530"
+    }
+  ],
+  "base_materials": {
+    "url": "https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz",
+    "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
+  }
+}
