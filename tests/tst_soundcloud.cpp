@@ -663,6 +663,50 @@ private slots:
         sc.m_state["updateReady"] = true; sc.m_state["updateInstalling"] = true; sc.installUpdate();
         QVERIFY(sc.state()["updateInstalling"].toBool());
     }
+#ifdef Q_OS_LINUX
+    void linuxUpdateInstallUsesPkexecSafelyAndReportsResults() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        QTemporaryDir tmp; QVERIFY(tmp.isValid());
+        const QString bin = tmp.filePath("bin"); QVERIFY(QDir().mkpath(bin));
+        const QString capture = tmp.filePath("args");
+        const QString fakePkexec = bin + "/pkexec";
+        QFile script(fakePkexec); QVERIFY(script.open(QIODevice::WriteOnly));
+        script.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$CAPTURE_ARGS\"\nexit \"$CAPTURE_EXIT\"\n"); script.close();
+        QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
+        const QByteArray oldPath = qgetenv("PATH"); const bool hadPath = qEnvironmentVariableIsSet("PATH");
+        qputenv("PATH", (bin + QLatin1Char(':') + QString::fromLocal8Bit(oldPath)).toLocal8Bit());
+        qputenv("CAPTURE_ARGS", capture.toLocal8Bit());
+        auto prepare = [&](const QString &name) {
+            const QString path = tmp.filePath(name); QFile package(path); if (!package.open(QIODevice::WriteOnly)) return false;
+            package.write("safe test package"); package.close();
+            sc.m_updatePath = path; sc.m_updateExpectedSize = QFileInfo(path).size();
+            sc.m_updateDigest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(QByteArray("safe test package"), QCryptographicHash::Sha256).toHex());
+            sc.m_updateVersion = sc.m_updateReadyVersion = "2.0"; sc.m_updateReadyName = name; sc.m_updateReadyDigest = sc.m_updateDigest;
+            sc.m_updateAsset = QJsonObject{{"name", name}}; sc.m_state["latestVersion"] = "2.0"; sc.m_state["updateReady"] = true;
+            sc.m_state["updateInstalling"] = false; sc.m_state["updateError"] = ""; sc.m_state["updateResult"] = "";
+            return true;
+        };
+        auto run = [&](const QString &name, int exitCode) {
+            QFile::remove(capture); qputenv("CAPTURE_EXIT", QByteArray::number(exitCode));
+            QVERIFY(prepare(name)); sc.installUpdate();
+            QTRY_VERIFY(!sc.state()["updateInstalling"].toBool());
+        };
+        run("package with spaces.deb", 0);
+        QFile debFile(capture); QVERIFY(debFile.open(QIODevice::ReadOnly)); const auto deb = debFile.readAll().split('\n'); debFile.close();
+        QCOMPARE(deb, QList<QByteArray>({"apt-get", "install", "-y", "--", QFile::encodeName(tmp.filePath("package with spaces.deb")), ""}));
+        QCOMPARE(sc.state()["updateResult"].toString(), QString("Установка завершена"));
+        run("scrip-2.0-x86_64.pkg.tar.zst", 0);
+        QFile archFile(capture); QVERIFY(archFile.open(QIODevice::ReadOnly)); const auto arch = archFile.readAll().split('\n'); archFile.close();
+        QCOMPARE(arch, QList<QByteArray>({"pacman", "--noconfirm", "-U", "--", QFile::encodeName(tmp.filePath("scrip-2.0-x86_64.pkg.tar.zst")), ""}));
+        run("package.deb", 126); QCOMPARE(sc.state()["updateResult"].toString(), QString("Установка отменена пользователем."));
+        run("package.deb", 1); QVERIFY(!sc.state()["updateError"].toString().isEmpty());
+        QVERIFY(prepare("package.txt")); QFile::remove(capture); sc.installUpdate();
+        QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(!QFileInfo::exists(capture));
+        if (hadPath) qputenv("PATH", oldPath); else qunsetenv("PATH");
+        qunsetenv("CAPTURE_ARGS"); qunsetenv("CAPTURE_EXIT");
+    }
+#endif
     void movingQueuePreservesCurrentAndSetsNext() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());

@@ -3,12 +3,13 @@ pkgver=1.4.2
 pkgrel=1
 license=('GPL-3.0-only')
 pkgdesc='Настольный плеер для SoundCloud'
+# For each tagged release, set pkgver to the tag version and refresh with `updpkgsums`.
 arch=('x86_64')
 url='https://github.com/sykia/SCrip'
 depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
 makedepends=('cmake' 'ninja')
 source=("SCrip-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('ff14c3534210d6da8f9ef4e29b4c690c106c3803591bead9e18f30ca2b45ee0a')
 build() {
     cmake -S "SCrip-$pkgver" -B build -G Ninja -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     cmake --build build --parallel 2

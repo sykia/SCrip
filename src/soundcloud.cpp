@@ -1126,11 +1126,18 @@ void SoundCloud::installUpdate() {
         }
     }
 #elif defined(Q_OS_LINUX)
-    auto *process = new QProcess(this); const bool arch = m_updatePath.endsWith(".zst");
+    const bool arch = m_updateReadyName.endsWith(".pkg.tar.zst");
+    const QFileInfo packageInfo(m_updatePath);
+    if (!packageInfo.isAbsolute() || packageInfo.fileName() != m_updateReadyName ||
+        (!arch && !m_updateReadyName.endsWith(".deb"))) {
+        set("updateInstalling", false); set("updateReady", false);
+        set("updateError", "Формат или путь пакета обновления недопустим."); set("updateResult", "Ошибка проверки пакета"); return;
+    }
+    auto *process = new QProcess(this);
     if (!arch) { auto env = QProcessEnvironment::systemEnvironment(); env.insert("DEBIAN_FRONTEND", "noninteractive"); process->setProcessEnvironment(env); }
     connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateError", "Не удалось запустить системный установщик."); set("updateResult", "Ошибка передачи установщику"); process->deleteLater(); } });
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); set("updateResult", code == 0 && status == QProcess::NormalExit ? "Установка завершена" : "Установка отменена или завершилась с ошибкой"); if (code != 0 || status != QProcess::NormalExit) set("updateError", "Системный установщик не завершил установку."); process->deleteLater(); } });
-    process->start("pkexec", arch ? QStringList{"pacman", "--noconfirm", "-U", m_updatePath} : QStringList{"apt-get", "install", "-y", "--no-download", m_updatePath});
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process](int code, QProcess::ExitStatus status) { if (!process->property("updateTerminal").toBool()) { process->setProperty("updateTerminal", true); set("updateInstalling", false); if (code == 0 && status == QProcess::NormalExit) { set("updateError", ""); set("updateResult", "Установка завершена"); } else if (code == 126 && status == QProcess::NormalExit) { set("updateError", ""); set("updateResult", "Установка отменена пользователем."); } else { set("updateError", "Системный установщик не завершил установку."); set("updateResult", "Ошибка установки"); } process->deleteLater(); } });
+    process->start("pkexec", arch ? QStringList{"pacman", "--noconfirm", "-U", "--", m_updatePath} : QStringList{"apt-get", "install", "-y", "--", m_updatePath});
 #endif
 }
 
