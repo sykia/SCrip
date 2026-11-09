@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager;
 import android.content.*;
 import android.graphics.*;
 import android.media.session.*;
+import android.net.Uri;
 import android.os.*;
 import java.lang.reflect.*;
 
@@ -107,6 +108,24 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         Method clear = bridge.getDeclaredMethod("clearSavedTrack", Context.class); clear.setAccessible(true); clear.invoke(null, ctx);
         require(read.invoke(null, ctx) == null, "Явная остановка не удалила снимок трека");
     }
+    private void testPluginContentRead(Context target) throws Exception {
+        Class<?> reader = target.getClassLoader().loadClass("org.scrip.app.PluginFileReader");
+        Method read = reader.getMethod("read", Context.class, String.class, int.class);
+        String authority = "org.scrip.lifecycletest.pluginfiles";
+        Uri small = Uri.parse("content://" + authority + "/small");
+        Uri exact = Uri.parse("content://" + authority + "/exact");
+        Uri oversized = Uri.parse("content://" + authority + "/oversize");
+        for (Uri uri : new Uri[]{small, exact, oversized})
+            getContext().grantUriPermission(target.getPackageName(), uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        byte[] smallBytes = (byte[]) read.invoke(null, target, small.toString(), 131072);
+        byte[] exactBytes = (byte[]) read.invoke(null, target, exact.toString(), 131072);
+        byte[] oversizedBytes = (byte[]) read.invoke(null, target, oversized.toString(), 131072);
+        require(smallBytes != null && smallBytes.length == 11, "ContentProvider не прочитан");
+        require(exactBytes != null && exactBytes.length == 131072, "Отклонён файл ровно на границе квоты");
+        require(oversizedBytes != null && oversizedBytes.length == 131073, "Не обнаружен файл больше квоты");
+        for (Uri uri : new Uri[]{small, exact, oversized})
+            getContext().revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    }
     private void testArtworkPublication() throws Exception {
         Object instance = field(service, null, "instance");
         require(instance != null, "Нет службы для теста обложки");
@@ -177,6 +196,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             require((Boolean) field(bridge, null, "ready"), "Qt-мост не готов");
             testDeferredPlay();
             testSavedTrackSnapshot();
+            testPluginContentRead(ctx);
             int previewStyle = -1;
             if (testArguments != null && testArguments.containsKey("previewStyle"))
                 previewStyle = Integer.parseInt(testArguments.getString("previewStyle"));

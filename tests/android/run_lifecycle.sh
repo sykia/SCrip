@@ -29,12 +29,18 @@ GRADLE
 cat > "$testdir/AndroidManifest.xml" <<'XML'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.scrip.lifecycletest">
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
-    <application android:label="SCrip lifecycle tests" />
+    <application android:label="SCrip lifecycle tests">
+        <provider android:name="org.scrip.test.PluginFileProvider"
+            android:authorities="org.scrip.lifecycletest.pluginfiles"
+            android:exported="true" android:grantUriPermissions="true" />
+    </application>
     <instrumentation android:name="org.scrip.test.PlaybackLifecycleTest" android:targetPackage="org.scrip.lifecycle" />
 </manifest>
 XML
-javac -source 8 -target 8 -cp "$platform" -d "$testdir/classes" tests/android/PlaybackLifecycleTest.java
-"$tools/d8" --lib "$platform" --output "$testdir/dex" "$testdir/classes/org/scrip/test/PlaybackLifecycleTest.class"
+javac -source 8 -target 8 -cp "$platform" -d "$testdir/classes" \
+    tests/android/PlaybackLifecycleTest.java tests/android/PluginFileProvider.java
+(cd "$testdir/classes" && "$JAVA_HOME/bin/jar" cf "$testdir/test-classes.jar" .)
+"$tools/d8" --lib "$platform" --output "$testdir/dex" "$testdir/test-classes.jar"
 "$tools/aapt" package -f -M "$testdir/AndroidManifest.xml" -I "$platform" -F "$testdir/test-unsigned.apk"
 (cd "$testdir/dex" && "$tools/aapt" add "$testdir/test-unsigned.apk" classes.dex)
 if [ ! -f "$testdir/test.keystore" ]; then

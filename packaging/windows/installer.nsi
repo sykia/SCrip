@@ -19,6 +19,7 @@ OutFile "${OUTPUT}"
 InstallDir "${TEST_INSTALL_DIR}"
 !else
 InstallDir "$LOCALAPPDATA\Programs\SCrip"
+InstallDirRegKey HKCU "${UNKEY}" "InstallLocation"
 !endif
 BrandingText "SCrip"
 SetCompressor /SOLID lzma

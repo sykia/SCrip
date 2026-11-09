@@ -142,7 +142,7 @@ Column {
                     PluginAction { width: Math.min(implicitWidth, parent.width); visible: card.modelData.status !== "removed"; text: card.modelData.enabled ? "Отключить" : "Включить"; onClicked: root.showResult(root.manager.enable(card.modelData.plugin.id, !card.modelData.enabled)) }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Обновить из файла"; onClicked: picker.open() }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Удалить"; onClicked: { root.removalId = card.modelData.plugin.id; keep.checked = false; removal.open() } }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить ошибку"; visible: !!card.modelData.lastError; onClicked: root.manager.clearError(card.modelData.plugin.id) }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить журнал"; visible: !!card.modelData.lastError; onClicked: root.manager.clearError(card.modelData.plugin.id) }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Копировать ошибку"; visible: !!card.modelData.lastError; onClicked: sc.copyText(String(card.modelData.lastError)) }
                 }
                 PluginAction { text: "Разрешения · " + (card.modelData.permissionRows || []).length; onClicked: card.permissionsOpen = !card.permissionsOpen }

@@ -20,8 +20,14 @@ ApplicationWindow {
     readonly property real coverRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginManager.theme.coverRadius ?? prefs.coverRadius
     readonly property color ink: "#242426"
     readonly property color muted: "#858589"
-    // SafeArea появился в Qt 6.9; на Qt 6.8 шапка всё равно должна занимать 66 px.
-    readonly property real headerTopInset: typeof SafeArea !== "undefined" ? app.SafeArea.margins.top : 0
+    // SafeArea появился в Qt 6.9. Остальные версии используют нулевые отступы.
+    function safeAreaTop(item) {
+        return typeof SafeArea !== "undefined" ? item.SafeArea.margins.top : 0
+    }
+    function safeAreaBottom(item) {
+        return typeof SafeArea !== "undefined" ? item.SafeArea.margins.bottom : 0
+    }
+    readonly property real headerTopInset: safeAreaTop(app)
     Settings {
         id: prefs
         category: "androidInterface"
@@ -32,10 +38,11 @@ ApplicationWindow {
                 coverRadiusOverride = coverRadius !== 16
                 themePreferencesMigrated = true
             }
-            widgetStyle = androidMedia.widgetStyle()
+            if (Qt.platform.os === "android")
+                widgetStyle = androidMedia.widgetStyle()
         }
         property int widgetStyle: 0
-        onWidgetStyleChanged: androidMedia.setWidgetStyle(widgetStyle)
+        onWidgetStyleChanged: if (Qt.platform.os === "android") androidMedia.setWidgetStyle(widgetStyle)
         property bool accentOverride: false
         property bool coverRadiusOverride: false
         property string accent: "#f43756"
@@ -575,7 +582,7 @@ ApplicationWindow {
                 }
             }
         }
-        Item { width: 1; height: navigationFooter.SafeArea.margins.bottom }
+        Item { width: 1; height: app.safeAreaBottom(navigationFooter) }
         }
     }
 
@@ -584,8 +591,8 @@ ApplicationWindow {
         parent: Overlay.overlay
         width: parent.width; height: parent.height
         modal: true; padding: 20
-        topPadding: 12 + parent.SafeArea.margins.top
-        bottomPadding: 16 + parent.SafeArea.margins.bottom
+        topPadding: 12 + app.safeAreaTop(parent)
+        bottomPadding: 16 + app.safeAreaBottom(parent)
         background: Rectangle { color: "#faf4f6" }
         contentItem: ColumnLayout {
             spacing: 10
@@ -681,7 +688,7 @@ ApplicationWindow {
         id: createPlaylist
         parent: Overlay.overlay
         x: (parent.width - width) / 2
-        y: Math.max(16 + parent.SafeArea.margins.top, (parent.height - Qt.inputMethod.keyboardRectangle.height - height) / 2)
+        y: Math.max(16 + app.safeAreaTop(parent), (parent.height - Qt.inputMethod.keyboardRectangle.height - height) / 2)
         width: Math.min(parent.width - 32, 380)
         modal: true; padding: 20
         background: Rectangle { radius: 24; color: "#faf9fa" }

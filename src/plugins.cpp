@@ -17,6 +17,11 @@
 #include <QUuid>
 #include <cmath>
 #include <memory>
+#ifdef Q_OS_ANDROID
+#include <QJniEnvironment>
+#include <QJniObject>
+#include <QtCore/qcoreapplication_platform.h>
+#endif
 
 namespace {
 QString storage() {
@@ -65,6 +70,40 @@ bool hasCycle(const QVariantList &rows) {
     return false;
 }
 QAtomicInt readers;
+#ifdef Q_OS_ANDROID
+bool readContentUri(const QUrl &url, QByteArray *bytes) {
+    const auto context = QNativeInterface::QAndroidApplication::context();
+    if (!context.object())
+        return false;
+    const auto result = QJniObject::callStaticObjectMethod(
+        "org/scrip/app/PluginFileReader", "read",
+        "(Landroid/content/Context;Ljava/lang/String;I)[B", context.object(),
+        QJniObject::fromString(url.toString(QUrl::FullyEncoded)).object(), jint(131072));
+    if (!result.isValid())
+        return false;
+    const auto array = result.object<jbyteArray>();
+    if (!array)
+        return false;
+    QJniEnvironment env;
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return false;
+    }
+    const jsize size = env->GetArrayLength(array);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return false;
+    }
+    bytes->resize(size);
+    if (size > 0)
+        env->GetByteArrayRegion(array, 0, size, reinterpret_cast<jbyte *>(bytes->data()));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return false;
+    }
+    return true;
+}
+#endif
 QString readFile(const QUrl &url, QByteArray *bytes) {
     QString name;
     if (url.isLocalFile() && url.host().isEmpty()) {
@@ -73,8 +112,13 @@ QString readFile(const QUrl &url, QByteArray *bytes) {
             return "Выберите обычный файл.";
     }
 #ifdef Q_OS_ANDROID
-    else if (url.scheme() == "content" && !url.authority().isEmpty())
-        name = url.toString(QUrl::FullyEncoded);
+    else if (url.scheme() == "content" && !url.authority().isEmpty()) {
+        if (!readContentUri(url, bytes))
+            return "Не удалось прочитать файл через системный Android-провайдер.";
+        if (bytes->size() > 131072)
+            return "Файл превышает 128 КиБ.";
+        return {};
+    }
 #endif
     else
         return "Выберите локальный JSON-файл через системный диалог.";

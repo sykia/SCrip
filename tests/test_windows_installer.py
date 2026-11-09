@@ -14,6 +14,7 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertIn('Function .onInstFailed', script)
         self.assertIn('Function RestorePrevious', script)
         self.assertIn('_?=$INSTDIR', script)
+        self.assertIn('InstallDirRegKey HKCU "${UNKEY}" "InstallLocation"', script)
         recovery = script.split("Function RecoverInterruptedUpdate", 1)[1].split("FunctionEnd", 1)[0]
         self.assertIn('"$WINDIR\\Sysnative\\robocopy.exe" "$BackupDir" "$INSTDIR" /MIR', recovery)
 
