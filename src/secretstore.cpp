@@ -12,8 +12,6 @@
 #elif defined(Q_OS_ANDROID)
 #include <QJniObject>
 #include <QtCore/qcoreapplication_platform.h>
-#elif defined(Q_OS_MACOS)
-#include <Security/Security.h>
 #else
 // GLib использует идентификатор signals.
 #undef signals
@@ -25,7 +23,7 @@
 #endif
 
 namespace {
-#if !defined(Q_OS_WIN) && !defined(Q_OS_ANDROID) && !defined(Q_OS_MACOS)
+#if !defined(Q_OS_WIN) && !defined(Q_OS_ANDROID)
 // Отсутствующий/зависший Secret Service не должен блокировать запуск навсегда.
 class SecretOperation {
     GCancellable *m_cancel = g_cancellable_new();
@@ -85,36 +83,6 @@ public:
         return QJniObject::callStaticMethod<jboolean>("org/scrip/app/SecretVault", "remove",
             "(Landroid/content/Context;Ljava/lang/String;)Z", context().object(), QJniObject::fromString(key).object());
     }
-#elif defined(Q_OS_MACOS)
-    CFMutableDictionaryRef query(const QString &key) const {
-        auto q = CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        CFDictionarySetValue(q, kSecClass, kSecClassGenericPassword);
-        CFDictionarySetValue(q, kSecAttrService, CFSTR("org.scrip.oauth"));
-        auto account = key.toUtf8();
-        auto s = CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8 *>(account.constData()), account.size(), kCFStringEncodingUTF8, false);
-        CFDictionarySetValue(q, kSecAttrAccount, s); CFRelease(s); return q;
-    }
-    bool read(const QString &key, QByteArray &value) override {
-        value.clear(); auto q = query(key); CFDictionarySetValue(q, kSecReturnData, kCFBooleanTrue);
-        CFTypeRef result = nullptr; auto status = SecItemCopyMatching(q, &result); CFRelease(q);
-        if (status == errSecItemNotFound) return true;
-        if (status != errSecSuccess) return false;
-        auto data = static_cast<CFDataRef>(result);
-        value = QByteArray(reinterpret_cast<const char *>(CFDataGetBytePtr(data)), CFDataGetLength(data)); CFRelease(result); return true;
-    }
-    bool write(const QString &key, const QByteArray &value) override {
-        auto q = query(key);
-        auto data = CFDataCreate(nullptr, reinterpret_cast<const UInt8 *>(value.constData()), value.size());
-        auto attrs = CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        CFDictionarySetValue(attrs, kSecValueData, data);
-        auto status = SecItemUpdate(q, attrs);
-        if (status == errSecItemNotFound) { CFDictionarySetValue(q, kSecValueData, data); status = SecItemAdd(q, nullptr); }
-        CFRelease(attrs); CFRelease(data); CFRelease(q); return status == errSecSuccess;
-    }
-    bool remove(const QString &key) override {
-        auto q = query(key); auto status = SecItemDelete(q); CFRelease(q);
-        return status == errSecSuccess || status == errSecItemNotFound;
-    }
 #else
     const SecretSchema *schema() const {
         static const SecretSchema s = {"org.scrip.OAuth", SECRET_SCHEMA_NONE, {{"record", SECRET_SCHEMA_ATTRIBUTE_STRING}, {nullptr, SECRET_SCHEMA_ATTRIBUTE_STRING}}};
@@ -148,8 +116,6 @@ QString AuthStorage::errorMessage() {
     help = QStringLiteral("Проверьте доступ к профилю Windows.");
 #elif defined(Q_OS_ANDROID)
     help = QStringLiteral("Проверьте доступность Android Keystore и свободное место.");
-#elif defined(Q_OS_MACOS)
-    help = QStringLiteral("Разблокируйте системную связку ключей Keychain.");
 #else
     help = QStringLiteral("Запустите и разблокируйте Secret Service (например, GNOME Keyring или совместимый KWallet).");
 #endif

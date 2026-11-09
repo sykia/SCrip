@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.21)
-project(SCrip VERSION 1.4.2 LANGUAGES CXX)
+project(SCrip VERSION 1.5.0 LANGUAGES CXX)
+
+if(APPLE)
+    message(FATAL_ERROR "macOS не поддерживается")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,6 +30,7 @@ if(ANDROID)
     list(APPEND executable_options MANUAL_FINALIZATION)
 endif()
 qt_add_executable(scrip ${executable_options} src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/soundcloud.cpp src/soundcloud.h src/artworknetwork.cpp src/artworknetwork.h)
+target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${PROJECT_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)
 set_source_files_properties(qml/android/RoundedImage.qml PROPERTIES QT_RESOURCE_ALIAS RoundedImage.qml)
@@ -48,8 +53,6 @@ function(scrip_secret_store target)
     target_sources(${target} PRIVATE src/secretstore.cpp src/secretstore.h)
     if(WIN32)
         target_link_libraries(${target} PRIVATE crypt32)
-    elseif(APPLE)
-        target_link_libraries(${target} PRIVATE "-framework Security" "-framework CoreFoundation")
     elseif(NOT ANDROID)
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(LIBSECRET REQUIRED IMPORTED_TARGET libsecret-1)
@@ -69,7 +72,7 @@ if(ANDROID)
         set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${android_ssl_dir}/${library}")
     endforeach()
     set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME SCrip
-        QT_ANDROID_VERSION_CODE 10402 QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
+        QT_ANDROID_VERSION_CODE 10500 QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android")
@@ -79,8 +82,6 @@ else()
 endif()
 set_target_properties(scrip PROPERTIES
     WIN32_EXECUTABLE TRUE
-    MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_GUI_IDENTIFIER org.scrip.app
 )
 
 include(CTest)

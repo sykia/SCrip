@@ -209,12 +209,15 @@ private slots:
         QVERIFY(!sc.state()["playbackActive"].toBool());
     }
     void androidRestoreWithoutSessionIsDiscarded() {
+        QSettings settings;
+        settings.setValue("playback/session", QByteArray("stale snapshot"));
         Network net; SoundCloud sc(nullptr, &net, secrets);
         sc.restoreAndroidTrack({{"urn", "soundcloud:tracks:restore"}, {"title", "Трек"}}, 9000);
         QVERIFY(sc.m_androidRestorePending);
         sc.set("connected", true); sc.tryRestoreAndroidTrack();
         QVERIFY(!sc.m_androidRestorePending); QVERIFY(sc.state()["restoreCleared"].toBool());
         QVERIFY(sc.state()["current"].toMap().isEmpty()); QVERIFY(!sc.state()["playbackActive"].toBool());
+        settings.remove("playback/session");
     }
     void androidRestoreFailureClearsTrackAndQueue() {
         Network net; net.responses = {{500, "{}"}};

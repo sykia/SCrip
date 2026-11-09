@@ -22,7 +22,6 @@ OAuth access/refresh tokens, время истечения и локальный
   ключ создаётся в Android Keystore и не экспортируется. Имя записи включено в AAD.
   Зашифрованные файлы атомарно сохраняются в приватном `noBackupFilesDir/oauth`.
   Аппаратная защита ключа зависит от устройства; StrongBox не является обязательным.
-- **macOS:** системный Keychain, generic-password сервиса `org.scrip.oauth`.
 
 При первом запуске старые `GenericConfigLocation/SCrip/soundcloud.json` и
 `session.json` автоматически переносятся целиком, включая существующую сессию.
@@ -49,7 +48,7 @@ Android Backup и перенос между устройствами исклю�
 Остальные настройки и данные плагинов сохраняют прежние правила резервного копирования.
 Уже существующие внешние резервные копии приложение удалить не может.
 В резервных копиях Windows остаётся только DPAPI blob; защита полного профиля и
-системных хранилищ Windows/Linux/macOS определяется политикой ОС и программы backup.
+системных хранилищ Windows/Linux определяется политикой ОС и программы backup.
 Защита не распространяется на вредоносный процесс с правами пользователя или root.
 
 Плагины v1/v2 остаются декларативными, без исполнения JavaScript, произвольных
@@ -129,7 +128,7 @@ Git-репозитория можно включить hook: `git config core.ho
 `tests/run-secretstore-linux.sh` проверяет настоящий libsecret в изолированной
 D-Bus-сессии и связке GNOME Keyring, а также отказ недоступного сервиса.
 Нужны `dbus-run-session` и `gnome-keyring-daemon`. Пользовательская связка не затрагивается.
-`secretstore_tests roundTrip` также можно вручную запустить на Windows/macOS.
+`secretstore_tests roundTrip` также можно вручную запустить на Windows.
 
 `tests/run-secretstore-android.sh` запускает `tests/android/SecretVaultCheck.java` — instrumentation для отдельного тестового
 приложения/UID: запись/чтение, разные IV, отсутствие открытого секрета в файле,

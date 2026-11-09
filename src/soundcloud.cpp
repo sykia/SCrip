@@ -631,10 +631,10 @@ void SoundCloud::restoreAndroidTrack(const QVariantMap &track, qint64 position) 
 }
 void SoundCloud::tryRestoreAndroidTrack() {
     if (!m_androidRestorePending) return;
-    if (!m_restoreChecked && !QSettings().value("playback/session").toByteArray().isEmpty()) return;
     if (m_state.value("connected").toBool() && !m_state.value("signedIn").toBool()) {
         m_androidRestorePending = false; m_androidRestoreTrack.clear(); set("restoreCleared", true); return;
     }
+    if (!m_restoreChecked && !QSettings().value("playback/session").toByteArray().isEmpty()) return;
     if (!m_state.value("signedIn").toBool()) return;
     if (!m_state.value("current").toMap().isEmpty() || m_playGeneration != 0) {
         m_androidRestorePending = false; m_androidRestoreTrack.clear(); set("restoreCleared", true); return;
@@ -738,7 +738,7 @@ void SoundCloud::loadHome(bool force) {
         if (clean.isEmpty()) return;
         auto shelves = m_state.value("home").toList();
         shelves.append(QVariantMap{{"title", title}, {"subtitle", subtitle}, {"tracks", clean}, {"mix", mix}, {"order", order}});
-
+        std::stable_sort(shelves.begin(), shelves.end(), [](const QVariant &a, const QVariant &b) { return a.toMap().value("order").toInt() < b.toMap().value("order").toInt(); });
         set("home", shelves);
     };
     request("/me/followings/tracks?limit=24", [add, finish](QJsonDocument doc) {
