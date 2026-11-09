@@ -1,0 +1,2713 @@
+{
+  "artifact_sha256": "e99440754ec370cea569ddf0f818af4b5f6ed4ee5bdaab669c55dc7e6945bf44",
+  "files": {
+    "META-INF/com/android/build/gradle/app-metadata.properties": {
+      "sha256": "ec4d22df67b36fd5a8661daaabd02c8941d41189452895f15dae18c033f5e27e",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/version-control-info.textproto": {
+      "sha256": "38d377afa76b6364e5bf551cf4ffec1a881a46102a0047f523fbf148e0df6928",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "assets/dexopt/baseline.prof": {
+      "sha256": "2627e6c5380b7c91ab79fd4bec0415aacbe178fc87c1a0ea3ce158859c493d64",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "assets/dexopt/baseline.profm": {
+      "sha256": "91054f34ef8d85ac7565dbd01d654b7f6af8d5835708429d229999b8589483e2",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "classes.dex": {
+      "sha256": "a2df1af7d25c60736f0d9594ac6a312f61392923248723af3e2595127dea9299",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Concurrent_arm64-v8a.so": {
+      "sha256": "039661a764757b9d55698f9b15bf48e6004482dcc99d27501bc1b7386976dcf5",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Core_arm64-v8a.so": {
+      "sha256": "b86a16e86aa506f545ce13a3f80ce20b8eace42d03bbecee4ddbb3fdc77d7b35",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6FFmpegStub-crypto_arm64-v8a.so": {
+      "sha256": "6f9a310de02c9d1d6254e5bc5bd93c614b9cc18b457359b471a7ca5ea4333181",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6FFmpegStub-ssl_arm64-v8a.so": {
+      "sha256": "3f2fcd9bd9a6f5f1b684c8dd89435623852f9ea7ddd7a0ff069e357bdd01ae8e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Gui_arm64-v8a.so": {
+      "sha256": "d3ac059cef8b7727fa78ef863bdbe280d3a389a8af81e387089ad9a9c5dbf11d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6LabsFolderListModel_arm64-v8a.so": {
+      "sha256": "ba272c6bf4a96cb30535d06e5d14e9425cfadbcf858175651c8c38d378fb9aa2",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6LabsQmlModels_arm64-v8a.so": {
+      "sha256": "3feebbd1996d98ff7b1ffb1e03bdcb7f3c672256bfc548cc71f758b0c9e650c1",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Multimedia_arm64-v8a.so": {
+      "sha256": "c84c2feeddccd01e94406816311ab17eed03457ca5ee1ba4df0d01e84ab726de",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Network_arm64-v8a.so": {
+      "sha256": "e9125aceed44c010a746f030e225ffde2e08b04f7392b0b2ec8f94d571f9f740",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6OpenGL_arm64-v8a.so": {
+      "sha256": "a3559476859fd1527bed92dbe51da1f886bc5f4a0aa8d41237681755edfa807c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QmlCore_arm64-v8a.so": {
+      "sha256": "1eebb3a473ce3852a9a77b47e5c2ba4eec565ea22e5c755cc5a3c68d40e086dc",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QmlMeta_arm64-v8a.so": {
+      "sha256": "8177e414e8019bf9f5d23584a833706ebb03fe7912c64694d0b7d6e09310bc7a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QmlModels_arm64-v8a.so": {
+      "sha256": "c7dd79e08db900388b6d69f40ed6cd86827f6c72c9d9667e994db693b6428ae2",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QmlWorkerScript_arm64-v8a.so": {
+      "sha256": "00da94580e46f15395f4eb331f6ad90cb427a9b03fcf1be5bdafef4a23484791",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Qml_arm64-v8a.so": {
+      "sha256": "b3a1237c544a8f3c57c170036c2fe77c92356cee71bc085eb60719bc5c823e5f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2BasicStyleImpl_arm64-v8a.so": {
+      "sha256": "ffaee2ece76276565fd4deeeb19d408a90af84fcc3fd0135fd2d2ceefcdb20cf",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2Basic_arm64-v8a.so": {
+      "sha256": "32f32f79fd12f98c6f4ad26dc731dfd3337b98b2be165d5c9ab3cbbe30725f5d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2FluentWinUI3StyleImpl_arm64-v8a.so": {
+      "sha256": "741a01f6b7c4befa8f3fdce8a54718cede22c5ee3f761f19315909e75a4714ba",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2FusionStyleImpl_arm64-v8a.so": {
+      "sha256": "7344a573d882baa2589368aaf0ef25c660fc404ab0829d9187ed9ed2f8f5cbef",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2Fusion_arm64-v8a.so": {
+      "sha256": "c5c528539c6934b8902e6f0fa61c8dfc09aef36ef91c7e9cada56b6dee49ffe1",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2ImagineStyleImpl_arm64-v8a.so": {
+      "sha256": "c953fa6d63ebbd24bc916d3f4662a6716248b966d441674eea6b9baa96dde448",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2Imagine_arm64-v8a.so": {
+      "sha256": "f3dc80228292eb2b7f4d76637917196e567542402a9eb3bc4e75dae1122b4f7a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2Impl_arm64-v8a.so": {
+      "sha256": "112ea3270ec5f213091bc6d1dacb9e30a7a3b2adea6b65563f7081deb9216eb2",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2MaterialStyleImpl_arm64-v8a.so": {
+      "sha256": "e935c66ac45070377ea3aad344cf913d7f82c002fd3641e81e2da6719b0e63fd",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2Material_arm64-v8a.so": {
+      "sha256": "e9b2a6bf9c6b3e6dbcdd7f4d48a469c36970aed61a6dc069caed7e1181c1a5df",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2UniversalStyleImpl_arm64-v8a.so": {
+      "sha256": "59f4e089ff2f4c33895b0bdeb083e166cc69d69b9718e0cc4f06e754b805d4a8",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2Universal_arm64-v8a.so": {
+      "sha256": "5af71c62aa04d987df62adc7aebea3106f447dfe89c2e17f88715afb8d118e9b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickControls2_arm64-v8a.so": {
+      "sha256": "a22bd9388717e472e6824a1f111b807cf68e5053755494a085f466f175205454",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickDialogs2QuickImpl_arm64-v8a.so": {
+      "sha256": "1df096974f43ba5a8b98277ef6814f4319b08c6a9576b404905a3c9b2a82d77c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickDialogs2Utils_arm64-v8a.so": {
+      "sha256": "066243e17cc9600e99c515331b6cb59bfd50082b16ea3e7cfa906e45ca7e0fd8",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickDialogs2_arm64-v8a.so": {
+      "sha256": "1246047c2540948488f25eaf117d575e96d2ba531d71f32eace9b18acddb2dc6",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickEffects_arm64-v8a.so": {
+      "sha256": "6b2bf1d639b3ea68ace85257570a24744b7ab2b89d078ef6a9f8a912674a4197",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickLayouts_arm64-v8a.so": {
+      "sha256": "8813b1dff3426d736be307c087f36936117212b3932ef0ec1c497fcd9b965c3b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickShapes_arm64-v8a.so": {
+      "sha256": "abe9b8141f11e13b157c225229333a76101eeb357836c4153f5a432065153050",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6QuickTemplates2_arm64-v8a.so": {
+      "sha256": "4a3248f9b028548cf62d3694e7ee017a8ba617f1f26f28c8adac861717d10513",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Quick_arm64-v8a.so": {
+      "sha256": "ae0742e829f01a1b3af5df40c3c5be6e25499b847420865b209283bc034c6c79",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libQt6Svg_arm64-v8a.so": {
+      "sha256": "8befb2178bc47e5dfef757f19c00a787f6b98500adbd25b0672e2d2062eb240e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libavcodec.so": {
+      "sha256": "2566dc437a5bf71a5a0e63ec0feea780caabfbe6b8fb59dac1043f3725062586",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libavformat.so": {
+      "sha256": "29378b8b30601ef8b7576f629d5312260cdae399602d35a9bc1365d5ea6fe254",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libavutil.so": {
+      "sha256": "e2fcecf92e5cbc0ddc265866f8ba62fec65dad512c5e2f1ef2cf84ce074ea77b",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libc++_shared.so": {
+      "sha256": "4397241b4bd20a8e579bfb41d21107857e12985f6a01ca0c2a5f83380d1270b4",
+      "components": [
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libcrypto_3.so": {
+      "sha256": "1e6c12ae0c2dadfe9d178d7f80f0ab248a1877a234066098bf5594e5205e5740",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_iconengines_qsvgicon_arm64-v8a.so": {
+      "sha256": "1e3d384d3c4895bc7ec54a65aef6dd3bf72aa5c44dbb7794a976ea3eefcbc0af",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_imageformats_qgif_arm64-v8a.so": {
+      "sha256": "4fa4c353eb4ede56ef6b98ae2cddfe22a1c1af1115704740acb41cb807ccf925",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_imageformats_qico_arm64-v8a.so": {
+      "sha256": "351aedc4ba84e435815afef8a891a0694fe2e27a0255b77ff60e15ba57294de4",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_imageformats_qjpeg_arm64-v8a.so": {
+      "sha256": "1810725753508a07c652ffc96f52de57ffb00b9685143bd8d7cac0a1026e64e8",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_imageformats_qsvg_arm64-v8a.so": {
+      "sha256": "1a52b6b9cba045e33eabcd15f2e90747ba7374b1ce6246a76b628b7ca6ad4690",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_multimedia_androidmediaplugin_arm64-v8a.so": {
+      "sha256": "afab42fbf6c3de0da29a8548de2a54c4d4c66ad0f165e45477b4be7a64db5814",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_multimedia_ffmpegmediaplugin_arm64-v8a.so": {
+      "sha256": "dedad79c944206734230f44034a122cffdb600570fac6c69bbc5eb5f6f7362f0",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_networkinformation_qandroidnetworkinformation_arm64-v8a.so": {
+      "sha256": "1f8aa4b61805487c70e1d0becf1d950a8fcef2c48471f6d102e6f399f1a9f958",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_platforms_qtforandroid_arm64-v8a.so": {
+      "sha256": "43eae8b59708736c7de8b13bcdfa945e15c62be6ba7fa3041c7f96a35687a6e1",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_debugger_arm64-v8a.so": {
+      "sha256": "db6c743444b750fa0dcb30286238a1223733b7cb2dec634fbed58aa29625551a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_inspector_arm64-v8a.so": {
+      "sha256": "1694d369e51052120524fcf9c23e989566b47e378c4f2f64cbc242fd15d0896c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_local_arm64-v8a.so": {
+      "sha256": "28a487b2776675cd550fa175ddf3941f050d804ba80634e2847695fad22b7268",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_messages_arm64-v8a.so": {
+      "sha256": "466e7cbee8357c458091faf09189770bec2901007aece595c1473c45c28498f9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_native_arm64-v8a.so": {
+      "sha256": "66ae62ed1bee8f3f0f3a72b6ffd179799e70d8954909b4ae47ecde452a32c42e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_nativedebugger_arm64-v8a.so": {
+      "sha256": "06af32a5592d77eb81494fc0a036cd843ddf7077591bd57e1e3b5e89213bc182",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_preview_arm64-v8a.so": {
+      "sha256": "fefcf5885a5219575d4a7241de176c1cee86bdcd33eab13702fccdbe5e4d3626",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_profiler_arm64-v8a.so": {
+      "sha256": "cb47555d6cfe7483643c3407bfb49e6d9c30a0bf4b63ddffebbb7ac9bf52adce",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_quickprofiler_arm64-v8a.so": {
+      "sha256": "7bfcb36e6ae75eb156c1ab30dac620cee688cc4ecbab0e2ce4e1a769ee3c355a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_server_arm64-v8a.so": {
+      "sha256": "0671d455b7d32786e23fad2e58adea4c472f8022446e535fff61e5bc20cc58d7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_qmltooling_qmldbg_tcp_arm64-v8a.so": {
+      "sha256": "e3ac97016d1153f2103e9ffa334218d3b6ae75ff757d9607c3161201d044109f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libplugins_tls_qopensslbackend_arm64-v8a.so": {
+      "sha256": "f3c1f80dfeb4869adea6110fb4896873f56973c351180b9171be00e1d9849395",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtCore_qtqmlcoreplugin_arm64-v8a.so": {
+      "sha256": "d8fed94c2abff1dae99367097b62fe68247c8a17d1590a63efafef231d731449",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQml_Models_modelsplugin_arm64-v8a.so": {
+      "sha256": "2bc7d7748806ad411ba0667ff630ff7141f2e0fe89060c8dc17c11fb57e7e98a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQml_WorkerScript_workerscriptplugin_arm64-v8a.so": {
+      "sha256": "a0f1666b9a4fb04fe78fa19fe0463461432aa312c249525fd339c4f76ae663ba",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQml_qmlplugin_arm64-v8a.so": {
+      "sha256": "c78fffb7e9dd39229a77d1189d9c64d3e4e482248b3edfe78dbb63a0e5c2a2af",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Basic_impl_qtquickcontrols2basicstyleimplplugin_arm64-v8a.so": {
+      "sha256": "18a926bf51ca8dc95eebcf33ba90e32c261430a066f7c7caad612a1367a0fe5d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Basic_qtquickcontrols2basicstyleplugin_arm64-v8a.so": {
+      "sha256": "37d291b7a2065bafa498fd9e6bb90e56c691116b103c7631158f1de4885fde60",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_FluentWinUI3_impl_qtquickcontrols2fluentwinui3styleimplplugin_arm64-v8a.so": {
+      "sha256": "56b333b37f2e075c7338a25e2c26a6dfe074af590017dcf618f304c5e0cfc1b7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_FluentWinUI3_qtquickcontrols2fluentwinui3styleplugin_arm64-v8a.so": {
+      "sha256": "e0158c0aa46e44d224e5b5c5f8658d5946d26a603ed0e4d8966ea6b358b6598d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Fusion_impl_qtquickcontrols2fusionstyleimplplugin_arm64-v8a.so": {
+      "sha256": "dadd156bb1d0b21be453634a4c171b6276da2db3e62ba80dfdd214eecb04727a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Fusion_qtquickcontrols2fusionstyleplugin_arm64-v8a.so": {
+      "sha256": "b07719c6edbe95ebd1b4de6df476e787d9c5597e6640c77d4469eeb1e6e3cd9e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Imagine_impl_qtquickcontrols2imaginestyleimplplugin_arm64-v8a.so": {
+      "sha256": "a7602f89a729d2594515a79667baf5cc2958f29403887c0375d344a553076216",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Imagine_qtquickcontrols2imaginestyleplugin_arm64-v8a.so": {
+      "sha256": "2bec0dde3deb096ed000d82aab7614c9bbfb1aeb89c7623e9b881793b391cc6a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Material_impl_qtquickcontrols2materialstyleimplplugin_arm64-v8a.so": {
+      "sha256": "75be48933a9db09dd88218d3a8a2be6b18d2bfffdec5642aac1f982194a371f7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Material_qtquickcontrols2materialstyleplugin_arm64-v8a.so": {
+      "sha256": "ccf8b9273077e848f7c0b7ebec585624cb1712b8f5e4bc493df174215c4c0e3c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Universal_impl_qtquickcontrols2universalstyleimplplugin_arm64-v8a.so": {
+      "sha256": "11bcc615f3f0f8f6ef185627385f5d39e214938d899de7ddad4cada93ce0f08d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_Universal_qtquickcontrols2universalstyleplugin_arm64-v8a.so": {
+      "sha256": "429c2c9931585b288a4662ceb0bce540f5fcdadcad14250f25d1d446093932e7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_impl_qtquickcontrols2implplugin_arm64-v8a.so": {
+      "sha256": "c2bc12824f9214708124ef813665d9ff2170045c4a9a20432ef545f6560d7938",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Controls_qtquickcontrols2plugin_arm64-v8a.so": {
+      "sha256": "4a2144572e0de7ec67596cccbeb3fa52f409a8b93e782276329dc37c0f837a10",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Dialogs_qtquickdialogsplugin_arm64-v8a.so": {
+      "sha256": "95e12d8d97f0b03abbb97e4cd341fe7c04ba71fe45048b1267d0590845f1badc",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Dialogs_quickimpl_qtquickdialogs2quickimplplugin_arm64-v8a.so": {
+      "sha256": "27f4ad6c2f075140def19f706ff75f5f9fda48d7e8f2085bc563e3d314575f20",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Effects_effectsplugin_arm64-v8a.so": {
+      "sha256": "601b01371a0d0646041f855c2d7b19ec33ba7f896a2cfeef2d5d2f95e4264bc4",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Layouts_qquicklayoutsplugin_arm64-v8a.so": {
+      "sha256": "333430723621c3937fc34abf3d178dcea2a3bdfebabaf329266558cffb190e43",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Shapes_qmlshapesplugin_arm64-v8a.so": {
+      "sha256": "37c6fc43df2f596a6ffa9346a529e5db7ba881f7a1e5ed41e1051ccca402a860",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Templates_qtquicktemplates2plugin_arm64-v8a.so": {
+      "sha256": "cb90924d7187c125d68b340a2679fe8e40650f964745a1b243fdd64a9d49e6da",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_Window_quickwindowplugin_arm64-v8a.so": {
+      "sha256": "df1d9fe6360e9ccc87596235dea75e0caf564bff00144c6dc4ef37934832cc4a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_QtQuick_qtquick2plugin_arm64-v8a.so": {
+      "sha256": "87635967ec0626b4d40a2064260b082a11dda93046197f396054a7278081672f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_Qt_labs_folderlistmodel_qmlfolderlistmodelplugin_arm64-v8a.so": {
+      "sha256": "33d4f18b82200a34b07a7707eec51e4ba542b15c14cd1aa97a555f25768b92ce",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libqml_Qt_labs_qmlmodels_labsmodelsplugin_arm64-v8a.so": {
+      "sha256": "81e939295ad55815fcca9d24f267bf7a24ad3524dac3a1e0f9697a82d06b811b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libscrip_arm64-v8a.so": {
+      "sha256": "af6c674a5ca61fc137f2cc18e15c2eac680a43074e9e2433432625318a5c9b09",
+      "components": [
+        "SCrip",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libssl_3.so": {
+      "sha256": "01d2bd0baac626efd3309f35f99c4b826dd9b885a7e4d14d5b12b3603d3a407f",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "lib/arm64-v8a/libswresample.so": {
+      "sha256": "de2edd4475acdc54bd0fb9701a256842e5dd802d0f275ef349ec33c4307d974a",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/arm64-v8a/libswscale.so": {
+      "sha256": "b25d528e4c750133c06a8a180b063781792424f3ce62aa7de58ac33e595e6407",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Concurrent_armeabi-v7a.so": {
+      "sha256": "5daeef53305a32254ea99917d7679f4bd8c384c116fd41981d4518ae296f6fbd",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Core_armeabi-v7a.so": {
+      "sha256": "3d0463119a498fad080edb2e4cf58273149c8ed9b8bf78b8a2ec4b9136930d54",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6FFmpegStub-crypto_armeabi-v7a.so": {
+      "sha256": "14ebd821190f52eacd681e0c943e76e6e9415819ff6f3827ddbba5bcb1093235",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6FFmpegStub-ssl_armeabi-v7a.so": {
+      "sha256": "c2d8aaeca098ea798d928772c91613801dc7fcd048cdd8935f0ef7e2216182ea",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Gui_armeabi-v7a.so": {
+      "sha256": "fe151dfb2bd1466f190f133474fc507e28f63f38a099d3275a7dd0717a08bbdb",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6LabsFolderListModel_armeabi-v7a.so": {
+      "sha256": "407c27d2b60945a3e72ceaf7cde11088627d88c25b8438496f7396f50779b05d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6LabsQmlModels_armeabi-v7a.so": {
+      "sha256": "967c011a803245f98d226db71ba4a5cc708ee117b35157f00349446df2d28f6c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Multimedia_armeabi-v7a.so": {
+      "sha256": "f35ad0a8a318daaa798b4bf62caab97b6af2b59bc8fc5430fd381c0de7d79900",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Network_armeabi-v7a.so": {
+      "sha256": "727e051809b433cc22ddd2d12fff0347bbbac85c11fab1d52a4f2af487b5a2da",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6OpenGL_armeabi-v7a.so": {
+      "sha256": "40c1fb500d939a71bf1e9aa4ad3549821ab9a81aa2239e12dbbd0c5d66f282b8",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QmlCore_armeabi-v7a.so": {
+      "sha256": "2428adf406ee625155ee360db789e284381e561afc866d29eeebccdc3e200a63",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QmlMeta_armeabi-v7a.so": {
+      "sha256": "456a61cedbcad7eb3b3dbea4d072d920b7f34fa4726b94db9c3225ece08fd9f7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QmlModels_armeabi-v7a.so": {
+      "sha256": "0db0fbcf77680a24847c6c6a46e3cf6cab52573cb2cd1cf54e3f80bac6c0b33a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QmlWorkerScript_armeabi-v7a.so": {
+      "sha256": "77a237a4129cfc38530cb689d89513568489a44f6eb051ba3bdfbd11292a91f7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Qml_armeabi-v7a.so": {
+      "sha256": "45866259809121554a1a09aa52c4350458061cf468f6ae1125a1c288c9fc01b7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2BasicStyleImpl_armeabi-v7a.so": {
+      "sha256": "632297a2837e4c24b8cead2e5b2c8f64af73cffe559a5bd11ff31f9a45391354",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2Basic_armeabi-v7a.so": {
+      "sha256": "249922e41255808258160a483ddddc570994c2f532542d80b7e38a6996292d6a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2FluentWinUI3StyleImpl_armeabi-v7a.so": {
+      "sha256": "1c486df9594fa26430fad6f56f7ba7938f25fffc16b2f9ae0c932e608842e472",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2FusionStyleImpl_armeabi-v7a.so": {
+      "sha256": "de7b7de3cc91104597b404e3066c4fbc3771be90634df0fe6c96d031fee11002",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2Fusion_armeabi-v7a.so": {
+      "sha256": "8cf68e869248e54a6ad296d1be302ac0e036316e08f60526f8c8118ad3fb9a76",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2ImagineStyleImpl_armeabi-v7a.so": {
+      "sha256": "a3ff0c363dc2f2f4d3dd41e9bcfae904f4f7e6e5210e45b1af9a2eb574b74ffd",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2Imagine_armeabi-v7a.so": {
+      "sha256": "e92574b866de13dd6ecdafc0bd9f6d572980e9e3a275b7699fb22099a77f38ef",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2Impl_armeabi-v7a.so": {
+      "sha256": "10b9ed18ca525f1b16b6a95781854b70d8abbbfdbd2ba1dcdcb5dec932a1fd99",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2MaterialStyleImpl_armeabi-v7a.so": {
+      "sha256": "4ec8068805a7df34ce49338baca5c49ad5d021a75160d9a584279ecac3dce6c6",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2Material_armeabi-v7a.so": {
+      "sha256": "3f62a19d57bd98e5198698af0be755e1ac0d7f974160568a55c35401219cca17",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2UniversalStyleImpl_armeabi-v7a.so": {
+      "sha256": "558767f8f38614861c3e4aa70ed0354749c7c1c56a584c1316b99ec8ff79c5ec",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2Universal_armeabi-v7a.so": {
+      "sha256": "8a214fef6e128ada0c98c03c6f33653893064eceb984eba70a9f455898aa686f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickControls2_armeabi-v7a.so": {
+      "sha256": "2baddb3fefbf432910ce13979c21fed041c72649aa6cc5ef91a832f50aa97430",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickDialogs2QuickImpl_armeabi-v7a.so": {
+      "sha256": "6bcac63e6ceb17d49bdb8481001ff7a062c18406dbab4bd27aba9e270e44bfbd",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickDialogs2Utils_armeabi-v7a.so": {
+      "sha256": "f57216b5330648486771aead01ebe75116b9f620de07dd356d3899836547b953",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickDialogs2_armeabi-v7a.so": {
+      "sha256": "ad7469b0abb4110dfa2bf240db15feff6e23a168640efe069b7231831ab48d02",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickEffects_armeabi-v7a.so": {
+      "sha256": "df260f41212207dfbfe0c3390a060ba9089c63d8d12f0e8f8d17e69a1e5c4a4c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickLayouts_armeabi-v7a.so": {
+      "sha256": "1d93a8eb93a44257b5f9c11a0d5f89419edfae6242f48367ab4988ee0fce802b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickShapes_armeabi-v7a.so": {
+      "sha256": "eabc84e6ae18f372e179c9f5688b648869494ffa0595fc1bab1ef404e14e1efb",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6QuickTemplates2_armeabi-v7a.so": {
+      "sha256": "f682b08a693a5d1099f8258bee07f0c2e395f9d44f94300138baab56bfcb8701",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Quick_armeabi-v7a.so": {
+      "sha256": "e2ba3a5942639f59c1b39d4e257c8a6cfc5d2e3d6d11dbbd17d9e190ee5eec6f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libQt6Svg_armeabi-v7a.so": {
+      "sha256": "008f6943142960760dd57d7d6b51c2f40b0ecfbbabf1c73b5b268ca0d1212858",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libavcodec.so": {
+      "sha256": "7abbd0723468f0f7109c89458236c7e8bf606fbca266111d670bededf40404f3",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libavformat.so": {
+      "sha256": "ffe62f3ad3ddb40f78a81be4b131a6b2e67c1d7f1791907d14d029b3497baf9b",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libavutil.so": {
+      "sha256": "b97fc23627c4100edf380b5557c4931f49d72af0f580fe6ba46088839889e168",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libc++_shared.so": {
+      "sha256": "91b49f121b3120538faff020fcf535ade1d945e65ccd793fc0b815b5799bbdf0",
+      "components": [
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libcrypto_3.so": {
+      "sha256": "a9d5352e52600e1c1c05d12e3112a479af7a2a3287760e3fcde432a423266b19",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_iconengines_qsvgicon_armeabi-v7a.so": {
+      "sha256": "1d997589028642615ee427bbace10f4a68559da7a50e6fd14f94ce2bc8fd0a75",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_imageformats_qgif_armeabi-v7a.so": {
+      "sha256": "32327133b342e12e7fe94b44a2ad869ec117ff5b35977cf38ac060db9a73aeb7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_imageformats_qico_armeabi-v7a.so": {
+      "sha256": "8870e6f14b038d5d91788954d76278e15d11e7e694fb64691d34e4830d3d68fc",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_imageformats_qjpeg_armeabi-v7a.so": {
+      "sha256": "f31b0eba3bc2f5fcdc390c3a7119614f875a095672b46000491aad90bec02cd2",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_imageformats_qsvg_armeabi-v7a.so": {
+      "sha256": "a8ee2ff7c17b2e482a04beaf0bb466a63a42c4c10eac0b5e8e971530ee89cb00",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_multimedia_androidmediaplugin_armeabi-v7a.so": {
+      "sha256": "8343684b98a884caab0c9e8f65ffd60d9724e032f28dfbbf739d7ed4ece1805f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_multimedia_ffmpegmediaplugin_armeabi-v7a.so": {
+      "sha256": "a600ea45381bbe0d3e384e29778e795a08ed3311c915a7e8d28e0e61b8bcf924",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_networkinformation_qandroidnetworkinformation_armeabi-v7a.so": {
+      "sha256": "5f194e0013f60400051031b46c372dd2d40ca3754239152404e578d74ac0020d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_platforms_qtforandroid_armeabi-v7a.so": {
+      "sha256": "ab5e9643bb12361af81c5657b02d53fba4d720ca48dd22948db3cc843cc505c8",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_debugger_armeabi-v7a.so": {
+      "sha256": "5705de250c2268a87353d849201c91b7cbf6ced2c0f8b8f1f3035fd2bd1a4343",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_inspector_armeabi-v7a.so": {
+      "sha256": "dec69457d6c449f76a955189a4e800e6aea91e9f67ba9a68e1b0be5083fee320",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_local_armeabi-v7a.so": {
+      "sha256": "5213530200ca171cd6fc621a6a9dcf65aaa678f2bd0693f9a3096d83e2abb4a5",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_messages_armeabi-v7a.so": {
+      "sha256": "ceba331a61c602396c9a0d03f24588a04a267c9562085b76be0bd367bf6559e9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_native_armeabi-v7a.so": {
+      "sha256": "7788958ce9efdf479ed45eef7dec75388252e5616d2027a3b1dbc391aff72c1a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_nativedebugger_armeabi-v7a.so": {
+      "sha256": "f106e0dc0fbfaef6406dae619f1caab565156a6c05be2faa08334aadfc0e0149",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_preview_armeabi-v7a.so": {
+      "sha256": "f79bc586199b1faee3bb42097cb20863df81a5164fff86edf68c86fde3423ec9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_profiler_armeabi-v7a.so": {
+      "sha256": "3c3268d1b6ebade8ac17d074a9df3f8f4814a6ee489931a2c6d5f73b99aeafaf",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_quickprofiler_armeabi-v7a.so": {
+      "sha256": "6aa5aebe7f8ffa88ea34a1af27b2e7337996b7de56ff7a31352835a3ded18491",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_server_armeabi-v7a.so": {
+      "sha256": "efb08c30d2f0cd3b7a3704fa070ff6afb4e22f57a48e9473fe256918ac9af2e5",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_qmltooling_qmldbg_tcp_armeabi-v7a.so": {
+      "sha256": "f1e41d7a2803e556fc4ea0cbe1354fd7c8994a0ebee3f9fae59d40f8e7097639",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libplugins_tls_qopensslbackend_armeabi-v7a.so": {
+      "sha256": "476b722bd1ca6a6101fa6643f4bc53821b1a66453c8cec329c69acd55f67f7dc",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtCore_qtqmlcoreplugin_armeabi-v7a.so": {
+      "sha256": "8287206f7fe8d1f92a8e4c705353d0eadc26628e6e625bf5d570559d15545fab",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQml_Models_modelsplugin_armeabi-v7a.so": {
+      "sha256": "ba2b6059aeea089be0712624981c75a10c6f1334f0126ec4a0bddf5e1298e4a0",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQml_WorkerScript_workerscriptplugin_armeabi-v7a.so": {
+      "sha256": "b133ea529c2ac76264fc7dc5cd714cd4a72b1521dcd0213619c4c2ef954c375b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQml_qmlplugin_armeabi-v7a.so": {
+      "sha256": "f1b810c679c02414884f69a53d89f928334d7d579d74e629af67d045143637e7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Basic_impl_qtquickcontrols2basicstyleimplplugin_armeabi-v7a.so": {
+      "sha256": "49498ccb042045de0db51230c66e1fdfac1d20598191263165998e3a9920c5d8",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Basic_qtquickcontrols2basicstyleplugin_armeabi-v7a.so": {
+      "sha256": "b5fd3927dad6acff5e034d76c80139681c0d8dc86145e3e8897e437da7f6153b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_FluentWinUI3_impl_qtquickcontrols2fluentwinui3styleimplplugin_armeabi-v7a.so": {
+      "sha256": "25a53dacdf668d2f1e50b3f13ffb62a12f628fe644b50efbb2122486978873c9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_FluentWinUI3_qtquickcontrols2fluentwinui3styleplugin_armeabi-v7a.so": {
+      "sha256": "0639f2f7a742685940b19b213d2778d3e5c9abac429e08e73c94e41406bfcdcb",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Fusion_impl_qtquickcontrols2fusionstyleimplplugin_armeabi-v7a.so": {
+      "sha256": "d5747c1c191a33ebe9bf2c84606806d28d1a1fd8958439642c28a00d12f96131",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Fusion_qtquickcontrols2fusionstyleplugin_armeabi-v7a.so": {
+      "sha256": "851468f92eb8ff3c8af6fa279d5dca995f27eb24dcc15027b501405000472120",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Imagine_impl_qtquickcontrols2imaginestyleimplplugin_armeabi-v7a.so": {
+      "sha256": "a14aaa66d5c13d86eba7dd9aa9fbde6a5f7b80c086c354b6aba0574a241bd5ce",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Imagine_qtquickcontrols2imaginestyleplugin_armeabi-v7a.so": {
+      "sha256": "7b9b91f9cbc7afddf6403751a333e9c60a079bc9f53d90decb0705477e634980",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Material_impl_qtquickcontrols2materialstyleimplplugin_armeabi-v7a.so": {
+      "sha256": "adb090517ce57a2fa5323a8079be31f26caa10a465c93503c92a3acbd6703316",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Material_qtquickcontrols2materialstyleplugin_armeabi-v7a.so": {
+      "sha256": "25c18df2be6ec756b58a460d25702997109416d05e6bf9752b9a62756b974e46",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Universal_impl_qtquickcontrols2universalstyleimplplugin_armeabi-v7a.so": {
+      "sha256": "a15493dd0eb890cfca03af34f562840451508f899330250a5bfb14b192d37f4d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_Universal_qtquickcontrols2universalstyleplugin_armeabi-v7a.so": {
+      "sha256": "9a7c2b0c1457c1d749d133a0a988375adbc2132ca242d5bd890cb2e28a40464b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_impl_qtquickcontrols2implplugin_armeabi-v7a.so": {
+      "sha256": "b77b4552dddbdb16ef5aa82c63253f693935609d68b45b156275a4906346e232",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Controls_qtquickcontrols2plugin_armeabi-v7a.so": {
+      "sha256": "ff9d19cc78b5b9363fd0e57183d4378d2d224c20dda0e90dfb61a47b357fd461",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Dialogs_qtquickdialogsplugin_armeabi-v7a.so": {
+      "sha256": "ea923e49d2bf01a69f46d83cd0abcaa11c323cff211fd878f13d45c70aafff62",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Dialogs_quickimpl_qtquickdialogs2quickimplplugin_armeabi-v7a.so": {
+      "sha256": "b2c48fd2f0481a4d59cd896a5dc743f53b5fec4ccba1471b87a837ee9cc9e964",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Effects_effectsplugin_armeabi-v7a.so": {
+      "sha256": "427cc38c4b5e9f9f40ae04146bf83b84d1ca1f6e93629dde7288730a4cda3aed",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Layouts_qquicklayoutsplugin_armeabi-v7a.so": {
+      "sha256": "83622b0746d474760c6d16a698d0d3b57699a95d03c28d1b6dcb3ba8b0aef22a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Shapes_qmlshapesplugin_armeabi-v7a.so": {
+      "sha256": "d9e1087a03257d56c2b56d7cc1336314fb472680741ebfcedef45d8115b3408d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Templates_qtquicktemplates2plugin_armeabi-v7a.so": {
+      "sha256": "911268a996e174d4230d291cbf7bfcdc8f7cd08944baa55ea2c6f0beb17bccae",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_Window_quickwindowplugin_armeabi-v7a.so": {
+      "sha256": "b32a0adeb35a9ef78e492d7f1d1fb0d3847e4f2fc786ad80f30b16ab24a60487",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_QtQuick_qtquick2plugin_armeabi-v7a.so": {
+      "sha256": "efef87a0c1e044f68016fa32ece0989dea1357e21af967d844d381c26f3bae67",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_Qt_labs_folderlistmodel_qmlfolderlistmodelplugin_armeabi-v7a.so": {
+      "sha256": "899bc9994ef79dc804d3d66e88efcb585f976ba132c49ee4509829ae5273ff8a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libqml_Qt_labs_qmlmodels_labsmodelsplugin_armeabi-v7a.so": {
+      "sha256": "6dc3ac66c133e6f3e8c25b127373872ec7b1692e0ffd090660845a3203ee2331",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libscrip_armeabi-v7a.so": {
+      "sha256": "4d8f5226b6ba280a9d8cb427bf0ad63e76de05968f1d5ffdb8c0c5b48eb18a6d",
+      "components": [
+        "SCrip",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libssl_3.so": {
+      "sha256": "a1a9fda0b13d93a30cf103f993c080eafc6e1dee249e1a29d68cd7616dc052a4",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "lib/armeabi-v7a/libswresample.so": {
+      "sha256": "44560f37ee0fac98a74c74a16798ffa91d7048672d479872c5ab145efd58d97a",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/armeabi-v7a/libswscale.so": {
+      "sha256": "245fc1c56204356ee81a123a1397992c6d0434227f82a42cacab138c872ded99",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Concurrent_x86_64.so": {
+      "sha256": "7298ec5952d583d2a1564ba74c92801098998b103b7a8990ad42cfd2f010fe8d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Core_x86_64.so": {
+      "sha256": "1d8845432c7974d27cd81028c51b5eec921d9b2aba7d05c502a91cfac1375844",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6FFmpegStub-crypto_x86_64.so": {
+      "sha256": "91633c2238d6697bfacd7eeb98961e6e5b4c4bdaeea6c533f997f6c892068636",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6FFmpegStub-ssl_x86_64.so": {
+      "sha256": "d0405774f533a5df62f6dffdb6b47301e3abeacd131e64782faba39ae8317e10",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Gui_x86_64.so": {
+      "sha256": "c75e2a7f75e74e2b6c2f07ec045180212d52895948d0e42a0b23870a1ba02789",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6LabsFolderListModel_x86_64.so": {
+      "sha256": "1eaff98e2ce54b5c731d65d350726cb0ab37984634dea6558cc2cebc75b00ad7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6LabsQmlModels_x86_64.so": {
+      "sha256": "5bf8016984202ad482d979de25be5619b5dd5632a4a44314b4aa7292ca2c9067",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Multimedia_x86_64.so": {
+      "sha256": "1ea12d5b399c7b1bb574a8d6f074abad2ecbd26f46c353d13e98f2714308046b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Network_x86_64.so": {
+      "sha256": "d6608a28a163e2d2cce2ef4322254176c5b329592a6ff009cdc3b1e2dbdedf5b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6OpenGL_x86_64.so": {
+      "sha256": "53ce57767b3967a8122c67304d3f0b1117a54149f514fc7911df936511108db6",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QmlCore_x86_64.so": {
+      "sha256": "5b7baf58e1428c5a1f2f351a8bbe7ec137dd81bd37647313b3dd81caaac5b00c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QmlMeta_x86_64.so": {
+      "sha256": "751b61d4c8199b43346ec4b9357d8a4b88c970deec91db81b7f7fa4eda15946b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QmlModels_x86_64.so": {
+      "sha256": "e37d4b48137613a6d0992895d1e62395cadf84bac8a72d81421165627087a65b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QmlWorkerScript_x86_64.so": {
+      "sha256": "3f9c52751436f7eb8c23fccd9d9d45f60bfc59a7125f6d01c93ec6a2491c0e0a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Qml_x86_64.so": {
+      "sha256": "06abb94149455e0472a945475c3e897b3ebac62cfdc06b409d70d3df738cbe16",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2BasicStyleImpl_x86_64.so": {
+      "sha256": "6748e804f2fb6feb44bbf95d1ea4e3926a205bdba86083631f83ea379347999b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2Basic_x86_64.so": {
+      "sha256": "68d78a84116b099c7ee514c6bb9f364878a989b8a3eb7efb7e013a4109bcfa9e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2FluentWinUI3StyleImpl_x86_64.so": {
+      "sha256": "299caed8927cc4cdef74c59ce51d4ec00df276691ed68697a5482db21f7069ed",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2FusionStyleImpl_x86_64.so": {
+      "sha256": "da34ea0b5d1737b90c91199ce668afb4154e3340a439fabe9f9e07719e800d10",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2Fusion_x86_64.so": {
+      "sha256": "d952027b477bd4d3e6bf7338cda9639e0cbdee5f764bde270e69698865773d5e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2ImagineStyleImpl_x86_64.so": {
+      "sha256": "8757cc131467c4f4be0bc5f6b9baf18faf356f9d32bde88ffc7bd1469a9922cf",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2Imagine_x86_64.so": {
+      "sha256": "fdd529b26da7fd3598d7c6d9c8b91086e87f43e1cd7cd23019dd297046c7be09",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2Impl_x86_64.so": {
+      "sha256": "40720091ff26307a704fc94e50eee5d67a27a9af8173fad9b63b4143394dcaa9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2MaterialStyleImpl_x86_64.so": {
+      "sha256": "83790b0466eacbb7f57f7795c966971a1fb17b5a728772640bfde2c10699918f",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2Material_x86_64.so": {
+      "sha256": "2597d8b38eedc4a5d68090da9b081df5dfb9212e1b4ef62425904a03aec272e3",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2UniversalStyleImpl_x86_64.so": {
+      "sha256": "ed1f0b54fbaa4cd6fc25a390300046c4f947bf7b575f49317eab260f4f30d0ce",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2Universal_x86_64.so": {
+      "sha256": "3048f4d16e3cff43d83d5a1c52c7b26b7628d5af1dcbf9451742dc2d46c2b40e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickControls2_x86_64.so": {
+      "sha256": "0599ee1060480ececc0d6085e4e1c7cc04b4622ff327c79afcd279fef00381e7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickDialogs2QuickImpl_x86_64.so": {
+      "sha256": "5106abd81f05cf55ba42c03ec9386f8ac8d7c4bcc2d36094a6baee71f63b253c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickDialogs2Utils_x86_64.so": {
+      "sha256": "08e4481ae65b2d42bb0f245fbfb7631500adddc2a32dc28a609580243f614294",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickDialogs2_x86_64.so": {
+      "sha256": "c0983a67259712d29718e813df9601b93a20a2abc41dd0fe394fc1fbca5028f4",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickEffects_x86_64.so": {
+      "sha256": "01de2cc6efc91e8920d4e36224b6fd531550ad673b6c572a0ca4b420754bd4e2",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickLayouts_x86_64.so": {
+      "sha256": "f00f99fa78bd589bb4ec909f3202b08b5d91ad9f5370f87c7e668ea4d9d16960",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickShapes_x86_64.so": {
+      "sha256": "308ae270a08200d90a86a7e5e89b81a8713ae05226a7679d8763a37a2fab4485",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6QuickTemplates2_x86_64.so": {
+      "sha256": "c3a2afdc6aa71b048f57bbd3c7d7fc14b31cd01b1eccb367211850a28947486d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Quick_x86_64.so": {
+      "sha256": "e7d59fd0e55a1bd9939e21e160892e4f0c2a105e7c6f0684993ab25688e8374b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libQt6Svg_x86_64.so": {
+      "sha256": "2308c155d4b8d5907c61082a81d0c0a708544df05de74d78782b767efb5f01a6",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libavcodec.so": {
+      "sha256": "2959d17c8a1664271d3876434a26e54cc107f1b6117c5631edc955dc14aae9d4",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libavformat.so": {
+      "sha256": "59ccb3ae4bbf048c131d90b0a66874839a52e42453c0051162942977be20fa17",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libavutil.so": {
+      "sha256": "0cfb6f8d3ad420b5695169a3d500cd6b539c83cce76d0f95faefa24abf1d8aa7",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libc++_shared.so": {
+      "sha256": "db9609240e60ca18b816a5e95a6bbc784e799261efbd5b30c8e2e03b540b3fa8",
+      "components": [
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libcrypto_3.so": {
+      "sha256": "bc4bdd31835659e639c2dc8f0a722342f51230074c23ee3dd6d1fa2353d72db1",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "lib/x86_64/libplugins_iconengines_qsvgicon_x86_64.so": {
+      "sha256": "c021fc68420654e45cde52b01f562cc65599434aa89c7165475531e58f56929c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_imageformats_qgif_x86_64.so": {
+      "sha256": "1d8c85a02a2e062cad26f9e8de6cdd97314f0b6e70c1e1ff99f2866f4147c3cb",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_imageformats_qico_x86_64.so": {
+      "sha256": "95a9df8cd8b47c9932bb7796928361dde3bb9e0f558258109347041e4d8d726e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_imageformats_qjpeg_x86_64.so": {
+      "sha256": "bc511dbc7b47eac0baece6b0fef1592307afc88707e6fecbdc8ace67cf2bd2ed",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_imageformats_qsvg_x86_64.so": {
+      "sha256": "b914d92d82ae4e439a0dc32a7eab7fea580e7392cff91312796efc7203db220a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_multimedia_androidmediaplugin_x86_64.so": {
+      "sha256": "fe3c0d424cfe556efcd620b1689cf98a0dba9c555fd2083541d80a89a4644ab0",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_multimedia_ffmpegmediaplugin_x86_64.so": {
+      "sha256": "eac7e0937d2171fc8237e0a14450157beb1a9b3637bb512944c8cdeb015b547d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_networkinformation_qandroidnetworkinformation_x86_64.so": {
+      "sha256": "a37627829efb1839cd6204e0b9c1a29c20b382875106a90e360a7262a38fe760",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_platforms_qtforandroid_x86_64.so": {
+      "sha256": "3100a8ff2eb8a9ff9761b7e854aa529e7b41910f60a0da18e94ba59037a2304c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_debugger_x86_64.so": {
+      "sha256": "286e25e718469d158ad8ef2f47e633957039de178e3b7db52342d5b3e180d48e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_inspector_x86_64.so": {
+      "sha256": "45df69a44315f91919f008f13df0a1c7eb6f3448e8041ef991f1e3153621a42b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_local_x86_64.so": {
+      "sha256": "a9e09a72bf1cc7a3549fa5ff65bd27b8dc51343d9add171b1972e5648aea7ff9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_messages_x86_64.so": {
+      "sha256": "8be459f8fdb384928281eeb7e48191ce5bff87322d9854296f46567e4b9d7aea",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_native_x86_64.so": {
+      "sha256": "fa7b08c1403ec82832985cc9359d72db8b210aaaad6e575bb9f5bcdce041ce6b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_nativedebugger_x86_64.so": {
+      "sha256": "72b305482d4e730a9b14c07e1f1e631f2f4e9f3e1a78785af778e75abd13868d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_preview_x86_64.so": {
+      "sha256": "f2435a5fb55a605e14366c987ebe5b7e32e523efe7e7be0400760940b88e15c7",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_profiler_x86_64.so": {
+      "sha256": "41c0fe00f36a63b3de7bd66383efdb677c2f8de17fa8286567ccf0c6a09c4853",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_quickprofiler_x86_64.so": {
+      "sha256": "f1aded19a72809ff11424ece61440f1597cfbcb953729103ef497ba94ad48e10",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_server_x86_64.so": {
+      "sha256": "da3ed95e07b493a6052b7d66e78f043a81ad8242b506bf695069b54c3f7130b3",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_qmltooling_qmldbg_tcp_x86_64.so": {
+      "sha256": "f98303073f20333e023525bfc3754e511f3cabfa21302e5f500d3faec2467b7c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libplugins_tls_qopensslbackend_x86_64.so": {
+      "sha256": "0edcb5dacd23c4c2b2dad884d7d1ce51a3ce5c3671eb7d7b786f5159c6797963",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtCore_qtqmlcoreplugin_x86_64.so": {
+      "sha256": "93e4c360dac61baa2013a1d0dd310227339c38765b02cbf7a12d5c3e0b09641a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQml_Models_modelsplugin_x86_64.so": {
+      "sha256": "b86a6ae1b64da8035db3a5687eb2572dd654a95d54a37d13626d0ff41dab505e",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQml_WorkerScript_workerscriptplugin_x86_64.so": {
+      "sha256": "36e08cfbdbb42bb7b19fc51f0dd5674cd3973f6cc089e037e0ccc5e926df1aa9",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQml_qmlplugin_x86_64.so": {
+      "sha256": "499a0398b32e2aad2f3740bb27bdd44720c666a6a9b25b5dd66c56a79244359d",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Basic_impl_qtquickcontrols2basicstyleimplplugin_x86_64.so": {
+      "sha256": "947790cfb27ffe3b1b02cd5d336054b41207155a9e22fa41ddfba1a695a38787",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Basic_qtquickcontrols2basicstyleplugin_x86_64.so": {
+      "sha256": "083a30d3b74c7d983d2ebd0bd402d61b414097838820c8ecdfaa4bdf7e737d1c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_FluentWinUI3_impl_qtquickcontrols2fluentwinui3styleimplplugin_x86_64.so": {
+      "sha256": "0b089d0df74c808443d6196b41325f15209b1215faa592fda4ca905e5dedf19a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_FluentWinUI3_qtquickcontrols2fluentwinui3styleplugin_x86_64.so": {
+      "sha256": "7b216f397257c7ed37a28ea658aa63d552075bc5e86927b3c58f160162e7dc7c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Fusion_impl_qtquickcontrols2fusionstyleimplplugin_x86_64.so": {
+      "sha256": "966723ca383fabc567db7ffb5e6903f063f7994fdbd37a8c6c305bdef22b9f8b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Fusion_qtquickcontrols2fusionstyleplugin_x86_64.so": {
+      "sha256": "168d360b317b9c95ffbd3a46bc1e6f7d954a57b29db79c3b39ccc5b15dd73081",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Imagine_impl_qtquickcontrols2imaginestyleimplplugin_x86_64.so": {
+      "sha256": "82627982c6925d8452d6983a343900b0a5c41c5de29977e3e0ef168f9f44bb75",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Imagine_qtquickcontrols2imaginestyleplugin_x86_64.so": {
+      "sha256": "92033c0548e9efca6da8050901bb74f83b40326fd0a221da211864a594396285",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Material_impl_qtquickcontrols2materialstyleimplplugin_x86_64.so": {
+      "sha256": "6e654009e14fdc34e8763d4a354396452901836d33f9dab33062289844e5493c",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Material_qtquickcontrols2materialstyleplugin_x86_64.so": {
+      "sha256": "1f6fad0204cd9fe863eeffbed5f5b4257f252a6dddd98b81d2b0c0fc763552de",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Universal_impl_qtquickcontrols2universalstyleimplplugin_x86_64.so": {
+      "sha256": "104769002e56c1d5967f8b08a91efb3a95a38941dffa4b573e1976d1bd8e462b",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_Universal_qtquickcontrols2universalstyleplugin_x86_64.so": {
+      "sha256": "d6d9d3805cbb64650cad693f23d8312a8dab86d4597126644d94fecd52c30d93",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_impl_qtquickcontrols2implplugin_x86_64.so": {
+      "sha256": "4323c4c6ff1a1023a64187091ec7356cc7bc96497cb8d2484311a29fabf39a86",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Controls_qtquickcontrols2plugin_x86_64.so": {
+      "sha256": "600eedd1595d5664918448d12c9c3f6a5d713d526a97950edca51957bc577c97",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Dialogs_qtquickdialogsplugin_x86_64.so": {
+      "sha256": "32e617381f77e2ab975e66e5f56ded760b704d9a936ca3ae579c7170c1e84586",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Dialogs_quickimpl_qtquickdialogs2quickimplplugin_x86_64.so": {
+      "sha256": "8424d7579cb0a5f0a2d6a16763a9271d57ff9b9fa1a82f9655fb00a81d265f63",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Effects_effectsplugin_x86_64.so": {
+      "sha256": "2ad0d8a3d5c635037ef4f270be583dfd24d6e6cd3c338fddbce049c9d619eaed",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Layouts_qquicklayoutsplugin_x86_64.so": {
+      "sha256": "9a81fe13546786d305ee71c1c167a59cfd5c60075b44bab0f06b51bd92a27f6a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Shapes_qmlshapesplugin_x86_64.so": {
+      "sha256": "395eda89c3b3958c1f85c25695aedad271d19eaafa59cbcd30c89f4511035b24",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Templates_qtquicktemplates2plugin_x86_64.so": {
+      "sha256": "021da7f209f8f4aededacebf8a1654083ad7e3dabd01e320ff743e8b94b60f9a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_Window_quickwindowplugin_x86_64.so": {
+      "sha256": "c51ad0256404f78a680adbf2d552c5c5ecace7ae0001279bed2f8738d1d700e6",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_QtQuick_qtquick2plugin_x86_64.so": {
+      "sha256": "35d4958fdbe7a380fc98b753de63b240f82eba53eab94bb652a5491c6171a890",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_Qt_labs_folderlistmodel_qmlfolderlistmodelplugin_x86_64.so": {
+      "sha256": "e15fb630ac61514a92fbd81ad57d2498f25d36d8fe00b7df007ba3f064034f48",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libqml_Qt_labs_qmlmodels_labsmodelsplugin_x86_64.so": {
+      "sha256": "1c40b72ddbfc620fd945b504bec1a002c0e6832a4445bb45dc16d0a29e2fc71a",
+      "components": [
+        "Qt",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libscrip_x86_64.so": {
+      "sha256": "f0b70431ddd0840a05d1bf779bc51561fe52a193342780a88a4ffc0c79157649",
+      "components": [
+        "SCrip",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libssl_3.so": {
+      "sha256": "2af32571317adf90fb7a007756a17dd15cd2469da9ebbd4e973883f8753369c1",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "lib/x86_64/libswresample.so": {
+      "sha256": "572f1f8ca9c084ea86e473664cc4396145f53f447dc4ca69952958a416884046",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "lib/x86_64/libswscale.so": {
+      "sha256": "b16f2721e075cef3e86a5a7d78aba275e3c7224bfff1f7ac2f5d50fb5610fe74",
+      "components": [
+        "FFmpeg",
+        "NDK"
+      ]
+    },
+    "assets/android_rcc_bundle.rcc": {
+      "sha256": "c4e4aa389197cbb0c5a016e0986983ad6da4fadeb8698c7920d31b61c6df2f6c",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "assets/licenses/Android-runtime-NOTICE.txt": {
+      "sha256": "3930de70c7781c92737252f12fc9ac4c01d09d674d371212859e784cd62e0552",
+      "components": [
+        "Android-runtime"
+      ]
+    },
+    "assets/licenses/FFmpeg-NOTICE.txt": {
+      "sha256": "054760d613dc7b8eec0cc66d643f54c899d68716854bb0eb891852e793cd0f43",
+      "components": [
+        "FFmpeg"
+      ]
+    },
+    "assets/licenses/NDK-NOTICE.txt": {
+      "sha256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+      "components": [
+        "NDK"
+      ]
+    },
+    "assets/licenses/OpenSSL-NOTICE.txt": {
+      "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+      "components": [
+        "OpenSSL"
+      ]
+    },
+    "assets/licenses/Qt-NOTICE.txt": {
+      "sha256": "5c1713017371f225f7e1b9c20e5912725fe134f1e2a2eee3504d67c1ba5e2687",
+      "components": [
+        "Qt"
+      ]
+    },
+    "assets/licenses/SCrip-LICENSE.txt": {
+      "sha256": "6e4c151807550c0d56cdacd15ea874a9134f8c9cdda14537604b2968253e263e",
+      "components": [
+        "SCrip"
+      ]
+    },
+    "DebugProbesKt.bin": {
+      "sha256": "158a19eb94aa2f3e2f459db69ee10276c73b945dd6c5f8fc223cf2d85e2b5e33",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.annotation_annotation-experimental.version": {
+      "sha256": "7d072b48526b023950e4c48db01e8c273554a6401119f5691e7589ba9bc65d9d",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.arch.core_core-runtime.version": {
+      "sha256": "1b7c606370188534dac5561fba2b2988093829697fce9e6e8832e9291d24ed00",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.core_core-viewtree.version": {
+      "sha256": "59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.core_core.version": {
+      "sha256": "46081fd90571a274160408ebc81fc91b78ffca4049d477998e3b6909ac245e05",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.interpolator_interpolator.version": {
+      "sha256": "59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.lifecycle_lifecycle-runtime.version": {
+      "sha256": "4257cccbba3f7aea521a40937d1bfdd5949f5f3e1ed689c402a4f2977109030b",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.profileinstaller_profileinstaller.version": {
+      "sha256": "64d23f858ef51b0f996e4966d4e27c0371b437e2d2787890b1f7ad22d4ec5663",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.startup_startup-runtime.version": {
+      "sha256": "cc52f678848b814373757b460383bf61960e4943c203735adde0a350b3e50989",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.tracing_tracing.version": {
+      "sha256": "1e5b51cde515396a9fa762909cf8ca6584ccc564b325d2eebeea76175fe95c4d",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/androidx.versionedparcelable_versionedparcelable.version": {
+      "sha256": "cc52f678848b814373757b460383bf61960e4943c203735adde0a350b3e50989",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/kotlinx_coroutines_android.version": {
+      "sha256": "4f232ffa4f33d6227b6f492a7857a3fb3ea8ea0f8ab1d89fe667211326262a4a",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/kotlinx_coroutines_core.version": {
+      "sha256": "4f232ffa4f33d6227b6f492a7857a3fb3ea8ea0f8ab1d89fe667211326262a4a",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/services/kotlinx.coroutines.CoroutineExceptionHandler": {
+      "sha256": "3129b8edf6db07de6f8ff47695e2177c8bba4eed2962d3085c719e5acbb58a33",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory": {
+      "sha256": "a1ea77ea8f93f419256b6e66f29713f950d8d6e90442b608d880a48003b5eb72",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/versions/9/OSGI-INF/MANIFEST.MF": {
+      "sha256": "a844d62b02a9eefd9d112e74fd660843d91cd8b81dce6ce60a9eaba605fa939c",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/annotation/annotation.kotlin_builtins": {
+      "sha256": "f7c93e7067ca12ba9b3d94c6e540e4c23cb6fdd8c9aff704b553caba650fc357",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/collections/collections.kotlin_builtins": {
+      "sha256": "539b85c2403f6ef0638161ad99df7b11256412e9411335ed2ea3931a3efd7c76",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/coroutines/coroutines.kotlin_builtins": {
+      "sha256": "59a6d632b8a9f5dba26f2a689c3865e195351df7c3c08aa1669fe0df9f9eb883",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/internal/internal.kotlin_builtins": {
+      "sha256": "c76b70a3db1eccbe42ea91a53667d7661edfc615409d3d6e574b5843b1e2a05e",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/kotlin.kotlin_builtins": {
+      "sha256": "0633ac9c37e96556927bd7224a5d31c098e13b1416e48290d50bd502aed62d3b",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/ranges/ranges.kotlin_builtins": {
+      "sha256": "b59c1b5a9a491df799eee202ad919376009bd4f822d7e9fcf79c20b350503852",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "kotlin/reflect/reflect.kotlin_builtins": {
+      "sha256": "f0021ca61426250d6b17e76dd5f732c5908cf67dcaf33b0429a3ead7b1894386",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "AndroidManifest.xml": {
+      "sha256": "dd40f7eae95f96fdb8a797019c2502cf1cfed8be2209fa61507a420b3fe2725d",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/2K.9.png": {
+      "sha256": "42aee0b03883e94df5e543348a397d1302c1b8221895871a83b81899f5a9647b",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/4j.xml": {
+      "sha256": "792485b2d43ba461d57adba315f97af781f3afcffbc9a511d5be18d7fdf44103",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/4z.xml": {
+      "sha256": "515c061f73c1de37f4610c52b264f32233e64599726247dbf79646a8a1d0b993",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/5c.png": {
+      "sha256": "b44eeda34d7a529c2fe55719eb098fa29707caa91d18de06a7a775d6e6bcf973",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/63.xml": {
+      "sha256": "b2fdb33abd54d3ea5bd60f3832065a0492fa9adac7995fac8d5447846f11f91d",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/8_.xml": {
+      "sha256": "6f5640b7079ddde41f704010d5fb0d88ed7c8723a711e99ade77a1bd9c2eb5fd",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/9T.png": {
+      "sha256": "2d5664220a0678e629473bf50bfdf53bca37b32daf5d7b3256a7f3dc0b6400c1",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/9m.xml": {
+      "sha256": "53561f917ddec3c589725cb7d53210e2db40d4706ce80e34286e531ff946f558",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/C_.9.png": {
+      "sha256": "a8676a1793ac8310ffb12986232df66df092d29c242aeedc2b73556c010d38dc",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Ce.xml": {
+      "sha256": "8f9acacabaf2dfb4bb53dab7ce7bec9c1451ce0a0219ffaa41760ea82da3d2d6",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/DO.xml": {
+      "sha256": "43834ae96ba9cec93161825f7b567f087f5ae821fda18daa793ea034033d9d3e",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Dt.xml": {
+      "sha256": "0cc86c95084cdda201412c2c12b8222eb8eee7cdad2c410ba2d662d7b0d54660",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Ma.9.png": {
+      "sha256": "d27af435101ca4cbec0c840bd30687918cd39eb83aab1487420855623a45998b",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/N3.xml": {
+      "sha256": "4a959580080ebb1d822a2459a4234d2abf0dd0b65d9c28bda8c258dafc888c51",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Qq.xml": {
+      "sha256": "99044ecd113ede6d584aae0c5cf3f660a612f47f73446f75f6683c1bb799ccf9",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/S8.xml": {
+      "sha256": "cf63a26e78b2f18360c9c17d38ff2ab5c5c363c86b4f6d15cd99dc3d66c7e882",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/U-.9.png": {
+      "sha256": "e17761ed280edd93d7141bd504b70f9e9e15a8652288d9e6333bf4ce964ef844",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/WU.xml": {
+      "sha256": "5d4cdaae5838ad9442c085f951b766b2808bff13b8c85a14e0bcf8571514492c",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Ws.xml": {
+      "sha256": "dd61ee14a4e03bd9104fa40a72d0742fc926ab0d843bc6ff7886e2f0bc4dea69",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Wz.xml": {
+      "sha256": "dd812658837556dd1b0602fe2588902269f15bebb8346011cec584b532770004",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/Xk.xml": {
+      "sha256": "c8321364802409baf4d76e2a84e303871585bdc95b0395040c5ecea0e2051105",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/_y.xml": {
+      "sha256": "7ecca2c79c3add0f5ad8f8dbc2a7aaadf18e1ac7ee3513b7ae2a588b924af7ad",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/a0.xml": {
+      "sha256": "abc47592952ff6d1ffbfb9f5c25f1ccafb00c95f79761039b5a2e6928c0e84ce",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/bX.xml": {
+      "sha256": "5f6376dfe199d8a6e40033d3e623989d052c9b2f974d00c824fbb8b76fc6fde8",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/c6.xml": {
+      "sha256": "b3801aa2f660de2d10bcf8afdda597e5b6567f085e25425fb69b21d2db2304f6",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/cV.xml": {
+      "sha256": "b6b7e721236926367f6754cc103ff13983f86df484634ecd7cc65d3acadc3866",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/cr.xml": {
+      "sha256": "37ff040591f96786bfaf9d3d937fedf2f2f97e218c06beb3e7fe8a2442a181a8",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/df.xml": {
+      "sha256": "528d72a90ebdbe3f94e7d1fd7e4ea726879301f4a0453743e788ec8d1d75e797",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/gK.9.png": {
+      "sha256": "2f7fbda0ba6e53e9a47e2fc0e24e32c447c613a5808c2d6285dc651e83a07ad7",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/ga.xml": {
+      "sha256": "c4c7a8f6eca71aee1849e773203d6e55f6247f925db0eeecdd0457450df51301",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/hn.xml": {
+      "sha256": "cf53aaf3dd556a5c12717594235128068f0c55371dbe353e1f7f545828da35ee",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/iQ.xml": {
+      "sha256": "3b08a4878ed9d2f99bb6e6becdd92d90a09c9786df28d1b4331ee687086be51f",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/je.9.png": {
+      "sha256": "21f0b55280be10b187ceff8edef4a5a7047683e6e9fcf47de410aa3839f41094",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/lR.xml": {
+      "sha256": "ce501721766c9eecabe1312d9d15fb8ddfb7c480228337d13af51c99012fa213",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/nz.xml": {
+      "sha256": "0b75b4edba8ee5193abc765e3d224b3eb97ca0689b0a8667a481835b5540dbff",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/o_.9.png": {
+      "sha256": "20343222f9f79dd565c3a2248494d452e70820ac1c437173c38badd45f962afd",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/pY.png": {
+      "sha256": "8430ec003e003f3f2ba2f78d48fd150e25407667e530e82e87a7d4841c0fd676",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/pu.png": {
+      "sha256": "aa00088d0d9fd97bd92ed9ffd29b54bb69a48a984aa73448ce553fb9d812be41",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/s4.png": {
+      "sha256": "0d773e62c756422313262846c787e58f67e0ee87e45e1ae9942002e816c4cb9e",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/sA.9.png": {
+      "sha256": "0c6328c7b2420570a7ec38b3beb3bac9a29d895ac1ab7239315aba7266418593",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/vL.9.png": {
+      "sha256": "99c14d6855b8be296d58017d3751b8dc849c47b6d1d80ab614ff9075080e461b",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/w3.xml": {
+      "sha256": "579aadf0b10126d3c67fe29299f3d168e248d431d3b3dde4ac21a3527a633de6",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/wN.9.png": {
+      "sha256": "18b328d8017e677d5aad3dbd66bae356b5cac978c6f0670938ea648e51d0eb66",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/x4.xml": {
+      "sha256": "2d825b79cce60203492ff09a04826db0ac8d9eb9bc0fb9fb139ae1aa5cde0f67",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/xN.xml": {
+      "sha256": "6a2d1f63ffc2b5851e67438138be0ab55c9080e29afc23cc92f5ee5871e77a85",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/xa.9.png": {
+      "sha256": "3e09afa21c45372c035598c017c8fb405a6d678e6cb84dc857581cb3b40e482d",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "res/z-.9.png": {
+      "sha256": "559bf783d765c02338e97952bdc9c6689c7ff99090b8c9813369118da8b080f0",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "resources.arsc": {
+      "sha256": "1f8cebd1a0355dd85449b5cf705cf3a992df5887a6e34557348a73ad188c4fca",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/SCRIP.SF": {
+      "sha256": "721a54bd2cc7651e39a868110d4c5b359b5e6e647ffc1f741ddf20f1ac4fc562",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/SCRIP.RSA": {
+      "sha256": "edc9b88d0d52b91e92f0d11bfea9ffe9df1657a120a5ccb255683cf7d41f8dcd",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    },
+    "META-INF/MANIFEST.MF": {
+      "sha256": "f9c9ffac1dffcb89a11ecbd5334f29415a48486d64132ad4105439117f7d69be",
+      "components": [
+        "SCrip",
+        "Qt",
+        "Android-runtime"
+      ]
+    }
+  },
+  "components": {
+    "SCrip": {
+      "license": "GPL-3.0-only",
+      "notice": "payload/assets/licenses/SCrip-LICENSE.txt",
+      "source": "sources/SCrip-1.5.3-source.tar.gz",
+      "source_sha256": "64d78936180e25a6c8a6296a9fca613b4e15d73fa85a233d754ca372011aaf9b"
+    },
+    "Qt": {
+      "license": "GPL-3.0-only",
+      "notice": "payload/assets/licenses/Qt-NOTICE.txt",
+      "source": "sources/qt-6.10.1-scrip-modules-source.tar.zst",
+      "source_sha256": "5cebe7eb264024e0bba42dc116924337c613b192a5d6e151536ae3c4d64eb2c0"
+    },
+    "FFmpeg": {
+      "license": "LGPL-3.0-or-later",
+      "notice": "payload/assets/licenses/FFmpeg-NOTICE.txt",
+      "source": "sources/ffmpeg-7.1.2-android-source.tar.zst",
+      "source_sha256": "6dc423c3f06f2a2f54023a82392d06a012adaa3b814d47fed95660821eca4df1"
+    },
+    "OpenSSL": {
+      "license": "Apache-2.0",
+      "notice": "payload/assets/licenses/OpenSSL-NOTICE.txt",
+      "source": "sources/openssl-3.1.8-android-source.tar.zst",
+      "source_sha256": "2006abda120e6f78c067b75e4f59522bba921ca17c51dd3290cb5f2db6e3cb7d"
+    },
+    "NDK": {
+      "license": "Apache-2.0 WITH LLVM-exception",
+      "notice": "payload/assets/licenses/NDK-NOTICE.txt",
+      "source": "sources/ndk-r27c-runtime-source.tar.zst",
+      "source_sha256": "31d0d7ecda10d79531ff0a3ba304ad66035976a46265c40db0a69072dd2301bd"
+    },
+    "Android-runtime": {
+      "license": "Apache-2.0",
+      "notice": "payload/assets/licenses/Android-runtime-NOTICE.txt",
+      "source": "sources/android-java-runtime-source.tar.zst",
+      "source_sha256": "4a11f15b82152181c37dec673a967634915e38440d3e19521cc5d4911d2eec79"
+    }
+  }
+}
