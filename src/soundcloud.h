@@ -96,8 +96,10 @@ private:
     void finishStorageLoad(bool ok, const QJsonObject &connection, const QJsonObject &session, bool autoConnect);
     std::shared_ptr<SoundCloudStorageCompletion> m_storageCompletion;
 #endif
-    void ensureToken(std::function<void()> continuation);
-    void token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed = {}, int loginEpoch = -1);
+    using TokenFailure = std::function<void(QString)>;
+    struct WaitingOperation { std::function<void()> continuation; TokenFailure failed; };
+    void ensureToken(std::function<void()> continuation, TokenFailure failed = {});
+    void token(const QUrlQuery &form, bool basic, std::function<void()> done, TokenFailure failed = {}, int loginEpoch = -1);
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
     void collection(const QString &path, bool append = false);
     void profile();
@@ -144,7 +146,7 @@ private:
     QVariantMap m_androidRestoreTrack;
     qint64 m_restorePosition = 0;
     bool m_androidRestorePending = false, m_restoringPlayback = false;
-    QList<std::function<void()>> m_waiting;
+    QList<WaitingOperation> m_waiting;
     bool m_forceNext = false;
     QVariantList m_queue;
     QNetworkReply *m_updateReply = nullptr;

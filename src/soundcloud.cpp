@@ -299,7 +299,6 @@ void SoundCloud::configure(const QString &id, const QString &secret, const QStri
 void SoundCloud::storageFailure() {
     m_storageReady = false;
     set("connected", false); set("signedIn", false);
-    ++m_homeGeneration; set("homeBusy", false);
     set("status", "Хранилище авторизации недоступно");
     fail(AuthStorage::errorMessage());
 }
@@ -308,7 +307,7 @@ bool SoundCloud::saveSession() {
         {"expires_at", m_expires}, {"user_session", m_userSession}})) { storageFailure(); return false; }
     return true;
 }
-void SoundCloud::token(const QUrlQuery &form, bool basic, std::function<void()> done, std::function<void()> failed, int loginEpoch) {
+void SoundCloud::token(const QUrlQuery &form, bool basic, std::function<void()> done, TokenFailure failed, int loginEpoch) {
     QNetworkRequest request{QUrl(m_useWorker ? "https://scrip-auth.scrip-desktop-aca3d9.workers.dev/oauth/token"
                                             : "https://secure.soundcloud.com/oauth/token")};
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
@@ -317,36 +316,45 @@ void SoundCloud::token(const QUrlQuery &form, bool basic, std::function<void()> 
     if (basic && !m_useWorker) request.setRawHeader("Authorization", "Basic " + (m_clientId + ":" + m_clientSecret).toUtf8().toBase64());
     auto *reply = m_network->post(request, form.query(QUrl::FullyEncoded).toUtf8().replace("+", "%2B"));
     const int epoch = m_epoch;
-    connect(reply, &QNetworkReply::finished, this, [this, reply, done, failed, epoch, loginEpoch] {
+    auto handled = std::make_shared<bool>(false);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, done, failed, epoch, loginEpoch, handled] {
         reply->deleteLater(); if (epoch != m_epoch || (loginEpoch >= 0 && loginEpoch != m_loginEpoch)) return;
-        const auto obj = QJsonDocument::fromJson(reply->readAll()).object();
-        if (reply->error() != QNetworkReply::NoError || obj.value("access_token").toString().isEmpty()) {
-            if (m_state.value("buffering").toBool()) set("playbackActive", false);
-            m_refreshing = false; m_waiting.clear(); set("busy", false); set("authBusy", false); set("buffering", false);
+        if (std::exchange(*handled, true)) return;
+        QJsonParseError parseError;
+        const auto document = QJsonDocument::fromJson(reply->readAll(), &parseError);
+        const auto obj = document.object();
+        if (reply->error() != QNetworkReply::NoError || parseError.error != QJsonParseError::NoError
+            || !document.isObject() || obj.value("access_token").toString().isEmpty()) {
             const int code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            if (code == 400 || code == 401) { m_access.clear(); m_refresh.clear(); if (!m_authStorage.remove("session", m_sessionPath)) storageFailure(); set("connected", false); set("signedIn", false); }
-            if (failed) failed();
-            if (!m_storageReady) return;
-            fail(code == 429 ? "Лимит входов SoundCloud. Подождите перед повторной попыткой." : QString("SoundCloud не выдал токен (HTTP %1). Проверьте ключи, адрес возврата и доступ к сети.").arg(code));
+            const QString message = code == 429 ? "Лимит входов SoundCloud. Подождите перед повторной попыткой."
+                : QString("SoundCloud не выдал токен (HTTP %1). Проверьте ключи, адрес возврата и доступ к сети.").arg(code);
+            m_refreshing = false;
+            if (code == 400 || code == 401) {
+                m_access.clear(); m_refresh.clear();
+                if (!m_authStorage.remove("session", m_sessionPath)) storageFailure();
+                set("connected", false); set("signedIn", false);
+            }
+            if (failed) failed(message); else fail(message);
             return;
         }
         m_access = obj.value("access_token").toString(); m_refresh = obj.value("refresh_token").toString();
         m_expires = QDateTime::currentSecsSinceEpoch() + obj.value("expires_in").toInt(3600);
         if (!saveSession()) {
-            m_refreshing = false; m_waiting.clear(); set("busy", false); set("authBusy", false); set("buffering", false);
-            if (failed) failed();
+            m_refreshing = false;
+            if (failed) failed(AuthStorage::errorMessage());
             return;
         }
         set("connected", true); set("signedIn", m_userSession); set("status", m_userSession ? "Аккаунт подключён" : "Публичный каталог подключён");
         done();
     });
 }
-void SoundCloud::ensureToken(std::function<void()> continuation) {
-    if (!m_storageReady) { set("busy", false); set("buffering", false); fail(AuthStorage::errorMessage()); return; }
+void SoundCloud::ensureToken(std::function<void()> continuation, TokenFailure failed) {
+    const auto reject = [this, &failed](const QString &message) { if (failed) failed(message); else fail(message); };
+    if (!m_storageReady) { reject(AuthStorage::errorMessage()); return; }
     if (!m_access.isEmpty() && QDateTime::currentSecsSinceEpoch() < m_expires - 60) { continuation(); return; }
-    if (!m_state.value("configured").toBool()) { if (m_state.value("buffering").toBool()) { set("playbackActive", false); set("buffering", false); } set("busy", false); fail("Сначала настройте подключение к SoundCloud."); return; }
-    if (m_useWorker && m_refresh.isEmpty()) { if (m_state.value("buffering").toBool()) { set("playbackActive", false); set("buffering", false); } set("busy", false); fail("Войдите в SoundCloud."); return; }
-    m_waiting.append(continuation);
+    if (!m_state.value("configured").toBool()) { reject("Сначала настройте подключение к SoundCloud."); return; }
+    if (m_useWorker && m_refresh.isEmpty()) { reject("Войдите в SoundCloud."); return; }
+    m_waiting.append({continuation, std::move(failed)});
     if (m_refreshing) return;
     m_refreshing = true;
     QUrlQuery form;
@@ -358,8 +366,21 @@ void SoundCloud::ensureToken(std::function<void()> continuation) {
     }
     token(form, basic, [this] {
         m_refreshing = false;
+        const int epoch = m_epoch;
         auto waiting = std::exchange(m_waiting, {});
-        for (const auto &task : waiting) task();
+        for (auto &task : waiting) {
+            if (epoch != m_epoch) break;
+            if (task.continuation) task.continuation();
+        }
+    }, [this](QString message) {
+        m_refreshing = false;
+        const int epoch = m_epoch;
+        auto waiting = std::exchange(m_waiting, {});
+        for (auto &task : waiting) {
+            if (epoch != m_epoch) break;
+            if (task.failed) task.failed(message);
+            else fail(message);
+        }
     });
 }
 void SoundCloud::request(const QString &path, Callback done, const QByteArray &method, const QJsonObject &body, bool retry, std::function<void(QString)> failed) {
@@ -372,8 +393,10 @@ void SoundCloud::request(const QString &path, Callback done, const QByteArray &m
         req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         auto *reply = m_network->sendCustomRequest(req, method, body.isEmpty() ? QByteArray{} : QJsonDocument(body).toJson(QJsonDocument::Compact));
         const int epoch = m_epoch;
+        auto handled = std::make_shared<bool>(false);
         connect(reply, &QNetworkReply::finished, this, [=, this] {
             reply->deleteLater(); if (epoch != m_epoch) return;
+            if (std::exchange(*handled, true)) return;
             int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             if (status == 401 && retry && !m_refresh.isEmpty()) { m_expires = 0; request(path, done, method, body, false, failed); return; }
             if (reply->error() != QNetworkReply::NoError || status >= 300) {
@@ -386,12 +409,12 @@ void SoundCloud::request(const QString &path, Callback done, const QByteArray &m
             if (!bytes.isEmpty() && error.error != QJsonParseError::NoError) { if (failed) failed("SoundCloud вернул некорректный ответ."); else fail("SoundCloud вернул некорректный ответ."); return; }
             done(doc);
         });
-    });
+    }, [this, failed](QString message) { if (failed) failed(message); else fail(message); });
 }
 void SoundCloud::connectCatalog() {
     if (m_refreshing || m_state.value("authBusy").toBool()) return;
     clearError(); set("busy", true);
-    ensureToken([this] { set("connected", true); set("signedIn", m_userSession); set("busy", false); set("status", m_userSession ? "Аккаунт подключён" : "Публичный каталог подключён"); if (m_userSession) { profile(); browse("likes"); } else { tryRestoreAndroidTrack(); browse("tracks", ""); } });
+    ensureToken([this] { set("connected", true); set("signedIn", m_userSession); set("busy", false); set("status", m_userSession ? "Аккаунт подключён" : "Публичный каталог подключён"); if (m_userSession) { profile(); browse("likes"); } else { tryRestoreAndroidTrack(); browse("tracks", ""); } }, [this](QString message) { set("busy", false); fail(message); });
 }
 void SoundCloud::profile() { request("/me", [this](QJsonDocument d) { set("profile", d.object().toVariantMap()); }); }
 void SoundCloud::login() {
@@ -462,7 +485,7 @@ void SoundCloud::callbackConnection() {
                 respond(true);
                 profile();
                 browse("likes");
-            }, [this, respond] { set("authStep", ""); respond(false); }, loginEpoch);
+            }, [this, respond](QString message) { set("authBusy", false); set("authStep", ""); respond(false); fail(message); }, loginEpoch);
         });
     }
 }
