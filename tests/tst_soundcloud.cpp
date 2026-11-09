@@ -812,6 +812,46 @@ private slots:
         QTRY_VERIFY(sc.state()["connected"].toBool()); sc.configure("id", "secret", "https://evil.example/callback");
         QVERIFY(!sc.state()["error"].toString().isEmpty()); QCOMPARE(net.requests.size(), 1);
     }
+    void configureRejectsWhitespaceSecretWithoutFallbackAndPreservesSession() {
+        AuthStorage storage(secrets);
+        const QJsonObject connection{{"client_id", "test-client"}, {"client_secret", ""},
+            {"redirect_uri", QString("http://127.0.0.1:%1/callback").arg(callbackPort)}};
+        const QJsonObject session{{"client_id", "test-client"}, {"access_token", "saved-access"},
+            {"refresh_token", "saved-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
+        QVERIFY(storage.save("connection", connection));
+        QVERIFY(storage.save("session", session));
+        const auto savedConnection = secrets->records["connection"];
+        const auto savedSession = secrets->records["session"];
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        QCoreApplication::processEvents();
+        QCOMPARE(sc.m_access, QString("saved-access"));
+        QVERIFY(!sc.state()["configured"].toBool());
+        sc.configure("  ", "   ", QString("http://127.0.0.1:%1/callback").arg(callbackPort));
+        QVERIFY(!sc.state()["error"].toString().isEmpty());
+        QCOMPARE(secrets->records["connection"], savedConnection);
+        QCOMPARE(secrets->records["session"], savedSession);
+        QCOMPARE(sc.m_access, QString("saved-access"));
+        QVERIFY(net.requests.isEmpty());
+    }
+    void configureWhitespaceSecretKeepsExistingSecret() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets);
+        const auto redirect = QString("http://127.0.0.1:%1/callback").arg(callbackPort);
+        sc.configure("  updated-client  ", "   ", redirect);
+        const auto saved = QJsonDocument::fromJson(secrets->records["connection"]).object();
+        QCOMPARE(saved["client_id"].toString(), QString("updated-client"));
+        QCOMPARE(saved["client_secret"].toString(), QString("test-secret"));
+    }
+    void configureTrimsValidCredentials() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets);
+        const auto redirect = QString("http://127.0.0.1:%1/callback").arg(callbackPort);
+        sc.configure("  updated-client  ", "  updated-secret  ", redirect);
+        const auto saved = QJsonDocument::fromJson(secrets->records["connection"]).object();
+        QCOMPARE(saved["client_id"].toString(), QString("updated-client"));
+        QCOMPARE(saved["client_secret"].toString(), QString("updated-secret"));
+    }
     void oauthRejectsWrongStateAndExchangesValidCode_data() {
         QTest::addColumn<bool>("worker");
         QTest::newRow("local") << false;

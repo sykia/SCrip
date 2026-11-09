@@ -284,12 +284,14 @@ bool SoundCloud::loadConfig() {
 void SoundCloud::configure(const QString &id, const QString &secret, const QString &redirect) {
     if (!m_storageReady) { fail(AuthStorage::errorMessage()); return; }
     QUrl url(redirect.trimmed());
-    if (id.trimmed().isEmpty() || (secret.isEmpty() && m_clientSecret.isEmpty())) { fail("Укажите Client ID и Client Secret."); return; }
+    const auto clientId = id.trimmed();
+    const auto enteredSecret = secret.trimmed();
+    const auto newSecret = enteredSecret.isEmpty() ? m_clientSecret.trimmed() : enteredSecret;
+    if (clientId.isEmpty() || newSecret.isEmpty()) { fail("Укажите Client ID и Client Secret."); return; }
     if (url.scheme() != "http" || url.host() != "127.0.0.1" || (url.port() < 1024 || url.port() > 65535) || url.path() != "/callback" || url.hasQuery() || url.hasFragment() || !url.userInfo().isEmpty()) {
         fail("Адрес возврата должен иметь вид http://127.0.0.1:43821/callback (порт от 1024)."); return;
     }
-    auto newSecret = secret.isEmpty() ? m_clientSecret : secret.trimmed();
-    const QJsonObject connection{{"client_id", id.trimmed()}, {"client_secret", newSecret}, {"redirect_uri", url.toString()}};
+    const QJsonObject connection{{"client_id", clientId}, {"client_secret", newSecret}, {"redirect_uri", url.toString()}};
     if (!m_authStorage.save("connection", connection)) { storageFailure(); return; }
     m_connection = connection;
     cancelLogin(); if (!clearSession()) return; loadConfig(); clearError(); connectCatalog();
