@@ -162,15 +162,30 @@ bool AuthStorage::save(const QString &key, const QJsonObject &value) {
     if (!m_store->read(key, previous)) return false;
     const bool hadPrevious = !previous.isEmpty();
     QByteArray verified;
-    if (m_store->write(key, bytes) && m_store->read(key, verified) && bytes == verified) return true;
+    if (m_store->write(key, bytes) && m_store->read(key, verified) && bytes == verified) {
+        m_consistent = true;
+        return true;
+    }
 
-    // Store implementations may report a verification failure after changing the
-    // record. Restore the previous value so a rejected candidate cannot replace it.
-    if (hadPrevious) m_store->write(key, previous);
-    else m_store->remove(key);
+    // A SecretStore has no atomic replace operation. Detect when best-effort
+    // restoration also fails so callers can refuse to use this session.
+    const bool restored = hadPrevious ? m_store->write(key, previous) : m_store->remove(key);
+    QByteArray afterRestore;
+    m_consistent = restored && m_store->read(key, afterRestore)
+        && (hadPrevious ? afterRestore == previous : afterRestore.isEmpty());
+    if (!m_consistent && key == QStringLiteral("session")) {
+        // Best-effort persistent quarantine: if rollback is unavailable but a
+        // later write succeeds, leave a token-free record for the next launch.
+        const auto quarantine = QJsonDocument(QJsonObject{{"access_token", ""}, {"refresh_token", ""},
+            {"expires_at", 0}, {"user_session", false}}).toJson(QJsonDocument::Compact);
+        QByteArray quarantined;
+        if (m_store->write(key, quarantine) && m_store->read(key, quarantined) && quarantine == quarantined)
+            m_consistent = false;
+    }
     return false;
 }
 bool AuthStorage::load(const QString &key, const QString &legacyPath, QJsonObject &value) {
+    if (!m_consistent) return false;
     QByteArray bytes;
     if (!m_store->read(key, bytes)) return false;
     QFile legacy(legacyPath);
@@ -195,7 +210,8 @@ bool AuthStorage::load(const QString &key, const QString &legacyPath, QJsonObjec
     value = result; return true;
 }
 bool AuthStorage::remove(const QString &key, const QString &legacyPath) {
-    if (QFileInfo::exists(legacyPath) && !QFile::remove(legacyPath)) return false;
+    if (QFileInfo::exists(legacyPath) && !QFile::remove(legacyPath)) { m_consistent = false; return false; }
     QByteArray check;
-    return m_store->remove(key) && m_store->read(key, check) && check.isEmpty();
+    m_consistent = m_store->remove(key) && m_store->read(key, check) && check.isEmpty();
+    return m_consistent;
 }

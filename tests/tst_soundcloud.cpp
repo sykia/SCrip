@@ -88,13 +88,17 @@ public:
     QMap<QString, QByteArray> records;
     bool readable = true, writable = true, removable = true, corrupt = false;
     int writesBeforeFailure = -1;
+    int readsBeforeFailure = -1;
     bool corruptNextWrite = false;
     bool read(const QString &key, QByteArray &value) override {
         if (!readable) return false;
+        if (readsBeforeFailure == 0) { readsBeforeFailure = -1; return false; }
+        if (readsBeforeFailure > 0) --readsBeforeFailure;
         value = records.value(key); return true;
     }
     bool write(const QString &key, const QByteArray &value) override {
-        if (!writable || writesBeforeFailure == 0) return false;
+        if (!writable) return false;
+        if (writesBeforeFailure == 0) { writesBeforeFailure = -1; return false; }
         if (writesBeforeFailure > 0) --writesBeforeFailure;
         if (corruptNextWrite) { corruptNextWrite = false; records[key] = QByteArray("corrupt"); return true; }
         records[key] = corrupt ? QByteArray("corrupt") : value; return true;
@@ -311,6 +315,26 @@ private slots:
         QVERIFY(QFileInfo::exists(legacy.path()));
         QVERIFY(secrets->records.contains("session"));
     }
+    void failedAuthStorageRollbackIsReported() {
+        AuthStorage storage(secrets);
+        const QJsonObject previous{{"refresh_token", "old-refresh"}};
+        const QJsonObject candidate{{"refresh_token", "new-refresh"}};
+        QVERIFY(storage.save("session", previous));
+        secrets->readsBeforeFailure = 1; // allow the pre-write read, fail verification once
+        secrets->writesBeforeFailure = 1; // allow candidate write, reject rollback
+        QVERIFY(!storage.save("session", candidate));
+        const auto quarantined = QJsonDocument::fromJson(secrets->records["session"]).object();
+        QVERIFY(quarantined["access_token"].toString().isEmpty());
+        QVERIFY(quarantined["refresh_token"].toString().isEmpty());
+        QVERIFY(!secrets->records["session"].contains("old-refresh"));
+        QVERIFY(!secrets->records["session"].contains("new-refresh"));
+        QJsonObject loaded;
+        QVERIFY(!storage.load("session", {}, loaded));
+        AuthStorage restartedStorage(secrets);
+        QVERIFY(restartedStorage.load("session", {}, loaded));
+        QVERIFY(loaded["access_token"].toString().isEmpty());
+        QVERIFY(loaded["refresh_token"].toString().isEmpty());
+    }
     void hostileOAuthErrorDoesNotExposeBody() {
         QStringList logs;
         QVariantMap state;
@@ -361,6 +385,8 @@ private slots:
         QVERIFY(!secrets->records.contains("session"));
         QVERIFY(secrets->records.contains("connection"));
         QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty());
+        QVERIFY(!secrets->records["session"].contains("old-access"));
+        QVERIFY(!secrets->records["session"].contains("refresh-invalid"));
     }
     void logoutIsImmediateWhenRevocationFailsOrIsLate() {
         const QList<Response> failures = {
@@ -394,6 +420,11 @@ private slots:
         QVERIFY(!sc.state()["connected"].toBool()); QVERIFY(sc.m_access.isEmpty());
         QVERIFY(sc.state()["error"].toString().contains("хранилище"));
         QVERIFY(secrets->records.contains("session"));
+        const auto quarantined = QJsonDocument::fromJson(secrets->records["session"]).object();
+        QVERIFY(quarantined["access_token"].toString().isEmpty());
+        QVERIFY(quarantined["refresh_token"].toString().isEmpty());
+        Network restartNet; SoundCloud restarted(nullptr, &restartNet, secrets);
+        QVERIFY(restarted.m_access.isEmpty()); QVERIFY(restarted.m_refresh.isEmpty());
         secrets->removable = true;
         sc.logout(); QVERIFY(!secrets->records.contains("session"));
     }
@@ -548,6 +579,63 @@ private slots:
             QTest::qWait(10);
             QCOMPARE(errors, 1);
         }
+    }
+    void invalidRefreshRemovalFailureQuarantinesSession() {
+        AuthStorage storage(secrets);
+        const QJsonObject oldSession{{"client_id", "test-client"}, {"access_token", "old-access"},
+            {"refresh_token", "refresh-invalid"}, {"expires_at", 0}, {"user_session", true}};
+        QVERIFY(storage.save("session", oldSession));
+        secrets->removable = false;
+        Network net; net.responses = {{401, "{}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        int errors = 0;
+        QString failureMessage;
+        sc.request("/waiting", [](QJsonDocument) {}, "GET", {}, true, [&errors, &failureMessage](QString message) {
+            failureMessage = message; ++errors;
+        });
+        QTRY_COMPARE(errors, 1);
+        QVERIFY(sc.m_storageReady); // verified token-free quarantine was stored
+        QVERIFY(failureMessage.contains("хранилище"));
+        QTest::qWait(10);
+        QCOMPARE(errors, 1);
+        QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty());
+        QCOMPARE(net.requests.size(), 1);
+        Network restartNet; SoundCloud restarted(nullptr, &restartNet, secrets);
+        QVERIFY(restarted.m_access.isEmpty());
+        QVERIFY(restarted.m_refresh.isEmpty());
+        QVERIFY(!restarted.signedIn());
+        QCOMPARE(restartNet.requests.size(), 0);
+    }
+    void invalidRefreshQuarantineFailureDisablesStorageUse() {
+        AuthStorage storage(secrets);
+        QVERIFY(storage.save("session", {{"client_id", "test-client"}, {"access_token", "old-access"},
+            {"refresh_token", "refresh-invalid"}, {"expires_at", 0}, {"user_session", true}}));
+        Network net; net.responses = {{401, "{}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        secrets->removable = false; secrets->writable = false;
+        int errors = 0;
+        sc.request("/waiting", [](QJsonDocument) {}, "GET", {}, true, [&errors](QString) { ++errors; });
+        QTRY_COMPARE(errors, 1);
+        QVERIFY(!sc.m_storageReady);
+        QVERIFY(sc.m_access.isEmpty()); QVERIFY(sc.m_refresh.isEmpty()); QVERIFY(!sc.signedIn());
+        QCOMPARE(net.requests.size(), 1);
+    }
+    void invalidRefreshInvalidatesLateApiResponse() {
+        AuthStorage storage(secrets);
+        QVERIFY(storage.save("session", {{"client_id", "test-client"}, {"access_token", "old-access"},
+            {"refresh_token", "refresh-invalid"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}}));
+        Response lateMe{200, "{\"username\":\"Stale account\"}"}; lateMe.delay = 100;
+        Network net; net.responses = {lateMe, {401, "{}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.profile();
+        QTRY_COMPARE(net.requests.size(), 1);
+        sc.m_expires = 0;
+        int errors = 0;
+        sc.request("/trigger-refresh", [](QJsonDocument) {}, "GET", {}, true, [&errors](QString) { ++errors; });
+        QTRY_COMPARE(errors, 1);
+        QTRY_VERIFY(net.requests.size() >= 2);
+        QTest::qWait(130);
+        QVERIFY(sc.state()["profile"].toMap().isEmpty());
     }
     void logoutCancelsWaitingRefreshCallbacks() {
         QFile session(config + "/session.json"); QVERIFY(session.open(QIODevice::WriteOnly));
@@ -1016,6 +1104,10 @@ private slots:
         sc.set("tracks", QVariantList{QVariantMap{{"urn", "soundcloud:tracks:account-a"}}});
         sc.set("home", QVariantList{QVariantMap{{"title", "Account A shelf"}}});
         sc.set("destinations", QVariantList{QVariantMap{{"urn", "soundcloud:playlists:account-a"}}});
+        sc.set("destinationNext", "https://api.soundcloud.com/me/playlists?cursor=old-account");
+        sc.set("hasMore", true);
+        sc.m_nextHref = "https://api.soundcloud.com/me/likes/tracks?cursor=old-account";
+        sc.set("visitedProfile", QVariantMap{{"urn", "soundcloud:users:public"}, {"username", "Public user"}});
         connect(&sc, &SoundCloud::authorizationRequested, this, &SoundCloudTest::captureUrl);
         sc.login(); QVERIFY(sc.state()["authBusy"].toBool());
         net.responses = {
@@ -1031,6 +1123,10 @@ private slots:
         QVERIFY(sc.m_userSession); QVERIFY(!sc.state()["authBusy"].toBool());
         QVERIFY(sc.state()["tracks"].toList().isEmpty()); QVERIFY(sc.state()["home"].toList().isEmpty());
         QVERIFY(sc.state()["destinations"].toList().isEmpty());
+        QVERIFY(sc.state()["destinationNext"].toString().isEmpty());
+        QVERIFY(!sc.state()["hasMore"].toBool());
+        QVERIFY(sc.m_nextHref.isEmpty());
+        QCOMPARE(sc.state()["visitedProfile"].toMap()["username"].toString(), QString("Public user"));
         const auto saved = QJsonDocument::fromJson(secrets->records["session"]).object();
         QCOMPARE(saved["access_token"].toString(), QString("account-b-access"));
         QCOMPARE(saved["refresh_token"].toString(), QString("account-b-refresh"));

@@ -331,11 +331,18 @@ void SoundCloud::token(const QUrlQuery &form, bool basic, TokenFlow flow, std::f
             if (flow == TokenFlow::Refresh && (code == 400 || code == 401)) {
                 m_access.clear(); m_refresh.clear();
                 m_expires = 0; m_userSession = false;
-                if (!m_authStorage.remove("session", m_sessionPath)) message = AuthStorage::errorMessage();
+                if (!m_authStorage.remove("session", m_sessionPath)) {
+                    message = AuthStorage::errorMessage();
+                    const bool quarantined = m_authStorage.save("session", {{"client_id", m_clientId},
+                        {"access_token", ""}, {"refresh_token", ""}, {"expires_at", 0}, {"user_session", false}});
+                    if (!quarantined) m_storageReady = false;
+                }
+                ++m_epoch;
                 ++m_listing; ++m_homeGeneration;
                 set("profile", QVariantMap{}); set("tracks", QVariantList{});
                 set("home", QVariantList{}); set("homeBusy", false); set("homeError", "");
                 set("destinations", QVariantList{}); set("destinationNext", "");
+                set("loadingDestinations", false); set("savingTrack", false); set("busy", false);
                 set("connected", false); set("signedIn", false); set("status", "Войдите в SoundCloud");
             }
             if (failed) failed(message); else fail(message);
@@ -349,6 +356,13 @@ void SoundCloud::token(const QUrlQuery &form, bool basic, TokenFlow flow, std::f
         if (!saveSession(access, refresh, expires, userSession)) {
             m_refreshing = false;
             const auto message = AuthStorage::errorMessage();
+            if (!m_authStorage.consistent()) {
+                ++m_epoch; ++m_listing; ++m_homeGeneration;
+                m_access.clear(); m_refresh.clear(); m_expires = 0; m_userSession = false;
+                m_storageReady = false;
+                set("connected", false); set("signedIn", false); set("busy", false);
+                set("homeBusy", false); set("loadingDestinations", false); set("savingTrack", false);
+            }
             fail(message);
             if (failed) failed(message);
             return;
@@ -508,6 +522,8 @@ void SoundCloud::callbackConnection() {
 }
 bool SoundCloud::clearSession() {
     const bool removed = m_authStorage.remove("session", m_sessionPath);
+    const bool quarantined = removed || m_authStorage.save("session", {{"client_id", m_clientId},
+        {"access_token", ""}, {"refresh_token", ""}, {"expires_at", 0}, {"user_session", false}});
     ++m_homeGeneration; set("home", QVariantList{}); set("homeBusy", false); set("homeError", "");
     set("savingTrack", false); set("loadingDestinations", false); set("destinations", QVariantList{}); set("destinationNext", "");
     stopPlayback();
@@ -516,7 +532,10 @@ bool SoundCloud::clearSession() {
     m_queue.clear(); m_queueIndex = -1; m_nextHref.clear();
     set("queue", m_queue); set("queueIndex", -1); set("buffering", false); set("current", QVariantMap{}); set("tracks", QVariantList{}); set("profile", QVariantMap{});
     set("connected", false); set("signedIn", false); set("busy", false); set("hasMore", false); set("status", "Аккаунт отключён");
-    if (!removed) storageFailure();
+    if (!removed) {
+        if (!quarantined) m_storageReady = false;
+        fail(AuthStorage::errorMessage());
+    }
     return removed;
 }
 void SoundCloud::logout() {

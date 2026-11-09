@@ -21,7 +21,9 @@ public:
     bool load(const QString &key, const QString &legacyPath, QJsonObject &value);
     bool save(const QString &key, const QJsonObject &value);
     bool remove(const QString &key, const QString &legacyPath);
+    bool consistent() const { return m_consistent; }
     static QString errorMessage();
 private:
     std::shared_ptr<SecretStore> m_store;
+    bool m_consistent = true;
 };
