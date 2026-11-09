@@ -72,15 +72,6 @@ AndroidMedia::~AndroidMedia() {
     QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "shutdown", "()V");
     controller.clear();
 }
-bool AndroidMedia::addWidget() {
-    return QJniObject::callStaticMethod<jboolean>("org/scrip/app/MediaBridge", "pinWidget", "()Z");
-}
-int AndroidMedia::widgetStyle() const {
-    return QJniObject::callStaticMethod<jint>("org/scrip/app/MediaBridge", "getWidgetStyle", "()I");
-}
-void AndroidMedia::setWidgetStyle(int style) {
-    QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "setWidgetStyle", "(I)V", jint(style));
-}
 void AndroidMedia::publish() {
     const auto state = m_soundcloud->state();
     const auto track = state.value("current").toMap();

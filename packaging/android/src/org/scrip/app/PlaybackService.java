@@ -178,7 +178,7 @@ public class PlaybackService extends Service {
         } else {
             MediaBridge.playing = MediaBridge.active = MediaBridge.buffering = MediaBridge.preparing = MediaBridge.hasTrack = false;
         }
-        MusicWidget.refresh(this); super.onDestroy();
+        super.onDestroy();
     }
     private void cancelFocusResume() {
         handler.removeCallbacks(focusTimeout); resumeAfterFocus = focusPaused = false;

@@ -38,11 +38,7 @@ ApplicationWindow {
                 coverRadiusOverride = coverRadius !== 16
                 themePreferencesMigrated = true
             }
-            if (Qt.platform.os === "android")
-                widgetStyle = androidMedia.widgetStyle()
         }
-        property int widgetStyle: 0
-        onWidgetStyleChanged: if (Qt.platform.os === "android") androidMedia.setWidgetStyle(widgetStyle)
         property bool accentOverride: false
         property bool coverRadiusOverride: false
         property string accent: "#f43756"
@@ -76,11 +72,18 @@ ApplicationWindow {
     readonly property string scrollKey: page + ":" + (page === 3 ? library : page === 2 ? searchKind + ":" + search.text : page === 4 ? profileTab + ":" + (guest?.urn || "me") : "")
     property string activeScrollKey: scrollKey
     property bool restoringScroll: false
+    property bool profileTabResetPending: false
     onScrollKeyChanged: {
         restoringScroll = true
         activeScrollKey = scrollKey
         const saved = scrollPositions[activeScrollKey] || 0
-        Qt.callLater(function() { tracks.contentY = saved; restoringScroll = false })
+        Qt.callLater(function() {
+            if (app.page === 4 && app.profileTabResetPending)
+                tracks.positionViewAtBeginning()
+            else
+                tracks.contentY = saved
+            restoringScroll = false
+        })
     }
     onPageChanged: { refresh(); pageArrival.restart() }
     ParallelAnimation {
@@ -287,12 +290,6 @@ ApplicationWindow {
             }
         }
         Action {
-            visible: sc.signedIn && app.page > 0 && app.page < 5
-            text: "Обновить"; enabled: !app.api.busy
-            Layout.leftMargin: 20; Layout.bottomMargin: 8
-            onClicked: app.refresh(true)
-        }
-        Action {
             visible: sc.signedIn && app.page === 3 && app.library === "playlists"
             text: "Создать плейлист"; Layout.leftMargin: 20; Layout.bottomMargin: 12
             onClicked: createPlaylist.open()
@@ -335,7 +332,6 @@ ApplicationWindow {
                     }
                 }
                 Label { x: 18; width: parent.width - 36; visible: !(app.api.home || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
-                Action { x: 24; text: "Обновить подборки"; enabled: !app.api.homeBusy; onClicked: sc.loadHome(true) }
                 PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: navigationFooter.height + 16 }
             }
@@ -351,41 +347,6 @@ ApplicationWindow {
                 ColumnLayout {
                     visible: app.page === 5
                     Layout.fillWidth: true; Layout.margins: 18; spacing: 14
-                    Caption { text: "Воспроизведение"; font.bold: true; font.pixelSize: 19 }
-                    CheckBox { text: "Плавный переход между треками (3 секунды)"; checked: !!app.api.crossfade; Layout.fillWidth: true; onToggled: sc.setCrossfade(checked) }
-                    Caption { text: "Виджет"; font.bold: true; font.pixelSize: 19 }
-                    Caption { text: "Стиль для всех виджетов SCrip"; color: app.muted; font.pixelSize: 12 }
-                    Repeater {
-                        model: ["Blur Cover", "Dark Card", "Light Card"]
-                        delegate: AbstractButton {
-                            required property int index
-                            required property string modelData
-                            Layout.fillWidth: true
-                            implicitHeight: 76
-                            Accessible.name: "Стиль виджета: " + modelData
-                            background: Rectangle {
-                                radius: 16
-                                color: index === 2 ? "#f5f1f2" : index === 1 ? "#191a1d" : "#3a3438"
-                                border.width: prefs.widgetStyle === index ? 2 : 1
-                                border.color: prefs.widgetStyle === index ? app.accent : (index === 2 ? "#e6dfe2" : "#39383c")
-                            }
-                            contentItem: RowLayout {
-                                spacing: 12
-                                Rectangle {
-                                    Layout.leftMargin: 10; Layout.preferredWidth: 48; Layout.preferredHeight: 48
-                                    radius: 10; color: index === 2 ? "#d8d1d4" : index === 1 ? "#303237" : "#83616b"
-                                    Image { anchors.fill: parent; anchors.margins: 2; source: "qrc:/qt/qml/SCrip/assets/blob.png"; fillMode: Image.PreserveAspectFit }
-                                }
-                                ColumnLayout {
-                                    Layout.fillWidth: true; spacing: 3
-                                    Text { text: modelData; color: index === 2 ? "#242126" : "#fffaf9"; font.pixelSize: 14; font.bold: true }
-                                    Text { text: "Название трека · Исполнитель"; color: index === 2 ? "#77737a" : "#c8c3c8"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
-                                }
-                                Text { Layout.rightMargin: 14; text: prefs.widgetStyle === index ? "✓" : "▶   ❚❚"; color: index === 2 ? "#242126" : "#fffaf9"; font.pixelSize: 16 }
-                            }
-                            onClicked: prefs.widgetStyle = index
-                        }
-                    }
                     Caption { text: "SCrip"; font.bold: true; font.pixelSize: 19 }
                     Caption { text: "Версия " + Qt.application.version + (app.api.updateAvailable ? " · доступна " + app.api.latestVersion : ""); color: app.api.updateAvailable ? app.accent : app.muted; font.pixelSize: 13 }
                     Caption { text: app.api.updateError || app.api.updateResult || (app.api.updateChecking ? "Проверяем обновления…" : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
@@ -414,7 +375,6 @@ ApplicationWindow {
                     Switch { text: "Анимации"; checked: prefs.motion; onToggled: prefs.motion = checked }
                     Switch { text: "Загружать треки при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
                     Action { text: "Плагины"; Layout.fillWidth: true; onClicked: app.page = 6 }
-                    Action { visible: Qt.platform.os === "android"; text: "Виджет на рабочий стол"; Layout.fillWidth: true; onClicked: app.message = androidMedia.addWidget() ? "Подтверди добавление виджета на рабочий стол" : "Удерживай свободное место на рабочем столе → Виджеты → SCrip" }
                     Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
                     Caption { text: "Аккаунт"; font.bold: true; font.pixelSize: 19 }
                     Action { text: sc.signedIn ? "Выйти из SoundCloud" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: sc.signedIn ? sc.logout() : sc.login() }
@@ -433,6 +393,7 @@ ApplicationWindow {
             visible: sc.signedIn && app.page > 0 && app.page < 5
             Layout.fillWidth: true; Layout.fillHeight: true
             clip: true; model: sc.trackModel
+            onCountChanged: if (app.page === 4 && app.profileTabResetPending) positionViewAtBeginning()
             onContentYChanged: {
                 if (!app.restoringScroll && app.activeScrollKey === app.scrollKey) app.scrollPositions[app.activeScrollKey] = contentY
                 if (prefs.autoLoad && app.api.hasMore && !app.api.busy && contentY + height >= contentHeight - 180) sc.more()
@@ -443,16 +404,68 @@ ApplicationWindow {
                 height: visible ? implicitHeight : 0
                 spacing: 14
                 Rectangle {
-                    width: parent.width; height: 156
-                    gradient: Gradient { GradientStop { position: 0; color: Qt.tint("#f7edf2", Qt.alpha(app.accent, 0.15)) } GradientStop { position: 1; color: "#faf9fa" } }
+                    id: profileCard
+                    x: 16; width: parent.width - 32
+                    height: profileContent.implicitHeight + 30; radius: 22
+                    color: "#f3eff2"; clip: true
+                    readonly property bool creator: app.profile?.urn === "soundcloud:users:1675018934"
+                    readonly property var visuals: app.profile?.visuals?.visuals || app.profile?.visuals || []
+                    readonly property string banner: app.profile?.banner_url || app.profile?.cover_url || (visuals.length ? visuals[0]?.visual_url || "" : "")
                     Column {
-                        anchors.centerIn: parent; spacing: 10
-                        Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter; width: 72; height: 72; radius: 36; color: "#eee5eb"; clip: true
-                            RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.profile?.avatar_url || ""; avatar: true }
+                        id: profileContent
+                        width: parent.width; spacing: 12
+                        Item {
+                            width: parent.width; height: 158
+                            Rectangle { anchors.fill: parent; color: "#eee9ed" }
+                            Image {
+                                anchors.fill: parent; source: profileCard.banner
+                                visible: status === Image.Ready; asynchronous: true
+                                fillMode: Image.PreserveAspectCrop
+                                sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
+                            }
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
+                                width: 86; height: 86; radius: 43
+                                color: "#faf9fa"; border.width: profileCard.creator ? 3 : 2
+                                border.color: profileCard.creator ? app.accent : "#ffffff"
+                                RoundedImage { anchors.fill: parent; anchors.margins: 4; avatar: true; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; source: app.profile?.avatar_url || "" }
+                            }
+                            Rectangle {
+                                visible: profileCard.creator
+                                anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10
+                                width: creatorBadge.implicitWidth + 20; height: 27; radius: 14; color: app.accent
+                                Text { id: creatorBadge; anchors.centerIn: parent; text: "✦ Создатель SCrip"; color: "white"; font.pixelSize: 11; font.bold: true }
+                            }
                         }
-                        Caption { anchors.horizontalCenter: parent.horizontalCenter; text: app.profile?.username || "Твой профиль"; font.pixelSize: 19; font.bold: true }
-                        Caption { anchors.horizontalCenter: parent.horizontalCenter; text: (app.profile?.followers_count || 0) + " подписчиков · " + (app.profile?.track_count || 0) + " треков"; color: app.muted; font.pixelSize: 12 }
+                        Caption { anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter; text: app.profile?.username || "Твой профиль"; font.pixelSize: 19; font.bold: true }
+                        Caption {
+                            anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter
+                            color: app.accent; font.bold: true; font.pixelSize: 12; visible: !!text
+                            text: {
+                                const p = app.profile || {}
+                                const products = (p.subscriptions || []).map(s => (s.product?.id || "") + " " + (s.product?.name || "")).join(" ")
+                                const info = (products + " " + (p.plan || "")).toLowerCase()
+                                const badges = []
+                                if (/artist[ -]pro|pro[ -]unlimited|pro plus/.test(info)) badges.push("Artist Pro")
+                                if (/go[ +_-]plus|go\+/.test(info)) badges.push("Go+")
+                                else if (/\bgo\b/.test(info)) badges.push("Go")
+                                return badges.join(" · ")
+                            }
+                        }
+                        Caption { anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter; visible: !!text; text: [app.profile?.city, app.profile?.country].filter(Boolean).join(", "); color: app.muted; font.pixelSize: 12 }
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter; spacing: 22
+                            Repeater {
+                                model: [{value: app.profile?.followers_count || 0, label: "подписчиков"}, {value: app.profile?.followings_count || 0, label: "подписок"}, {value: app.profile?.track_count || 0, label: "треков"}]
+                                Column {
+                                    required property var modelData
+                                    spacing: 3
+                                    Caption { anchors.horizontalCenter: parent.horizontalCenter; text: parent.modelData.value; font.bold: true; font.pixelSize: 15 }
+                                    Caption { anchors.horizontalCenter: parent.horizontalCenter; text: parent.modelData.label; color: app.muted; font.pixelSize: 11 }
+                                }
+                            }
+                        }
                     }
                 }
                 Label { x: 18; width: parent.width - 36; text: app.profile?.description || ""; visible: !!text; wrapMode: Text.Wrap; color: app.muted; maximumLineCount: 4; elide: Text.ElideRight }
@@ -460,7 +473,7 @@ ApplicationWindow {
                     width: parent.width - 32; x: 16
                     Repeater {
                         model: app.guest ? ["Треки", "Плейлисты"] : ["Треки", "Плейлисты", "Лайки", "Репосты"]
-                        Action { required property int index; required property string modelData; text: modelData; Layout.fillWidth: true; font.pixelSize: 12; leftPadding: 10; rightPadding: 10; implicitHeight: 44; primary: app.profileTab === index; onClicked: { app.profileTab = index; app.refresh() } }
+                        Action { required property int index; required property string modelData; text: modelData; Layout.fillWidth: true; font.pixelSize: 12; leftPadding: 10; rightPadding: 10; implicitHeight: 44; primary: app.profileTab === index; onClicked: { if (app.profileTab !== index) { app.profileTabResetPending = true; app.profileTab = index; app.refresh(); Qt.callLater(function() { tracks.positionViewAtBeginning() }) } } }
                     }
                 }
                 PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "profile"; onReport: error => app.message = error }
@@ -469,6 +482,20 @@ ApplicationWindow {
             delegate: Track {}
             Label { anchors.centerIn: parent; width: parent.width - 48; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; visible: !tracks.count; color: app.muted; text: app.api.busy ? "Загрузка…" : app.page === 2 ? "Найди то, что хочется услышать" : "Здесь пока нет треков" }
             footer: Action { visible: !!app.api.hasMore; text: "Показать ещё"; enabled: !app.api.busy; onClicked: sc.more() }
+        }
+    }
+
+    Connections {
+        target: sc
+        function onCatalogChanged() {
+            if (app.profileTabResetPending && app.page === 4 && !app.api.busy) {
+                Qt.callLater(function() {
+                    if (app.profileTabResetPending && app.page === 4) {
+                        tracks.positionViewAtBeginning()
+                        app.profileTabResetPending = false
+                    }
+                })
+            }
         }
     }
 

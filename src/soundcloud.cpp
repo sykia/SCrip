@@ -191,7 +191,12 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     QSettings preferences;
     m_audio.setVolume(preferences.value("player/volume", 0.7).toDouble());
     set("volume", m_audio.volume());
+#ifdef Q_OS_ANDROID
+    // На мобильных устройствах переходы между треками отключены, включая старую настройку.
+    set("crossfade", false);
+#else
     set("crossfade", preferences.value("player/crossfade", false).toBool());
+#endif
     m_volumeFade.setDuration(65);
     connect(&m_volumeFade, &QVariantAnimation::valueChanged, this, [this](const QVariant &level) {
         m_audio.setVolume(level.toFloat());
@@ -919,6 +924,9 @@ void SoundCloud::pausePlayback() {
     set("playbackActive", false);
     if (m_crossfadeStarted) { m_crossfade.pause(); m_preloadPlayer->pause(); }
     player().pause();
+#ifdef Q_OS_ANDROID
+    savePlayback();
+#endif
 }
 void SoundCloud::resumePlayback() {
     if (player().source().isEmpty()) {
@@ -998,6 +1006,9 @@ void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 posi
     }
     m_preloadUrn.clear(); m_preloadIndex = -1;
     set("current", track); set("position", position); set("duration", track.value("duration")); set("buffering", true);
+#ifdef Q_OS_ANDROID
+    savePlayback();
+#endif
     if (track.value("access").toString() == "blocked" || track.value("streamable") == false) { set("playbackActive", false); set("buffering", false); failAndroidRestore(); fail("Этот трек недоступен для воспроизведения через API."); return; }
     if (prepared) {
         set("buffering", player().mediaStatus() != QMediaPlayer::BufferedMedia);

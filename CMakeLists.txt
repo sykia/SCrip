@@ -30,7 +30,11 @@ if(ANDROID)
     list(APPEND executable_options MANUAL_FINALIZATION)
 endif()
 qt_add_executable(scrip ${executable_options} src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/soundcloud.cpp src/soundcloud.h src/artworknetwork.cpp src/artworknetwork.h)
-target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${PROJECT_VERSION}")
+set(SCRIP_APP_VERSION "${PROJECT_VERSION}")
+if(ANDROID)
+    set(SCRIP_APP_VERSION "1.5.1")
+endif()
+target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)
 set_source_files_properties(qml/android/RoundedImage.qml PROPERTIES QT_RESOURCE_ALIAS RoundedImage.qml)
@@ -72,7 +76,7 @@ if(ANDROID)
         set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${android_ssl_dir}/${library}")
     endforeach()
     set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME SCrip
-        QT_ANDROID_VERSION_CODE 10500 QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
+        QT_ANDROID_VERSION_CODE 10501 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android")
