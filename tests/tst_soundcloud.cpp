@@ -827,7 +827,7 @@ private slots:
         QCoreApplication::processEvents();
         QCOMPARE(sc.m_access, QString("saved-access"));
         QVERIFY(!sc.state()["configured"].toBool());
-        sc.configure("  ", "   ", QString("http://127.0.0.1:%1/callback").arg(callbackPort));
+        sc.configure("updated-client", "   ", QString("http://127.0.0.1:%1/callback").arg(callbackPort));
         QVERIFY(!sc.state()["error"].toString().isEmpty());
         QCOMPARE(secrets->records["connection"], savedConnection);
         QCOMPARE(secrets->records["session"], savedSession);
