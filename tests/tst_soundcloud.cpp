@@ -1665,8 +1665,9 @@ private slots:
                 QTRY_VERIFY(!sc.state()["hasMore"].toBool());
                 const qreal appendedEnd = gridView->property("contentHeight").toReal() - gridView->property("height").toReal();
                 gridView->setProperty("contentY", appendedEnd);
-                QVERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 5000)));
-                QCOMPARE(title.toString(), QString("Карточка 5000"));
+                // Qt создаёт делегат после обновления модели и следующего кадра.
+                QTRY_VERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 5000))
+                            && title.toString() == QString("Карточка 5000"));
             }
         }
         preferences->setProperty("gridView", false); QCoreApplication::processEvents(); QTest::qWait(120);
