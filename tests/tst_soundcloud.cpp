@@ -812,6 +812,9 @@ private slots:
         SoundCloud sc(nullptr, &net, secrets);
         sc.m_access = "private-oauth-token"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
         CaptureMessages messages;
+        // Здесь проверяется выбор URL, а не декодирование вымышленного CDN.
+        // Ошибка DNS не должна успеть переключить кандидат во время QTRY_COMPARE.
+        const QSignalBlocker playerSignals(sc.m_activePlayer);
         sc.startTrack({{"urn", "soundcloud:tracks:96"}}, false);
         QTRY_COMPARE(sc.m_streamCandidates.size(), 2);
         QCOMPARE(sc.m_streamCandidates.first().first, QString("hls_aac_96_url"));
