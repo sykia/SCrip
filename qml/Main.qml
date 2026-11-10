@@ -504,7 +504,7 @@ Window {
                                 implicitWidth: 38; implicitHeight: 38; primary: true; round: true
                                 enabled: player.hasTrack; opacity: 1; onClicked: sc.togglePlayback()
                                 background: Rectangle { radius: width / 2; color: parent.enabled ? app.accent : "#a7a7af" }
-                                BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: app.api.buffering; visible: running }
+                                BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: !!app.api.buffering; visible: running }
                             }
                             Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!app.api.queue?.length; onClicked: sc.next() }
                             Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "repeat"; active: app.api.repeat; text: "Повтор трека"; onClicked: sc.setRepeat(!app.api.repeat) }
