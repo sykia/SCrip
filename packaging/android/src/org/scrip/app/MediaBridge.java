@@ -19,6 +19,7 @@ public final class MediaBridge {
     private static boolean pendingPlay;
     private static boolean restorePending;
     static volatile boolean preparing;
+    static volatile long prepareStartedAt;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
     static boolean playing, active, buffering, hasTrack, liked;
     static long position, duration;
@@ -43,8 +44,10 @@ public final class MediaBridge {
     /** Start the foreground service while the activity is still visible, before Qt starts decoding audio. */
     public static void preparePlayback() {
         if (!ready || context == null) return;
+        prepareStartedAt = SystemClock.elapsedRealtime();
         MAIN.post(() -> {
             if (!ready) return;
+            Log.i("SCripStartup", "android_prepare_dispatch_ms=" + (SystemClock.elapsedRealtime() - prepareStartedAt));
             preparing = true;
             // Существующая служба остаётся foreground на всём переходе.
             if (PlaybackService.instance != null) return;

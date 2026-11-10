@@ -11,6 +11,7 @@
 #include <QVariantAnimation>
 #include <QTcpServer>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QSaveFile>
 #include <QCryptographicHash>
 #include <QJsonDocument>
@@ -120,17 +121,19 @@ private:
     struct WaitingOperation { std::function<void()> continuation; TokenFailure failed; };
     void ensureToken(std::function<void()> continuation, TokenFailure failed = {});
     void token(const QUrlQuery &form, bool basic, TokenFlow flow, std::function<void()> done, TokenFailure failed = {}, int loginEpoch = -1);
-    void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {});
+    void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {}, std::function<void()> started = {});
     void collection(const QString &path, bool append = false);
     void resolveRepostLikes(const QString &path, int generation, int revision, QSet<QString> pending);
     void profile();
     void savePlayback();
     void savePlaybackPosition();
     void restorePlayback(const QVariantMap &profile);
-    void startTrack(const QVariantMap &track, bool autoplay = true, qint64 position = 0);
+    void startTrack(const QVariantMap &track, bool autoplay = true, qint64 position = 0, bool recovery = false);
     void tryRestoreAndroidTrack();
     void failAndroidRestore();
     void resolveStream(const QUrl &url, int generation, int redirects = 0);
+    void nextStream(int generation, const char *reason);
+    void startupStage(const char *stage);
     void prepareNext();
     void holdPreloadedAudio(QMediaPlayer *media);
     void prepareStream(const QUrl &url, int generation, int redirects = 0);
@@ -158,6 +161,19 @@ private:
     QString m_preloadUrn;
     int m_preloadGeneration = 0;
     int m_preloadIndex = -1;
+    QList<QPair<QString, QUrl>> m_streamCandidates;
+    int m_streamCandidateIndex = -1;
+    QElapsedTimer m_startupClock;
+    qint64 m_lastStartupMs = 0;
+    qint64 m_startupInitialPosition = 0;
+    bool m_startupPending = false;
+    bool m_startupAudible = false;
+    bool m_startupSourceSet = false;
+    bool m_startupLoadedLogged = false;
+    bool m_startupUsedPreload = false;
+    bool m_preloadedRetryUsed = false;
+    bool m_previewStreamAvailable = false;
+    bool m_androidPreload = false;
     QAudioOutput m_audio;
     QVariantAnimation m_volumeFade;
     QVariantAnimation m_crossfade;

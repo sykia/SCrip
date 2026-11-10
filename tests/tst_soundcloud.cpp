@@ -806,6 +806,130 @@ private slots:
         QVERIFY(!sc.state()["playbackActive"].toBool());
         QVERIFY(!sc.state()["buffering"].toBool());
     }
+    void aac96IsPreferredToLegacyAndStartupLogIsRedacted() {
+        Network net;
+        net.responses = {{200, "{\"hls_aac_96_url\":\"https://cdn.example.test/96.m3u8?signature=private-signature\",\"hls_mp3_128_url\":\"https://cdn.example.test/mp3.m3u8\"}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "private-oauth-token"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        CaptureMessages messages;
+        sc.startTrack({{"urn", "soundcloud:tracks:96"}}, false);
+        QTRY_COMPARE(sc.m_streamCandidates.size(), 2);
+        QCOMPARE(sc.m_streamCandidates.first().first, QString("hls_aac_96_url"));
+        QCOMPARE(sc.m_streamCandidateIndex, 0);
+        const QString log = messages.messages.join('\n');
+        QVERIFY(log.contains("SCripStartup"));
+        QVERIFY(log.contains("delta_ms="));
+        QVERIFY(log.contains("streams_http_start"));
+        QVERIFY(!log.contains("private-oauth-token"));
+        QVERIFY(!log.contains("private-signature"));
+    }
+    void restoredPositionDoesNotCountAsFirstProgress() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        CaptureMessages messages;
+        sc.m_startupClock.start(); sc.m_startupPending = true; sc.m_startupAudible = true;
+        sc.m_startupInitialPosition = 25000;
+        QVERIFY(QMetaObject::invokeMethod(sc.m_activePlayer, "mediaStatusChanged", Qt::DirectConnection,
+            Q_ARG(QMediaPlayer::MediaStatus, QMediaPlayer::LoadedMedia)));
+        QVERIFY(!messages.messages.join('\n').contains("qt_loaded"));
+        QVERIFY(QMetaObject::invokeMethod(sc.m_activePlayer, "positionChanged", Qt::DirectConnection, Q_ARG(qint64, 25000)));
+        QVERIFY(!messages.messages.join('\n').contains("first_progress"));
+        QVERIFY(QMetaObject::invokeMethod(sc.m_activePlayer, "positionChanged", Qt::DirectConnection, Q_ARG(qint64, 25001)));
+        QVERIFY(messages.messages.join('\n').contains("first_progress"));
+        QVERIFY(!sc.m_startupPending);
+    }
+    void invalidAacStreamFallsBackTo96() {
+        Network net;
+        net.responses = {{200, "{\"hls_aac_160_url\":\"http://invalid.example/160.m3u8\",\"hls_aac_96_url\":\"https://cdn.example.test/96.m3u8\"}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.startTrack({{"urn", "soundcloud:tracks:fallback"}}, false);
+        QTRY_COMPARE(sc.m_streamCandidateIndex, 1);
+        QCOMPARE(sc.m_streamCandidates[1].first, QString("hls_aac_96_url"));
+        QCOMPARE(net.requests.size(), 1);
+    }
+    void previewOnlyIsNotStartedAsFullTrack() {
+        Network net;
+        net.responses = {{200, "{\"preview_mp3_128_url\":\"https://cdn.example.test/preview.mp3\"}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.startTrack({{"urn", "soundcloud:tracks:preview-only"}});
+        QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+        QVERIFY(sc.state()["error"].toString().contains("только короткий фрагмент"));
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QVERIFY(!sc.state()["buffering"].toBool());
+        QVERIFY(sc.m_streamCandidates.isEmpty());
+        QVERIFY(sc.m_activePlayer->source().isEmpty());
+    }
+    void qtStartupErrorFallsBackWithoutExposingUrl() {
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_streamCandidates = {{"hls_aac_160_url", QUrl("https://cdn.example.test/160.m3u8?signature=private")},
+                                 {"hls_aac_96_url", QUrl("https://cdn.example.test/96.m3u8")}};
+        sc.m_streamCandidateIndex = 0; sc.m_startupPending = true; sc.m_startupClock.start();
+        CaptureMessages messages;
+        sc.m_activePlayer->errorOccurred(QMediaPlayer::FormatError, "private backend error");
+        QCOMPARE(sc.m_streamCandidateIndex, 1);
+        QVERIFY(!messages.messages.join('\n').contains("private"));
+    }
+    void preloadedSourceFailureRefreshesStreamsOnlyOnce() {
+        Network net; net.responses = {{200, "{\"hls_aac_160_url\":\"http://invalid.example/expired.m3u8\"}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_state["current"] = QVariantMap{{"urn", "soundcloud:tracks:expired"}};
+        sc.m_state["playbackActive"] = true;
+        sc.m_startupClock.start(); sc.m_startupPending = true; sc.m_startupUsedPreload = true;
+        sc.m_activePlayer->errorOccurred(QMediaPlayer::NetworkError, "expired signed URL");
+        QTRY_COMPARE(sc.m_streamCandidates.size(), 1);
+        QCOMPARE(net.requests.size(), 1);
+        QVERIFY(sc.m_preloadedRetryUsed);
+        QVERIFY(!sc.m_startupUsedPreload);
+        sc.m_activePlayer->errorOccurred(QMediaPlayer::NetworkError, "fresh stream failed");
+        QCOMPARE(net.requests.size(), 1);
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+    }
+    void lateStreamsResponseCannotReplaceRapidlySelectedTrack() {
+        Network net;
+        net.responses = {
+            {200, "{\"hls_aac_160_url\":\"http://invalid.example/old.m3u8\",\"hls_aac_96_url\":\"http://invalid.example/old-96.m3u8\"}", 150},
+            {200, "{\"hls_aac_96_url\":\"http://invalid.example/new-96.m3u8\"}", 1}
+        };
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.play({{"urn", "soundcloud:tracks:old"}});
+        sc.play({{"urn", "soundcloud:tracks:new"}});
+        QTRY_VERIFY(!sc.m_startupPending);
+        QTest::qWait(180); // Поздний ответ старого трека уже должен прийти.
+        QCOMPARE(sc.state()["current"].toMap().value("urn").toString(), QString("soundcloud:tracks:new"));
+        QCOMPARE(sc.m_streamCandidates.size(), 1);
+        QCOMPARE(sc.m_streamCandidates.first().first, QString("hls_aac_96_url"));
+        QVERIFY(sc.m_activePlayer->source().isEmpty());
+        QCOMPARE(net.requests.size(), 2);
+    }
+    void streamResolverRateLimitDoesNotTryOtherFormats() {
+        Network net;
+        net.responses = {{200, "{\"hls_aac_160_url\":\"https://api.soundcloud.com/resolve-160\",\"hls_aac_96_url\":\"https://api.soundcloud.com/resolve-96\"}"},
+                         {429, "{}"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.startTrack({{"urn", "soundcloud:tracks:limited"}}, false);
+        QTRY_VERIFY(sc.state()["error"].toString().contains("ограничил"));
+        QCOMPARE(net.requests.size(), 2);
+        QVERIFY(!sc.state()["buffering"].toBool());
+    }
+    void streamRateLimitAndTimeoutFinishBuffering() {
+        for (const Response failure : {Response{429, "{}"}, Response{0, "", 0, QNetworkReply::TimeoutError}}) {
+            Network net; net.responses = {failure};
+            SoundCloud sc(nullptr, &net, secrets);
+            sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+            sc.startTrack({{"urn", "soundcloud:tracks:failure"}});
+            QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
+            QVERIFY(!sc.state()["buffering"].toBool());
+            QVERIFY(!sc.state()["playbackActive"].toBool());
+            QCOMPARE(net.requests.size(), 1);
+            if (failure.status == 429) QVERIFY(sc.state()["error"].toString().contains("ограничил"));
+            else QVERIFY(sc.state()["error"].toString().contains("ожидания"));
+        }
+    }
     void updateCheckDoesNotDownloadOrInstall() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());

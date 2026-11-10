@@ -6,6 +6,7 @@ import android.content.pm.ServiceInfo;
 import android.media.*;
 import android.media.session.*;
 import android.os.*;
+import android.util.Log;
 
 /** Foreground-служба удерживает Qt-процесс, а не воспроизводит вторую копию аудио. */
 public class PlaybackService extends Service {
@@ -79,6 +80,8 @@ public class PlaybackService extends Service {
             .setContentText("Подготовка воспроизведения…").setOngoing(true)
             .setContentIntent(MediaBridge.openApp(this)).build();
         enterForeground(pending);
+        if (MediaBridge.prepareStartedAt > 0)
+            Log.i("SCripStartup", "android_foreground_ms=" + (SystemClock.elapsedRealtime() - MediaBridge.prepareStartedAt));
         publish(); return START_NOT_STICKY;
     }
     void publish() {
