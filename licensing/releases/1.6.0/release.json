@@ -1,0 +1,18 @@
+{
+  "version": "1.6.0",
+  "platforms": [
+    "Windows",
+    "Linux-DEB",
+    "Linux-Arch",
+    "Android"
+  ],
+  "application_code_commit": "49609056cbdde669b04de1a85c065d1725c8edb6",
+  "base_materials": {
+    "url": "https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz",
+    "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
+  },
+  "materials_overlay": {
+    "name": "compliance-update.tar.gz",
+    "sha256": "7d06d0d453d7f3ff0bbc46412fe3cac049bb6a0e2a2a17f0e341b7dda6461827"
+  }
+}
