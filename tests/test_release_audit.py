@@ -65,3 +65,27 @@ class PartialReleaseTests(unittest.TestCase):
         bundle.write_bytes(b'wrong archive')
         with self.assertRaisesRegex(ValueError, 'SHA-256'):
             prepare(descriptor, self.root / 'out', bundle)
+
+    def test_overlay_restores_sources_and_checks_real_package(self):
+        descriptor = self.root / 'descriptor'
+        descriptor.mkdir()
+        bundle = self.root / 'base.tar.gz'
+        with tarfile.open(bundle, 'w:gz') as archive:
+            archive.add(self.materials / 'Android', arcname='Android')
+        overlay = self.assets / 'materials-update.tar.gz'
+        with tarfile.open(overlay, 'w:gz') as archive:
+            archive.add(self.manifest, arcname='Android-compliance.json')
+            archive.add(self.materials / 'Android/source.tar', arcname='source.tar')
+        sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+        info = {'base_materials': {
+            'url': 'https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz',
+            'sha256': sha(bundle)}, 'platforms': ['Android'],
+            'materials_overlay': {'name': overlay.name, 'sha256': sha(overlay)}}
+        (descriptor / 'release.json').write_text(json.dumps(info))
+        output = self.root / 'restored'
+        prepare(descriptor, output, bundle, self.assets)
+        audit(self.assets, output, ['Android'])
+        with overlay.open('ab') as target:
+            target.write(b'changed')
+        with self.assertRaisesRegex(ValueError, 'SHA-256 дополнения'):
+            prepare(descriptor, self.root / 'tampered', bundle, self.assets)

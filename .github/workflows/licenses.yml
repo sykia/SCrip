@@ -53,7 +53,7 @@ jobs:
           gh release download "${args[@]}" --repo "$GITHUB_REPOSITORY" --dir build/release-assets
           release_dir="licensing/releases/${TAG#v}"
           if [ -f "$release_dir/release.json" ]; then
-            python scripts/prepare_release_materials.py --release-dir "$release_dir" --output build/compliance --bundle build/base-compliance.tar.gz
+            python scripts/prepare_release_materials.py --release-dir "$release_dir" --output build/compliance --bundle build/base-compliance.tar.gz --assets build/release-assets
             mapfile -t platforms < <(python -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["platforms"]))' "$release_dir/release.json")
             platform_args=()
             for platform in "${platforms[@]}"; do platform_args+=(--platform "$platform"); done
