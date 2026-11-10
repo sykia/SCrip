@@ -72,9 +72,22 @@ class PartialReleaseTests(unittest.TestCase):
         bundle = self.root / 'base.tar.gz'
         with tarfile.open(bundle, 'w:gz') as archive:
             archive.add(self.materials / 'Android', arcname='Android')
+        # Новый путь уведомления отсутствует в базовых материалах.
+        notice = self.root / 'UPDATED-NOTICE'
+        notice.write_text('Updated copyright and license')
+        manifest = json.loads(self.manifest.read_text())
+        manifest['components']['app']['notice'] = 'payload/UPDATED-NOTICE'
+        package = self.assets / 'test.apk'
+        with zipfile.ZipFile(package, 'w') as archive:
+            archive.writestr('UPDATED-NOTICE', notice.read_bytes())
+        manifest['artifact_sha256'] = hashlib.sha256(package.read_bytes()).hexdigest()
+        manifest['files'] = {'UPDATED-NOTICE': {
+            'sha256': hashlib.sha256(notice.read_bytes()).hexdigest(), 'components': ['app']}}
+        self.manifest.write_text(json.dumps(manifest))
         overlay = self.assets / 'materials-update.tar.gz'
         with tarfile.open(overlay, 'w:gz') as archive:
             archive.add(self.manifest, arcname='Android-compliance.json')
+            archive.add(notice, arcname='payload/UPDATED-NOTICE')
             archive.add(self.materials / 'Android/source.tar', arcname='source.tar')
         sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
         info = {'base_materials': {

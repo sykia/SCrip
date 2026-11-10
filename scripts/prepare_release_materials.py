@@ -50,16 +50,17 @@ def prepare(release_dir, output, bundle, assets=None):
         shutil.copy2(local_file(release_dir, platform + '-compliance.json'), target / 'compliance.json')
         manifest = json.loads((target / 'compliance.json').read_text())
         for component in manifest['components'].values():
-            source = Path(component['source'])
-            if source.is_absolute() or '..' in source.parts:
-                raise ValueError('Небезопасный путь исходников')
-            replacement = release_dir / source
-            if replacement.is_file():
-                target_file = target / source
-                target_file.parent.mkdir(parents=True, exist_ok=True)
-                # Базовый tar может содержать hardlink: не менять соседние платформы.
-                target_file.unlink(missing_ok=True)
-                shutil.copy2(local_file(release_dir, str(source)), target_file)
+            for field in ('source', 'notice'):
+                relative = Path(component[field])
+                if relative.is_absolute() or '..' in relative.parts:
+                    raise ValueError('Небезопасный путь материалов')
+                replacement = release_dir / relative
+                if replacement.is_file():
+                    target_file = target / relative
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+                    # Базовый tar может содержать hardlink: не менять соседние платформы.
+                    target_file.unlink(missing_ok=True)
+                    shutil.copy2(local_file(release_dir, str(relative)), target_file)
         print(platform)
     if temporary is not None:
         temporary.cleanup()
