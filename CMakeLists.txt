@@ -75,6 +75,14 @@ if(ANDROID)
         endif()
         set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${android_ssl_dir}/${library}")
     endforeach()
+    # Qt 6.10.1 поставляет FFmpeg 7.1.2 с ошибкой перемотки fMP4 HLS (FFmpeg #7359).
+    set(SCRIP_ANDROID_FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/build/android-ffmpeg-seek" CACHE PATH
+        "Каталог FFmpeg 7.1.2 с исправлением перемотки HLS")
+    set(scrip_avformat "${SCRIP_ANDROID_FFMPEG_ROOT}/${CMAKE_ANDROID_ARCH_ABI}/libavformat.so")
+    if(NOT EXISTS "${scrip_avformat}")
+        message(FATAL_ERROR "Сначала выполните scripts/build_android_ffmpeg.sh ${CMAKE_ANDROID_ARCH_ABI}")
+    endif()
+    set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${scrip_avformat}")
     set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME SCrip
         QT_ANDROID_VERSION_CODE 10503 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
@@ -92,6 +100,11 @@ include(CTest)
 if(BUILD_TESTING AND NOT ANDROID)
     find_package(Qt6 REQUIRED COMPONENTS Test)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest)
+    if(Qt6_VERSION VERSION_GREATER_EQUAL 6.8)
+        qt_add_executable(scrip_hls_seek_tests tests/tst_hlsseek.cpp)
+        target_link_libraries(scrip_hls_seek_tests PRIVATE Qt6::Test Qt6::Multimedia)
+        add_test(NAME hls_seek COMMAND scrip_hls_seek_tests)
+    endif()
     qt_add_executable(scrip_tests tests/tst_soundcloud.cpp src/soundcloud.cpp src/soundcloud.h)
     if(qt_core_type STREQUAL "SHARED_LIBRARY")
         set_target_properties(scrip_tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)

@@ -11,6 +11,7 @@ export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$base/gradle}"
 export SCRIP_ANDROID_OPENSSL_ROOT="${SCRIP_ANDROID_OPENSSL_ROOT:-$base/openssl}"
 export QT_HOST_PATH="${QT_HOST_PATH:-$base/qt/6.10.1/gcc_64}"
 qt_android="${SCRIP_QT_ANDROID:-$base/qt/6.10.1/android_arm64_v8a}"
+"$PWD/scripts/build_android_ffmpeg.sh"
 "$qt_android/bin/qt-cmake" -S . -B build/android-universal -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DQT_HOST_PATH="$QT_HOST_PATH" -DANDROID_PLATFORM=android-28 \
     -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON '-DQT_ANDROID_ABIS=arm64-v8a;armeabi-v7a;x86_64' \

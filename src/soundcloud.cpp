@@ -225,13 +225,6 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     for (auto *media : players) {
         connect(media, &QMediaPlayer::positionChanged, this, [this, media](qint64 p) {
             if (media != m_activePlayer) return;
-#ifdef Q_OS_ANDROID
-            if (m_seekRecoveryPending && media->playbackState() == QMediaPlayer::PlayingState &&
-                p > m_seekRecoveryPosition + 300) {
-                m_seekRecoveryPending = false;
-                ++m_seekGeneration;
-            }
-#endif
             // Restore/seek emits positionChanged too; count progress only after the
             // saved start position has actually advanced while Qt is playing.
             if (p > m_startupInitialPosition && m_startupAudible) {
@@ -257,13 +250,6 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         });
         connect(media, &QMediaPlayer::errorOccurred, this, [this, media](QMediaPlayer::Error e, const QString &) {
             if (media == m_activePlayer && e != QMediaPlayer::NoError) {
-#ifdef Q_OS_ANDROID
-                if (m_seekRecoveryPending && m_state.value("playbackActive").toBool()) {
-                    qWarning() << "SCripSeek" << "media_error=" << int(e) << "recovering_at_ms=" << m_seekRecoveryPosition;
-                    recoverSeek(media);
-                    return;
-                }
-#endif
                 if (m_startupPending && m_startupUsedPreload && !m_preloadedRetryUsed) {
                     m_preloadedRetryUsed = true;
                     startupStage("preloaded_url_refresh");
@@ -1027,7 +1013,6 @@ void SoundCloud::togglePlayback() {
     if (m_state.value("playbackActive").toBool()) pausePlayback(); else resumePlayback();
 }
 void SoundCloud::pausePlayback() {
-    m_seekRecoveryPending = false; ++m_seekGeneration;
     set("playbackActive", false);
     if (m_crossfadeStarted) { m_crossfade.pause(); m_preloadPlayer->pause(); }
     player().pause();
@@ -1049,7 +1034,6 @@ void SoundCloud::resumePlayback() {
 }
 void SoundCloud::stopPlayback() {
     m_androidRestorePending = false; m_androidRestoreTrack.clear(); m_restoringPlayback = false;
-    m_seekRecoveryPending = false; ++m_seekGeneration;
     ++m_playGeneration; ++m_preloadGeneration;
     m_startupPending = m_startupAudible = false;
     m_startupSourceSet = m_startupLoadedLogged = m_startupUsedPreload = m_preloadedRetryUsed = false;
@@ -1072,51 +1056,7 @@ void SoundCloud::seek(qint64 position) {
     if (!media->isSeekable()) return;
     const qint64 duration = media->duration();
     const qint64 target = duration > 0 ? qBound(qint64(0), position, duration) : qMax(qint64(0), position);
-    const bool resumeAfterSeek = m_state.value("playbackActive").toBool();
-#ifdef Q_OS_ANDROID
-    const int seekGeneration = ++m_seekGeneration;
-    m_seekRecoveryPosition = target;
-    m_seekRecoveryPending = resumeAfterSeek;
-#endif
     media->setPosition(target);
-#ifdef Q_OS_ANDROID
-    // Give the asynchronous HLS seek time to settle, then recover the stream if
-    // Qt reports an error or the player never advances beyond the target.
-    if (resumeAfterSeek) QTimer::singleShot(150, this, [this, media] {
-        if (media == m_activePlayer && m_state.value("playbackActive").toBool() &&
-            !media->source().isEmpty() && media->playbackState() != QMediaPlayer::PlayingState)
-            media->play();
-    });
-    if (resumeAfterSeek) QTimer::singleShot(8000, this, [this, media, seekGeneration] {
-        if (seekGeneration != m_seekGeneration || !m_seekRecoveryPending || media != m_activePlayer ||
-            !m_state.value("playbackActive").toBool()) return;
-        const qint64 duration = media->duration();
-        const bool atEnd = duration > 0 && duration - m_seekRecoveryPosition <= 1000;
-        if (atEnd || (media->playbackState() == QMediaPlayer::PlayingState &&
-                      media->position() > m_seekRecoveryPosition + 300)) {
-            m_seekRecoveryPending = false;
-            ++m_seekGeneration;
-            return;
-        }
-        qWarning() << "SCripSeek" << "stalled_after_seek_ms=" << m_seekRecoveryPosition << "recovering_stream";
-        recoverSeek(media);
-    });
-#endif
-}
-void SoundCloud::recoverSeek(QMediaPlayer *media) {
-#ifdef Q_OS_ANDROID
-    if (media != m_activePlayer || !m_seekRecoveryPending || !m_state.value("playbackActive").toBool()) return;
-    const auto track = m_state.value("current").toMap();
-    const qint64 position = m_seekRecoveryPosition;
-    m_seekRecoveryPending = false;
-    ++m_seekGeneration;
-    startupStage("seek_recovery");
-    // recovery=true makes startTrack apply the requested position once the new
-    // HLS source is loaded, while preserving active playback intent.
-    startTrack(track, true, position, true);
-#else
-    Q_UNUSED(media);
-#endif
 }
 void SoundCloud::volume(double value) {
     const double target = qBound(0.0, value, 1.0);
@@ -1144,7 +1084,6 @@ void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 posi
     m_forceNext = false;
     if (position <= 0) m_snapshotPlayback = false;
     if (!urn(track).startsWith("soundcloud:tracks:")) return;
-    m_seekRecoveryPending = false; ++m_seekGeneration;
     if (!recovery) m_preloadedRetryUsed = false;
     m_startupClock.start(); m_lastStartupMs = 0; m_startupPending = true; m_startupAudible = false;
     m_startupInitialPosition = qMax<qint64>(0, position);

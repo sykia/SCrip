@@ -128,7 +128,6 @@ private:
     void savePlayback();
     void savePlaybackPosition();
     void restorePlayback(const QVariantMap &profile);
-    void recoverSeek(QMediaPlayer *media);
     void startTrack(const QVariantMap &track, bool autoplay = true, qint64 position = 0, bool recovery = false);
     void tryRestoreAndroidTrack();
     void failAndroidRestore();
@@ -167,9 +166,6 @@ private:
     QElapsedTimer m_startupClock;
     qint64 m_lastStartupMs = 0;
     qint64 m_startupInitialPosition = 0;
-    qint64 m_seekRecoveryPosition = 0;
-    int m_seekGeneration = 0;
-    bool m_seekRecoveryPending = false;
     bool m_startupPending = false;
     bool m_startupAudible = false;
     bool m_startupSourceSet = false;

@@ -1,3 +1,9 @@
+Изменения SCrip, 10 ноября 2026 года: libavformat FFmpeg 7.1.2 содержит
+backport исправления перемотки fMP4 HLS 380a518c439d4e5e3cf17b97e4a06259e8048f99
+(автор vectronic) и освобождение stream_info при очистке индекса фрагментов.
+Патч: packaging/android/patches/ffmpeg-7.1-hls-seek.patch.
+Сборка: scripts/build_android_ffmpeg.sh. Лицензия LGPL-2.1-or-later.
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
 
