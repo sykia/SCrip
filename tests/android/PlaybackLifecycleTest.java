@@ -184,6 +184,19 @@ public final class PlaybackLifecycleTest extends Instrumentation {
         require(!notification.equals(key.get(instance)), "Смена лайка не обновила уведомление");
         liked.setBoolean(null, oldLiked); publish.invoke(instance);
     }
+    private void testExplicitPlayReclaimsFocus() throws Exception {
+        runOnMainSync(() -> {
+            try {
+                Object instance = field(service, null, "instance");
+                Field paused = service.getDeclaredField("focusPaused"); paused.setAccessible(true);
+                Field focus = service.getDeclaredField("hasFocus"); focus.setAccessible(true);
+                paused.setBoolean(instance, true); focus.setBoolean(instance, false);
+                Method prepare = service.getDeclaredMethod("prepareUserPlayback"); prepare.setAccessible(true);
+                require((Boolean) prepare.invoke(instance), "Явный Play не вернул аудиофокус");
+                require(!paused.getBoolean(instance), "Явный Play оставил блокировку после потери фокуса");
+            } catch (Exception error) { throw new RuntimeException(error); }
+        });
+    }
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); testArguments = arguments; start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
@@ -216,6 +229,7 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             check(true, true, PlaybackState.STATE_PLAYING);
             testArtworkPublication();
             testNotificationProgressIsolation();
+            testExplicitPlayReclaimsFocus();
             Object playbackService = field(service, null, "instance");
             Method focus = service.getDeclaredMethod("handleAudioFocusChange", int.class); focus.setAccessible(true);
             focus.invoke(playbackService, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT);

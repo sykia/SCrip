@@ -5,6 +5,8 @@ import QtQuick.Dialogs as Dialogs
 
 Column {
     id: root
+    property bool dark: false
+
     property var manager: null
     property string message: ""
     property string operationId: ""
@@ -47,7 +49,7 @@ Column {
         width: Math.min(560, parent.width - 24)
         height: Math.min(660, parent.height - 32)
         modal: true
-        palette.window: "#faf9fa"
+        palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
         palette.windowText: root.ink
         palette.text: root.ink
         title: "Проверка плагина"
@@ -99,7 +101,7 @@ Column {
         anchors.centerIn: parent
         width: Math.min(480, parent.width - 24)
         modal: true
-        palette.window: "#faf9fa"
+        palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
         palette.windowText: root.ink
         palette.text: root.ink
         title: "Удаление плагина"
@@ -115,7 +117,7 @@ Column {
         width: parent.width; spacing: 8
         PluginAction { width: Math.min(implicitWidth, parent.width); text: "Установить / обновить из файла…"; enabled: !!root.manager && !root.manager.error; onClicked: picker.open() }
     }
-    Label { width: parent.width; text: root.manager ? root.manager.error : "Менеджер недоступен"; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: "#a22c39" }
+    Label { width: parent.width; text: root.manager ? root.manager.error : "Менеджер недоступен"; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: (root.dark ? "#ff8a97" : "#a22c39") }
     Label { width: parent.width; text: root.message; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
     Repeater {
         model: root.manager ? root.manager.installed : []
@@ -126,14 +128,14 @@ Column {
             property bool settingsOpen: false
             objectName: "plugin-card-" + modelData.plugin.id
             width: root.width; height: body.implicitHeight + 20; radius: 12
-            color: "#f5f2f5"; border.color: "#e6e0e6"
+            color: (root.dark ? "#242424" : "#f4f4f4"); border.color: (root.dark ? "#404040" : "#e3e3e3")
             Column {
                 id: body
                 x: 10; y: 10; width: parent.width - 20; spacing: 7
                 Label { width: parent.width; text: card.modelData.plugin.name + " · " + card.modelData.version; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true; color: root.ink }
                 Label { width: parent.width; text: card.modelData.plugin.description || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
                 Label { width: parent.width; text: ({"active":"Работает", "disabled":"Отключён", "removed":"Пакет удалён, конфигурация сохранена", "awaiting-permissions":"Нужны разрешения", "blocked":"Заблокирован", "error":"Ошибка"})[card.modelData.status] + (card.modelData.reason ? ": " + card.modelData.reason : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
-                Label { width: parent.width; text: card.modelData.lastError || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: "#a22c39" }
+                Label { width: parent.width; text: card.modelData.lastError || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: (root.dark ? "#ff8a97" : "#a22c39") }
                 Label { width: parent.width; text: card.modelData.themeStatus || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.muted }
                 Flow {
                     width: parent.width; spacing: 8
@@ -167,8 +169,8 @@ Column {
                         visible: card.settingsOpen
                         Label { width: parent.width; text: setting.modelData.label; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
                         Switch { palette.windowText: root.ink; visible: setting.modelData.type === "boolean"; checked: setting.modelData.value === true; text: "Включено"; onToggled: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, checked)) }
-                        SpinBox { palette.base: "#ffffff"; palette.text: root.ink; palette.button: "#ede7ee"; palette.buttonText: root.ink; visible: setting.modelData.type === "integer"; from: setting.modelData.min || 0; to: setting.modelData.max || 0; value: setting.modelData.type === "integer" ? setting.modelData.value : 0; editable: true; onValueModified: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, value)) }
-                        ComboBox { palette.base: "#ffffff"; palette.text: root.ink; palette.button: "#ede7ee"; palette.buttonText: root.ink; visible: setting.modelData.type === "enum"; width: Math.min(280, parent.width); model: setting.modelData.options || []; currentIndex: (setting.modelData.options || []).indexOf(setting.modelData.value); onActivated: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, currentText)) }
+                        SpinBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "integer"; from: setting.modelData.min || 0; to: setting.modelData.max || 0; value: setting.modelData.type === "integer" ? setting.modelData.value : 0; editable: true; onValueModified: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, value)) }
+                        ComboBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "enum"; width: Math.min(280, parent.width); model: setting.modelData.options || []; currentIndex: (setting.modelData.options || []).indexOf(setting.modelData.value); onActivated: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, currentText)) }
                     }
                 }
                 Label { width: parent.width; text: "Собственные данные: " + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }

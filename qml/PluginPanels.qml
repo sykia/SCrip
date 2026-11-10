@@ -4,6 +4,8 @@ import QtQuick.Layouts
 
 Column {
     id: root
+    property bool dark: false
+
     property var manager: null
     property string slotName: "home"
     property color ink: "#242426"
@@ -17,7 +19,7 @@ Column {
             required property var modelData
             width: root.width
             height: content.implicitHeight + 24
-            color: "#f5f2f5"
+            color: (root.dark ? "#242424" : "#f4f4f4")
             radius: 14
             Column {
                 id: content

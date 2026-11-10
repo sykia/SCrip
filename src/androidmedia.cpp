@@ -66,6 +66,8 @@ AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwor
     });
     m_timer.setInterval(1000);
     connect(&m_timer, &QTimer::timeout, this, &AndroidMedia::publish);
+    // Перемотка, в том числе на паузе, не должна ждать секундного опроса.
+    connect(soundcloud, &SoundCloud::playbackSeeked, this, &AndroidMedia::publish);
     publish();
 }
 AndroidMedia::~AndroidMedia() {
@@ -106,6 +108,7 @@ void AndroidMedia::publish() {
     const QJsonObject data{{"urn", track.value("urn").toString()}, {"title", track.value("title").toString()}, {"artist", user.value("username").toString()},
         {"artwork", m_artworkPath}, {"artworkUrl", m_artworkUrl}, {"playing", state.value("playing").toBool()},
         {"buffering", state.value("buffering").toBool()},
+        {"seekable", m_soundcloud->seekable()},
         {"liked", track.value("user_favorite").toBool()},
         {"active", state.value("playbackActive").toBool()}, {"hasTrack", !track.isEmpty()},
         {"position", state.value("position").toLongLong()}, {"duration", state.value("duration").toLongLong()},

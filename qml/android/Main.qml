@@ -14,12 +14,57 @@ ApplicationWindow {
     minimumWidth: 320
     minimumHeight: 480
     title: "SCrip · Android"
-    color: "#faf9fa"
+    color: app.surface
+    palette.window: app.surface
+    palette.windowText: app.ink
+    palette.text: app.ink
+    palette.base: app.surface
+    palette.button: app.raised
+    palette.buttonText: app.ink
+    palette.highlight: app.accent
+    palette.highlightedText: app.foreground(app.accent)
     readonly property var api: sc.catalogState
-    readonly property color accent: prefs.accentOverride ? prefs.accent : pluginManager.theme.accent || prefs.accent
+    readonly property bool dark: prefs.darkMode
+    property bool requestedDark: prefs.darkMode
+    function switchTheme(value) {
+        requestedDark = value
+        if (!prefs.motion) {
+            themeTransition.stop()
+            themeVeil.opacity = 0
+            prefs.darkMode = value
+        } else if (!themeTransition.running && value !== prefs.darkMode) {
+            themeTransition.start()
+        }
+    }
+    Rectangle {
+        id: themeVeil
+        parent: Overlay.overlay
+        anchors.fill: parent
+        z: 10000
+        color: "#111111"
+        opacity: 0
+        visible: opacity > 0
+    }
+    SequentialAnimation {
+        id: themeTransition
+        NumberAnimation { target: themeVeil; property: "opacity"; to: 1; duration: app.motion / 2; easing.type: Easing.InOutQuad }
+        ScriptAction { script: prefs.darkMode = app.requestedDark }
+        NumberAnimation { target: themeVeil; property: "opacity"; to: 0; duration: app.motion / 2; easing.type: Easing.InOutQuad }
+        onFinished: if (app.requestedDark !== prefs.darkMode) start()
+    }
+
+    readonly property color baseAccent: prefs.accentOverride ? prefs.accent : pluginManager.theme.accent || prefs.accent
+    readonly property color accent: (dark ? Qt.tint(baseAccent, Qt.rgba(1, 1, 1, 0.28)) : baseAccent)
+    readonly property color surface: (dark ? "#111111" : "#fafafa")
+    readonly property color panel: (dark ? "#1c1c1c" : "#ffffff")
+    readonly property color raised: (dark ? "#2c2c2c" : "#f0edef")
+    function foreground(c) {
+        function linear(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b) > 0.179 ? "#111113" : "#ffffff"
+    }
     readonly property real coverRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginManager.theme.coverRadius ?? prefs.coverRadius
-    readonly property color ink: "#242426"
-    readonly property color muted: "#858589"
+    readonly property color ink: (dark ? "#f1f1f1" : "#242426")
+    readonly property color muted: (dark ? "#aaaaaa" : "#858589")
     // SafeArea появился в Qt 6.9. Остальные версии используют нулевые отступы.
     function safeAreaTop(item) {
         return typeof SafeArea !== "undefined" ? item.SafeArea.margins.top : 0
@@ -39,6 +84,7 @@ ApplicationWindow {
                 themePreferencesMigrated = true
             }
         }
+        property bool darkMode: true
         property bool accentOverride: false
         property bool coverRadiusOverride: false
         property string accent: "#f43756"
@@ -121,7 +167,7 @@ ApplicationWindow {
         leftPadding: 0; rightPadding: 0
         background: Rectangle {
             x: fine.leftPadding; y: fine.topPadding + fine.availableHeight / 2 - height / 2
-            width: fine.availableWidth; height: 3; radius: 1.5; color: "#ded7dc"
+            width: fine.availableWidth; height: 3; radius: 1.5; color: (app.dark ? "#484848" : "#dcdcdc")
             Rectangle { width: fine.visualPosition * parent.width; height: parent.height; radius: parent.radius; color: app.accent }
         }
         handle: Rectangle {
@@ -145,11 +191,11 @@ ApplicationWindow {
         Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
         background: Rectangle {
             radius: width / 2
-            color: transport.main ? app.accent : transport.down ? "#e9e0e5" : "transparent"
+            color: transport.main ? app.accent : transport.down ? (app.dark ? "#383838" : "#e6e6e6") : "transparent"
             Behavior on color { ColorAnimation { duration: prefs.motion ? 150 : 0 } }
         }
         contentItem: Item {
-            AndroidGlyph { visible: !transport.loading; anchors.centerIn: parent; width: transport.main ? 26 : 22; height: width; name: transport.symbol; ink: transport.main ? "white" : transport.active ? app.accent : app.ink }
+            AndroidGlyph { visible: !transport.loading; anchors.centerIn: parent; width: transport.main ? 26 : 22; height: width; name: transport.symbol; ink: transport.main ? app.foreground(app.accent) : transport.active ? app.accent : app.ink }
             BusyIndicator { anchors.centerIn: parent; width: 32; height: 32; running: transport.loading; visible: running }
             Rectangle { visible: transport.active && !transport.main; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; width: 3; height: 3; radius: 1.5; color: app.accent }
         }
@@ -188,10 +234,10 @@ ApplicationWindow {
         contentItem: Item {
             implicitWidth: control.symbol ? 16 : label.implicitWidth
             implicitHeight: 22
-            AndroidGlyph { anchors.centerIn: parent; visible: !!control.symbol; name: control.symbol; ink: control.primary ? "white" : app.ink; width: 22; height: 22 }
-            Text { id: label; visible: !control.symbol; anchors.fill: parent; text: control.text; font: control.font; color: control.primary ? "white" : app.ink; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
+            AndroidGlyph { anchors.centerIn: parent; visible: !!control.symbol; name: control.symbol; ink: control.primary ? app.foreground(app.accent) : app.ink; width: 22; height: 22 }
+            Text { id: label; visible: !control.symbol; anchors.fill: parent; text: control.text; font: control.font; color: control.primary ? app.foreground(app.accent) : app.ink; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
         }
-        background: Rectangle { radius: height / 2; color: control.down ? (control.primary ? Qt.darker(app.accent, 1.12) : "#e7e3e7") : control.primary ? app.accent : "#f0edef"; opacity: control.enabled ? 1 : 0.45; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
+        background: Rectangle { radius: height / 2; color: control.down ? (control.primary ? Qt.darker(app.accent, 1.12) : (app.dark ? "#393939" : "#e7e3e7")) : control.primary ? app.accent : (app.dark ? "#2c2c2c" : "#f0edef"); opacity: control.enabled ? 1 : 0.45; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
     }
     component Caption: Label { color: app.ink; font.pixelSize: 15; elide: Text.ElideRight }
     component Track: ItemDelegate {
@@ -203,12 +249,12 @@ ApplicationWindow {
         height: 68
         leftPadding: 20
         rightPadding: 12
-        background: Rectangle { x: 8; width: parent.width - 16; radius: 16; color: row.down ? "#eaeaec" : "transparent" }
+        background: Rectangle { x: 8; width: parent.width - 16; radius: 16; color: row.down ? (app.dark ? "#333333" : "#eaeaec") : "transparent" }
         contentItem: RowLayout {
             spacing: 12
             Rectangle {
                 Layout.preferredWidth: 44; Layout.preferredHeight: 44
-                radius: app.page === 2 && app.searchKind === "users" ? width / 2 : app.coverRadius; color: "#efe8eb"; clip: true
+                radius: app.page === 2 && app.searchKind === "users" ? width / 2 : app.coverRadius; color: (app.dark ? "#2c2c2c" : "#ededed"); clip: true
                 RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.page === 2 && app.searchKind === "users" ? row.modelData.avatar_url || "" : app.cover(row.modelData); avatar: app.page === 2 && app.searchKind === "users" }
             }
             ColumnLayout {
@@ -254,7 +300,7 @@ ApplicationWindow {
                     RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.centerIn: parent; width: 36; height: 36; avatar: true; source: app.api.profile?.avatar_url || ""; visible: app.page !== 4 }
                     AndroidGlyph { anchors.centerIn: parent; name: "settings"; visible: app.page === 4 }
                 }
-                background: Rectangle { radius: 24; color: accountButton.down ? "#e9e2e7" : "transparent"; Behavior on color { ColorAnimation { duration: app.motion } } }
+                background: Rectangle { radius: 24; color: accountButton.down ? (app.dark ? "#383838" : "#e7e7e7") : "transparent"; Behavior on color { ColorAnimation { duration: app.motion } } }
                 onClicked: app.page === 4 ? app.page = 5 : app.openProfile(null)
             }
         }
@@ -291,9 +337,9 @@ ApplicationWindow {
                 id: search
                 Layout.fillWidth: true; implicitHeight: 48
                 placeholderText: "Треки, плейлисты, исполнители"
-                color: app.ink; placeholderTextColor: "#77717a"; selectionColor: app.accent; selectedTextColor: "white"
+                color: app.ink; placeholderTextColor: (app.dark ? "#aaaaaa" : "#77717a"); selectionColor: app.accent; selectedTextColor: app.foreground(app.accent)
                 font.pixelSize: 14; leftPadding: 14
-                background: Rectangle { radius: 16; color: search.activeFocus ? "#f3edf0" : "#eeebee"; border.width: search.activeFocus ? 1 : 0; border.color: Qt.alpha(app.accent, 0.45); Behavior on color { ColorAnimation { duration: app.motion } } }
+                background: Rectangle { radius: 16; color: search.activeFocus ? (app.dark ? "#2c2c2c" : "#f2f2f2") : (app.dark ? "#242424" : "#eeeeee"); border.width: search.activeFocus ? 1 : 0; border.color: Qt.alpha(app.accent, 0.45); Behavior on color { ColorAnimation { duration: app.motion } } }
                 onAccepted: { Qt.inputMethod.hide(); app.refresh() }
             }
             Action { text: "Найти"; primary: true; onClicked: { Qt.inputMethod.hide(); app.refresh() } }
@@ -347,7 +393,7 @@ ApplicationWindow {
                                 contentItem: Column {
                                     spacing: 7
                                     Rectangle {
-                                        width: 120; height: 120; radius: app.coverRadius; color: "#eee7ea"; clip: true
+                                        width: 120; height: 120; radius: app.coverRadius; color: (app.dark ? "#2c2c2c" : "#ededed"); clip: true
                                         RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.cover(modelData) }
                                     }
                                     Caption { width: 120; text: modelData.title || ""; font.bold: true; font.pixelSize: 13 }
@@ -359,7 +405,7 @@ ApplicationWindow {
                     }
                 }
                 Label { x: 18; width: parent.width - 36; visible: !(app.api.home || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
-                PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
+                PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted; x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: navigationFooter.height + 16 }
             }
         }
@@ -384,6 +430,7 @@ ApplicationWindow {
                     Action { text: "Отмена"; visible: !!app.api.updateDownloading; Layout.fillWidth: true; onClicked: sc.cancelUpdateDownload() }
                     Action { text: "Установить сейчас"; visible: !!app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.installUpdate() }
                     Caption { text: "Оформление"; font.bold: true; font.pixelSize: 19 }
+                    Switch { text: "Тёмная тема"; checked: prefs.darkMode; onToggled: app.switchTheme(checked) }
                     Row {
                         spacing: 14
                         Repeater {
@@ -391,7 +438,7 @@ ApplicationWindow {
                             AbstractButton {
                                 required property string modelData
                                 width: 42; height: 42; Accessible.name: "Цвет " + modelData
-                                background: Rectangle { color: modelData; radius: 21; border.width: prefs.accent === modelData ? 4 : 0; border.color: "#d6cbd2" }
+                                background: Rectangle { color: modelData; radius: 21; border.width: prefs.accentOverride && prefs.accent === modelData ? 4 : 0; border.color: (app.dark ? "#e7e7e7" : "#d0d0d0") }
                                 onClicked: { prefs.accent = modelData; prefs.accentOverride = true }
                             }
                         }
@@ -408,8 +455,9 @@ ApplicationWindow {
                     Caption { text: "SCrip " + Qt.application.version + " · Android"; color: app.muted; font.pixelSize: 12 }
                 }
                 ColumnLayout {
+                    visible: app.page === 6
                     Layout.fillWidth: true; Layout.margins: 18
-                    PluginManagerView { Layout.fillWidth: true; manager: pluginManager; appearanceHint: prefs.accentOverride || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
+                    PluginManagerView { dark: app.dark; ink: app.ink; muted: app.muted; Layout.fillWidth: true; manager: pluginManager; appearanceHint: prefs.accentOverride || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
                 }
                 Item { Layout.fillWidth: true; implicitHeight: navigationFooter.height }
             }
@@ -434,7 +482,7 @@ ApplicationWindow {
                     id: profileCard
                     x: 16; width: parent.width - 32
                     height: profileContent.implicitHeight + 30; radius: 22
-                    color: "#f3eff2"; clip: true
+                    color: (app.dark ? "#2c2c2c" : "#f2f2f2"); clip: true
                     readonly property bool creator: app.profile?.urn === "soundcloud:users:1675018934"
                     readonly property var visuals: app.profile?.visuals?.visuals || app.profile?.visuals || []
                     readonly property string banner: app.profile?.banner_url || app.profile?.cover_url || (visuals.length ? visuals[0]?.visual_url || "" : "")
@@ -443,7 +491,7 @@ ApplicationWindow {
                         width: parent.width; spacing: 12
                         Item {
                             width: parent.width; height: 158
-                            Rectangle { anchors.fill: parent; color: "#eee9ed" }
+                            Rectangle { anchors.fill: parent; color: (app.dark ? "#2c2c2c" : "#ededed") }
                             Image {
                                 anchors.fill: parent; source: profileCard.banner
                                 visible: status === Image.Ready; asynchronous: true
@@ -454,15 +502,15 @@ ApplicationWindow {
                             Rectangle {
                                 anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
                                 width: 86; height: 86; radius: 43
-                                color: "#faf9fa"; border.width: profileCard.creator ? 3 : 2
-                                border.color: profileCard.creator ? app.accent : "#ffffff"
+                                color: app.surface; border.width: profileCard.creator ? 3 : 2
+                                border.color: profileCard.creator ? app.accent : app.surface
                                 RoundedImage { anchors.fill: parent; anchors.margins: 4; avatar: true; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; source: app.profile?.avatar_url || "" }
                             }
                             Rectangle {
                                 visible: profileCard.creator
                                 anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10
                                 width: creatorBadge.implicitWidth + 20; height: 27; radius: 14; color: app.accent
-                                Text { id: creatorBadge; anchors.centerIn: parent; text: "✦ Создатель SCrip"; color: "white"; font.pixelSize: 11; font.bold: true }
+                                Text { id: creatorBadge; anchors.centerIn: parent; text: "✦ Создатель SCrip"; color: app.foreground(app.accent); font.pixelSize: 11; font.bold: true }
                             }
                         }
                         Caption { anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter; text: app.profile?.username || "Твой профиль"; font.pixelSize: 19; font.bold: true }
@@ -503,7 +551,7 @@ ApplicationWindow {
                         Action { required property int index; required property string modelData; text: modelData; Layout.fillWidth: true; font.pixelSize: 12; leftPadding: 10; rightPadding: 10; implicitHeight: 44; primary: app.profileTab === index; onClicked: { if (app.profileTab !== index) { app.profileTabResetPending = true; app.profileTab = index; app.refresh(); Qt.callLater(function() { tracks.positionViewAtBeginning() }) } } }
                     }
                 }
-                PluginPanels { x: 18; width: parent.width - 36; manager: pluginManager; slotName: "profile"; onReport: error => app.message = error }
+                PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted; x: 18; width: parent.width - 36; manager: pluginManager; slotName: "profile"; onReport: error => app.message = error }
                 Item { height: 8; width: 1 }
             }
             delegate: Track {}
@@ -538,11 +586,13 @@ ApplicationWindow {
         id: navigationStack
         width: parent.width
         spacing: 10
-        Rectangle {
+        AbstractButton {
             id: miniPlayer
             visible: !!app.api.current?.title
-            x: 16; width: parent.width - 32; height: 64; radius: 20; color: "#eeeeef"
-            TapHandler { onTapped: player.open() }
+            x: 16; width: parent.width - 32; height: 64
+            Accessible.name: "Открыть плеер: " + (app.api.current?.title || "")
+            onClicked: player.open()
+            background: Rectangle { radius: 20; color: miniPlayer.down ? (app.dark ? "#383838" : "#e6e6e8") : (app.dark ? "#242424" : "#eeeeef") }
             DragHandler {
                 target: null
                 onActiveTranslationChanged: if (active && activeTranslation.y < -45 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.open()
@@ -556,12 +606,12 @@ ApplicationWindow {
                     Caption { text: app.api.current?.user?.username || ""; Layout.fillWidth: true; color: app.muted; font.pixelSize: 12 }
                 }
                 PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; Accessible.name: app.api.playing ? "Пауза" : "Воспроизвести"; onClicked: sc.togglePlayback() }
-                PlayerButton { text: "Следующий"; symbol: "next"; Accessible.name: "Следующий трек"; onClicked: sc.next() }
+                PlayerButton { visible: (app.api.current?.urn || "").startsWith("soundcloud:tracks:"); active: !!app.api.current?.user_favorite; symbol: active ? "liked" : "heart"; text: active ? "Убрать из любимых" : "Добавить в любимые"; Accessible.name: text; onClicked: sc.like(app.api.current) }
             }
             Rectangle {
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 4
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - 40; height: 2; radius: 1; color: "#e3d9df"
+                width: parent.width - 40; height: 2; radius: 1; color: (app.dark ? "#464646" : "#dedede")
                 Rectangle { height: parent.height; radius: 1; width: parent.width * Math.min(1, (sc.position || 0) / Math.max(1, sc.duration || 0)); color: app.accent }
             }
         }
@@ -577,9 +627,9 @@ ApplicationWindow {
                     id: navigationCapsule
                     Layout.fillWidth: true; Layout.fillHeight: true
                     radius: height / 2
-                    color: "#ffffff"
+                    color: app.panel
                     border.width: 1
-                    border.color: "#f0ebef"
+                    border.color: (app.dark ? "#242424" : "#eeeeee")
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true; shadowColor: "#180f1724"
@@ -591,7 +641,7 @@ ApplicationWindow {
                         y: 5
                         width: (navigationCapsule.width - 10) / 3; height: parent.height - 10
                         radius: height / 2
-                        color: "#f2edf0"
+                        color: (app.dark ? "#383838" : "#f0f0f0")
                         opacity: navigationCapsule.selected >= 0 ? 1 : 0
                         Behavior on x { NumberAnimation { duration: app.motion; easing.type: Easing.OutQuint } }
                         Behavior on opacity { NumberAnimation { duration: app.motion / 2 } }
@@ -653,7 +703,7 @@ ApplicationWindow {
                         }
                     }
                     contentItem: Item {
-                        AndroidGlyph { anchors.centerIn: parent; name: "search"; width: 25; height: 25; ink: "white" }
+                        AndroidGlyph { anchors.centerIn: parent; name: "search"; width: 25; height: 25; ink: app.foreground(app.accent) }
                     }
                     onClicked: { app.page = 2; search.forceActiveFocus() }
                 }
@@ -670,7 +720,7 @@ ApplicationWindow {
         modal: true; focus: true; closePolicy: Popup.CloseOnEscape; padding: 20
         topPadding: 12 + app.safeAreaTop(parent)
         bottomPadding: 16 + app.safeAreaBottom(parent)
-        background: Rectangle { color: "#fafafa" }
+        background: Rectangle { color: app.surface }
         DragHandler {
             target: null
             onActiveTranslationChanged: if (active && activeTranslation.y > 80 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.close()
@@ -689,7 +739,7 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: Math.max(80, Math.min(player.availableWidth, player.availableHeight - 330))
                 Layout.preferredHeight: width
-                color: "#ece2e7"; radius: 24; clip: true
+                color: (app.dark ? "#2c2c2c" : "#e9e9e9"); radius: 24; clip: true
                 RoundedImage { anchors.fill: parent; source: app.cover(app.api.current); radius: 24; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0 }
             }
             Item { Layout.fillHeight: true }
@@ -698,9 +748,14 @@ ApplicationWindow {
             FineSlider {
                 id: progress
                 Layout.fillWidth: true; to: Math.max(1, sc.duration || 0)
-                value: sc.position || 0
+                property bool adjusting: false
+                Binding { target: progress; property: "value"; value: sc.position || 0; when: !progress.adjusting; restoreMode: Binding.RestoreNone }
                 enabled: (sc.duration || 0) > 0
-                onPressedChanged: if (!pressed) sc.seek(value)
+                onPressedChanged: {
+                    if (pressed) adjusting = true
+                    else { sc.seek(value); adjusting = false }
+                }
+                onMoved: if (!pressed) sc.seek(value)
                 Accessible.name: "Позиция воспроизведения"
             }
             RowLayout {
@@ -732,7 +787,7 @@ ApplicationWindow {
         id: queue
         parent: Overlay.overlay; width: parent.width; height: parent.height * 0.8; y: parent.height - height
         modal: true; padding: 0
-        background: Rectangle { color: "#faf9fa"; radius: 24 }
+        background: Rectangle { color: app.surface; radius: 24 }
         contentItem: ColumnLayout {
             RowLayout {
                 Layout.margins: 20; Layout.fillWidth: true
@@ -749,7 +804,7 @@ ApplicationWindow {
     Sheet {
         id: trackMenu
         parent: Overlay.overlay; width: parent.width; y: parent.height - height; modal: true; padding: 20
-        background: Rectangle { color: "white"; radius: 24 }
+        background: Rectangle { color: app.panel; radius: 24 }
         contentItem: ColumnLayout {
             Caption { text: app.selectedTrack.title || ""; font.bold: true; Layout.fillWidth: true }
             Action { text: "♡ Нравится / снять лайк"; Layout.fillWidth: true; onClicked: { sc.like(app.selectedTrack); trackMenu.close() } }
@@ -772,7 +827,7 @@ ApplicationWindow {
         y: Math.max(16 + app.safeAreaTop(parent), (parent.height - Qt.inputMethod.keyboardRectangle.height - height) / 2)
         width: Math.min(parent.width - 32, 380)
         modal: true; padding: 20
-        background: Rectangle { radius: 24; color: "#faf9fa" }
+        background: Rectangle { radius: 24; color: app.surface }
         onOpened: { playlistTitle.clear(); playlistTitle.forceActiveFocus() }
         onClosed: Qt.inputMethod.hide()
         function submit() {
@@ -787,9 +842,9 @@ ApplicationWindow {
                 id: playlistTitle
                 Layout.fillWidth: true; implicitHeight: 48
                 placeholderText: "Название плейлиста"; maximumLength: 200
-                font.pixelSize: 14; color: app.ink; placeholderTextColor: "#77717a"
-                selectionColor: app.accent; selectedTextColor: "white"; leftPadding: 14
-                background: Rectangle { radius: 16; color: "#eeebee"; border.width: playlistTitle.activeFocus ? 1 : 0; border.color: Qt.alpha(app.accent, 0.5) }
+                font.pixelSize: 14; color: app.ink; placeholderTextColor: (app.dark ? "#aaaaaa" : "#77717a")
+                selectionColor: app.accent; selectedTextColor: app.foreground(app.accent); leftPadding: 14
+                background: Rectangle { radius: 16; color: (app.dark ? "#242424" : "#eeeeee"); border.width: playlistTitle.activeFocus ? 1 : 0; border.color: Qt.alpha(app.accent, 0.5) }
                 onAccepted: createPlaylist.submit()
             }
             RowLayout {
@@ -803,7 +858,7 @@ ApplicationWindow {
         id: destinations
         parent: Overlay.overlay; width: parent.width; height: parent.height * 0.7; y: parent.height - height
         modal: true; padding: 20
-        background: Rectangle { radius: 24; color: "white" }
+        background: Rectangle { radius: 24; color: app.panel }
         contentItem: ColumnLayout {
             Caption { text: "Сохранить в плейлист"; font.bold: true; font.pixelSize: 22 }
             Label { visible: !!app.api.loadingDestinations; text: "Загрузка…"; color: app.muted }
@@ -823,7 +878,7 @@ ApplicationWindow {
     Sheet {
         id: account
         parent: Overlay.overlay; anchors.centerIn: parent; width: Math.min(parent.width - 40, 380); modal: true; padding: 24
-        background: Rectangle { color: "white"; radius: 24 }
+        background: Rectangle { color: app.panel; radius: 24 }
         contentItem: ColumnLayout {
             Caption { text: app.api.profile?.username || "SCrip"; font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
             Label { text: "SoundCloud для твоего ритма"; color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
@@ -831,7 +886,7 @@ ApplicationWindow {
             Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: account.close() }
         }
     }
-    PluginToolsPopup { id: pluginTools; manager: pluginManager }
+    PluginToolsPopup { dark: app.dark; ink: app.ink; muted: app.muted; id: pluginTools; manager: pluginManager }
     Connections {
         target: pluginManager
         function onNavigationRequested(destination) {
@@ -853,7 +908,7 @@ ApplicationWindow {
         parent: Overlay.overlay
         width: parent.width; height: parent.height
         modal: true; closePolicy: Popup.NoAutoClose; padding: 0
-        background: Rectangle { color: "#faf9fa" }
+        background: Rectangle { color: app.surface }
         contentItem: Item {
             Column {
                 anchors.centerIn: parent; spacing: 14

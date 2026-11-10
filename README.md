@@ -7,10 +7,10 @@
 <p align="center">SCrip — плеер для Windows, Linux и Android, который работает через официальный API SoundCloud.<br>Ваши лайки, свежие релизы и станции любимых исполнителей — в отдельном приложении.</p>
 
 <p align="center">
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.5.0/SCrip-1.5.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Скачать для Windows 10 и 11 x64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.5.0/SCrip-1.5.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Скачать для Debian 13 x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.5.0/scrip-1.5.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Скачать для Arch Linux x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.5.3/SCrip-1.5.3-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Скачать для Android"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.0/SCrip-1.6.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Скачать для Windows 10 и 11 x64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.0/SCrip-1.6.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Скачать для Debian 13 x86-64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.0/scrip-1.6.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Скачать для Arch Linux x86-64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.0/SCrip-1.6.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Скачать для Android"></a>
 </p>
 
 ## Версия 1.5.0
@@ -22,7 +22,7 @@
   <img src="docs/screenshots/android-player-frame.svg" width="32%" alt="Экран воспроизведения SCrip на Android">
 </p>
 
-[История изменений](CHANGELOG.md) · [Все файлы выпуска и SHA-256](https://github.com/sykia/SCrip/releases/tag/v1.5.0)
+[История изменений](CHANGELOG.md) · [Все файлы выпуска и SHA-256](https://github.com/sykia/SCrip/releases/tag/v1.6.0)
 
 ## Что послушать сегодня
 

@@ -243,6 +243,8 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
             if (media != m_activePlayer) { holdPreloadedAudio(media); return; }
             const bool playing = media->playbackState() == QMediaPlayer::PlayingState;
             set("playing", playing);
+            if (playing) m_streamCache.warm(media->source());
+            else m_streamCache.suspend();
             if (playing) {
                 set("buffering", false);
                 if (m_startupPending && !m_startupAudible) { startupStage("qt_playing"); m_startupAudible = true; }
@@ -950,7 +952,13 @@ void SoundCloud::openPlaylist(const QVariantMap &item) {
 }
 void SoundCloud::enqueue(const QVariantMap &item) {
     if (!urn(item).startsWith("soundcloud:tracks:")) return;
-    m_queue.append(item); set("queue", m_queue); savePlayback();
+    if (m_queueIndex >= 0 && m_queueIndex < m_queue.size()) {
+        m_queue.insert(m_queueIndex + 1, item);
+        m_forceNext = true;
+    } else {
+        m_queue.append(item);
+    }
+    set("queue", m_queue); savePlayback();
     prepareNext();
 }
 void SoundCloud::play(const QVariantMap &item) {
@@ -1008,7 +1016,7 @@ void SoundCloud::next() {
     if (index < m_queue.size()) playQueue(index);
     else if (player().mediaStatus() == QMediaPlayer::EndOfMedia) set("playbackActive", false);
 }
-void SoundCloud::previous() { if (player().position() > 3000) player().setPosition(0); else if (m_queueIndex > 0) playQueue(m_queueIndex - 1); }
+void SoundCloud::previous() { if (player().position() > 3000) seek(0); else if (m_queueIndex > 0) playQueue(m_queueIndex - 1); }
 void SoundCloud::togglePlayback() {
     if (m_state.value("playbackActive").toBool()) pausePlayback(); else resumePlayback();
 }
@@ -1057,6 +1065,8 @@ void SoundCloud::seek(qint64 position) {
     const qint64 duration = media->duration();
     const qint64 target = duration > 0 ? qBound(qint64(0), position, duration) : qMax(qint64(0), position);
     media->setPosition(target);
+    set("position", media->position());
+    emit playbackSeeked();
 }
 void SoundCloud::volume(double value) {
     const double target = qBound(0.0, value, 1.0);
@@ -1093,6 +1103,7 @@ void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 posi
     m_restoringPlayback = !autoplay || (recovery && position > 0);
     m_restorePosition = qMax<qint64>(0, position);
     set("restoreCleared", false); set("playbackActive", autoplay);
+    m_streamCache.suspend();
     clearError(); ++m_playGeneration; startupStage("selection");
     if (m_crossfadeStarted) {
         m_crossfade.stop();
@@ -1186,7 +1197,7 @@ void SoundCloud::resolveStream(const QUrl &url, int generation, int redirects) {
     if (generation != m_playGeneration) return;
     if (url.scheme() != "https" || redirects > 5 || !url.userInfo().isEmpty()) { startupStage("invalid_stream_address"); nextStream(generation, "invalid_address"); return; }
     // CDN SoundCloud выдаёт подписанные URL. OAuth передаём только API, никогда стороннему хосту.
-    if (url.host() != "api.soundcloud.com") { startupStage("cdn_source"); m_startupSourceSet = true; player().setSource(url); if (m_state.value("playbackActive").toBool() && !m_restoringPlayback) player().play(); prepareNext(); return; }
+    if (url.host() != "api.soundcloud.com") { startupStage("cdn_source"); m_startupSourceSet = true; player().setSource(m_streamCache.source(url)); if (m_state.value("playbackActive").toBool() && !m_restoringPlayback) player().play(); prepareNext(); return; }
     QNetworkRequest req(url); req.setRawHeader("Authorization", "OAuth " + m_access.toUtf8()); req.setTransferTimeout(20000);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     auto *reply = m_network->get(req);
@@ -1520,13 +1531,15 @@ void SoundCloud::beginCrossfade() {
     std::swap(m_activePlayer, m_preloadPlayer);
     m_preloadUrn.clear(); m_preloadIndex = -1;
     m_crossfadeStarted = true;
+    m_streamCache.suspend();
     incoming->play();
+    m_streamCache.warm(incoming->source());
     m_crossfade.stop(); m_crossfade.setStartValue(0.0); m_crossfade.setEndValue(1.0); m_crossfade.start();
 }
 void SoundCloud::prepareStream(const QUrl &url, int generation, int redirects) {
     if (generation != m_preloadGeneration || url.scheme() != "https" || redirects > 5 || !url.userInfo().isEmpty()) return;
     if (url.host() != "api.soundcloud.com") {
-        m_preloadPlayer->setSource(url);
+        m_preloadPlayer->setSource(m_streamCache.source(url));
         // Подготавливаем источник без запуска декодирования и расхода батареи.
         return;
     }

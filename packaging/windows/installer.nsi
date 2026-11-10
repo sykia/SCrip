@@ -24,10 +24,10 @@ InstallDirRegKey HKCU "${UNKEY}" "InstallLocation"
 BrandingText "SCrip"
 SetCompressor /SOLID lzma
 Icon "app.ico"
-VIProductVersion "1.5.0.0"
+VIProductVersion "1.6.0.0"
 VIAddVersionKey /LANG=1049 "ProductName" "SCrip"
 VIAddVersionKey /LANG=1049 "FileDescription" "Установка SCrip"
-VIAddVersionKey /LANG=1049 "FileVersion" "1.5.0"
+VIAddVersionKey /LANG=1049 "FileVersion" "1.6.0"
 VIAddVersionKey /LANG=1049 "LegalCopyright" "SCrip"
 !define MUI_ICON "app.ico"
 !define MUI_UNICON "app.ico"
@@ -113,7 +113,7 @@ Function RecoverInterruptedUpdate
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.5.0"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.6.0"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
@@ -149,7 +149,7 @@ Function RestorePrevious
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.5.0"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.6.0"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
@@ -296,7 +296,7 @@ Section
   CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.5.0"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.6.0"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1

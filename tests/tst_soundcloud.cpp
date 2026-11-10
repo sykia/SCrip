@@ -1108,6 +1108,21 @@ private slots:
         qunsetenv("CAPTURE_ARGS"); qunsetenv("CAPTURE_EXIT");
     }
 #endif
+    void enqueueInsertsAfterCurrentTrack() {
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        const QVariantMap first{{"urn", "soundcloud:tracks:1"}, {"access", "blocked"}};
+        const QVariantMap current{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}};
+        const QVariantMap last{{"urn", "soundcloud:tracks:3"}, {"access", "blocked"}};
+        const QVariantMap added{{"urn", "soundcloud:tracks:4"}, {"access", "blocked"}};
+        sc.playMix({first, current, last}, 1);
+        sc.setShuffle(true);
+        sc.enqueue(added);
+        QCOMPARE(sc.state()["queue"].toList(), QVariantList({first, current, added, last}));
+        QCOMPARE(sc.state()["queueIndex"].toInt(), 1);
+        sc.next();
+        QCOMPARE(sc.state()["current"].toMap()["urn"].toString(), QString("soundcloud:tracks:4"));
+    }
     void movingQueuePreservesCurrentAndSetsNext() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
@@ -1476,6 +1491,39 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(window));
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(25, 28));
         QTRY_VERIFY(!window->isVisible());
+    }
+    void queueHandleReordersTracks() {
+        QFile session(config + "/session.json"); QVERIFY(session.open(QIODevice::WriteOnly));
+        session.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"access_token", "test-access"}, {"refresh_token", "test-refresh"}, {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}}).toJson()); session.close();
+        Network net; net.responses = {{200, "{\"username\":\"Тестовый аккаунт\"}"}, {200, "[]"}};
+        SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["signedIn"].toBool());
+        for (int i = 0; i < 3; ++i)
+            sc.enqueue({{"urn", QString("soundcloud:tracks:%1").arg(i + 1)}, {"title", QString("Трек %1").arg(i + 1)}});
+        QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        window->setWidth(1320); window->setHeight(820);
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        std::function<QQuickItem *(QQuickItem *, const QString &)> findItem = [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
+            if (parent->objectName() == name) return parent;
+            for (auto *child : parent->childItems()) if (auto *found = findItem(child, name)) return found;
+            return nullptr;
+        };
+        QTRY_VERIFY(findItem(window->contentItem(), "queueHandle0"));
+        auto *first = findItem(window->contentItem(), "queueHandle0");
+        auto *third = findItem(window->contentItem(), "queueHandle2"); QVERIFY(third);
+        const auto start = first->mapToScene(QPointF(first->width() / 2, first->height() / 2)).toPoint();
+        const auto end = third->mapToScene(QPointF(third->width() / 2, third->height() / 2)).toPoint();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, start);
+        auto *preview = findItem(window->contentItem(), "queueDragPreview"); QVERIFY(preview);
+        QVERIFY(preview->isVisible());
+        const auto initialY = preview->y();
+        QTest::mouseMove(window, end, 50);
+        QTRY_VERIFY(preview->y() > initialY);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, end);
+        QTRY_COMPARE(sc.state()["queue"].toList().last().toMap()["urn"].toString(), QString("soundcloud:tracks:1"));
     }
     void qmlScreensRender() {
         QFile session(config + "/session.json"); QVERIFY(session.open(QIODevice::WriteOnly));

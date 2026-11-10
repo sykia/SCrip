@@ -24,6 +24,8 @@ public class PlaybackService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private String metadataKey = "";
     private String notificationKey = "";
+    private long seekPosition;
+    private final Runnable seekAction = () -> MediaBridge.dispatch(PlaybackService.this, 3, seekPosition);
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { MediaBridge.dispatch(context, 5, 0); }
     };
@@ -47,9 +49,15 @@ public class PlaybackService extends Service {
             @Override public void onCustomAction(String action, Bundle extras) {
                 if (LIKE.equals(action)) MediaBridge.dispatch(PlaybackService.this, 7, 0);
             }
-            @Override public void onSkipToNext() { MediaBridge.dispatch(PlaybackService.this, 2, 0); }
-            @Override public void onSkipToPrevious() { MediaBridge.dispatch(PlaybackService.this, 1, 0); }
-            @Override public void onSeekTo(long position) { MediaBridge.dispatch(PlaybackService.this, 3, position); }
+            @Override public void onSkipToNext() { handler.removeCallbacks(seekAction); MediaBridge.dispatch(PlaybackService.this, 2, 0); }
+            @Override public void onSkipToPrevious() { handler.removeCallbacks(seekAction); MediaBridge.dispatch(PlaybackService.this, 1, 0); }
+            @Override public void onSeekTo(long position) {
+                if (!MediaBridge.seekable) return;
+                seekPosition = Math.max(0, MediaBridge.duration > 0 ? Math.min(position, MediaBridge.duration) : position);
+                // Системная шкала может присылать событие на каждом движении пальца.
+                handler.removeCallbacks(seekAction);
+                handler.postDelayed(seekAction, 100);
+            }
         }, MediaBridge.MAIN);
         session.setActive(true);
     }
@@ -69,6 +77,7 @@ public class PlaybackService extends Service {
                     if (shouldResume) {
                         MediaBridge.dispatch(this, 4, 0);
                     }
+                    publish();
                 }
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -95,7 +104,8 @@ public class PlaybackService extends Service {
             if (MediaBridge.cover != null) metadata.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, MediaBridge.cover);
             session.setMetadata(metadata.build());
         }
-        long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO | PlaybackState.ACTION_STOP;
+        long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP;
+        if (MediaBridge.seekable) actions |= PlaybackState.ACTION_SEEK_TO;
         final boolean active = MediaBridge.active || MediaBridge.preparing;
         final int state = !MediaBridge.hasTrack ? PlaybackState.STATE_STOPPED
             : active && (!MediaBridge.playing || MediaBridge.buffering) ? PlaybackState.STATE_BUFFERING
@@ -104,7 +114,7 @@ public class PlaybackService extends Service {
         final String likeLabel = MediaBridge.liked ? "Снять лайк" : "Поставить лайк";
         session.setPlaybackState(new PlaybackState.Builder().setActions(actions)
             .addCustomAction(LIKE, likeLabel, likeIcon)
-            .setState(state, MediaBridge.position, state == PlaybackState.STATE_PLAYING ? 1f : 0f, SystemClock.elapsedRealtime()).build());
+            .setState(state, MediaBridge.position, state == PlaybackState.STATE_PLAYING ? 1f : 0f, MediaBridge.positionUpdatedAt).build());
         String nextNotificationKey = MediaBridge.title + '\n' + MediaBridge.artist + '\n' + MediaBridge.artworkRevision
             + '\n' + active + '\n' + MediaBridge.playing + '\n' + MediaBridge.buffering + '\n' + MediaBridge.liked;
         if (notificationKey.equals(nextNotificationKey) && !(active && !foreground)) {
@@ -181,6 +191,15 @@ public class PlaybackService extends Service {
     }
     private void cancelFocusResume() {
         resumeAfterFocus = focusPaused = false;
+        handler.removeCallbacks(seekAction);
+    }
+    boolean prepareUserPlayback() {
+        resumeAfterFocus = focusPaused = false;
+        // На Android 15 сначала возвращаем foreground, затем запрашиваем фокус.
+        MediaBridge.preparing = true;
+        publish();
+        if (!hasFocus) { MediaBridge.preparing = false; publish(); }
+        return hasFocus;
     }
     @Override public IBinder onBind(Intent intent) { return null; }
 }

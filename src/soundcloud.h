@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QSet>
 #include "secretstore.h"
+#include "streamcache.h"
 #include <QVariantMap>
 #include <QNetworkAccessManager>
 #include <QMediaPlayer>
@@ -101,6 +102,7 @@ signals:
     void changed();
     void catalogChanged();
     void progressChanged();
+    void playbackSeeked();
     void signedInChanged();
     void trackSaved();
     void authorizationRequested(const QUrl &url);
@@ -152,6 +154,7 @@ private:
     QTimer m_saveTimer;
     bool m_restoreChecked = false, m_snapshotPlayback = false, m_homeLoaded = false;
     QNetworkAccessManager *m_network;
+    StreamCache m_streamCache;
     QMediaPlayer m_player;
     QMediaPlayer m_sparePlayer;
     QMediaPlayer &player() { return *m_activePlayer; }

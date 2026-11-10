@@ -21,8 +21,8 @@ public final class MediaBridge {
     static volatile boolean preparing;
     static volatile long prepareStartedAt;
     static String title = "SCrip", artist = "Включи музыку в приложении", artwork = "";
-    static boolean playing, active, buffering, hasTrack, liked;
-    static long position, duration;
+    static boolean playing, active, buffering, hasTrack, liked, seekable;
+    static long position, duration, positionUpdatedAt;
     static Bitmap cover;
     static volatile int artworkRevision;
     private static final ExecutorService IMAGE_WORKER = Executors.newSingleThreadExecutor();
@@ -50,7 +50,10 @@ public final class MediaBridge {
             Log.i("SCripStartup", "android_prepare_dispatch_ms=" + (SystemClock.elapsedRealtime() - prepareStartedAt));
             preparing = true;
             // Существующая служба остаётся foreground на всём переходе.
-            if (PlaybackService.instance != null) return;
+            if (PlaybackService.instance != null) {
+                PlaybackService.instance.prepareUserPlayback();
+                return;
+            }
             try { context.startForegroundService(new Intent(context, PlaybackService.class)); }
             catch (IllegalStateException | SecurityException error) { Log.w("SCripMedia", "Не удалось подготовить фоновое воспроизведение", error); }
         });
@@ -86,6 +89,8 @@ public final class MediaBridge {
                 title = nextTitle.isEmpty() ? "SCrip" : nextTitle; artist = nextArtist;
                 playing = nextPlaying; buffering = nextBuffering; active = nextActive; hasTrack = nextHasTrack; liked = nextLiked;
                 position = nextPosition; duration = nextDuration;
+                positionUpdatedAt = SystemClock.elapsedRealtime();
+                seekable = data.optBoolean("seekable");
                 if (nextHasTrack && !nextUrn.isEmpty()) currentUrn = nextUrn;
                 if (nextHasTrack) currentArtworkUrl = data.optString("artworkUrl");
                 if (restoreCleared) { clearSavedTrack(context); restorePending = false; }
@@ -188,6 +193,10 @@ public final class MediaBridge {
     static void dispatch(Context ctx, int action, long value) {
         if (action == 6) { clearSavedTrack(ctx); restorePending = false; }
         if (ready) {
+            // Явный Play после потери фокуса обязан запросить его снова:
+            // Android может продолжать заглушать уже работающий декодер.
+            if ((action == 4 || action == 0 && !active) && PlaybackService.instance != null
+                    && !PlaybackService.instance.prepareUserPlayback()) return;
             if (action == 5 || action == 6) recordDeferredAction(action);
             nativeAction(action, value);
         }

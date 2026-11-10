@@ -14,14 +14,55 @@ Window {
     title: "SCrip"
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
+    palette.window: app.panel
+    palette.windowText: app.ink
+    palette.text: app.ink
+    palette.base: app.surface
+    palette.button: app.raised
+    palette.buttonText: app.ink
+    palette.highlight: app.accent
+    palette.highlightedText: app.foreground(app.accent)
     readonly property var api: sc.catalogState
     readonly property var extensions: typeof pluginManager === "undefined" ? null : pluginManager
     readonly property var pluginTheme: extensions ? extensions.theme : ({})
     readonly property var themes: JSON.parse(prefs.savedThemes)
     readonly property var chosenTheme: themes.find(t => t.name === prefs.themeName)
-    readonly property color accent: chosenTheme?.accent ?? pluginTheme.accent ?? "#f43756"
-    readonly property color surface: chosenTheme ? Qt.tint("white", Qt.alpha(accent, chosenTheme.tint / 100)) : "white"
-    readonly property color panel: chosenTheme ? Qt.tint(surface, Qt.alpha(accent, 0.05)) : "#f7f7f8"
+    readonly property color baseAccent: chosenTheme?.accent ?? pluginTheme.accent ?? "#f43756"
+    readonly property color accent: (dark ? Qt.tint(baseAccent, Qt.rgba(1, 1, 1, 0.28)) : baseAccent)
+    readonly property bool dark: prefs.darkMode
+    property bool requestedDark: prefs.darkMode
+    function switchTheme(value) {
+        requestedDark = value
+        if (!prefs.motion) {
+            themeTransition.stop()
+            themeVeil.opacity = 0
+            prefs.darkMode = value
+        } else if (!themeTransition.running && value !== prefs.darkMode) {
+            themeTransition.start()
+        }
+    }
+    Rectangle {
+        id: themeVeil
+        parent: Overlay.overlay
+        anchors.fill: parent
+        z: 10000
+        color: "#111111"
+        opacity: 0
+        visible: opacity > 0
+    }
+    SequentialAnimation {
+        id: themeTransition
+        NumberAnimation { target: themeVeil; property: "opacity"; to: 1; duration: app.motion / 2; easing.type: Easing.InOutQuad }
+        ScriptAction { script: prefs.darkMode = app.requestedDark }
+        NumberAnimation { target: themeVeil; property: "opacity"; to: 0; duration: app.motion / 2; easing.type: Easing.InOutQuad }
+        onFinished: if (app.requestedDark !== prefs.darkMode) start()
+    }
+
+    readonly property bool themed: !!chosenTheme || !!pluginTheme.accent
+    readonly property color surface: (dark ? Qt.tint("#111111", Qt.alpha(baseAccent, chosenTheme ? Math.min(0.06, chosenTheme.tint / 300) : 0)) : themed ? Qt.tint("white", Qt.alpha(baseAccent, chosenTheme ? chosenTheme.tint / 100 : 0.05)) : "white")
+    readonly property color panel: dark ? "#1a1a1a" : themed ? Qt.tint(surface, Qt.alpha(accent, 0.05)) : "#f7f7f8"
+    readonly property color raised: (dark ? "#282828" : "#f0edef")
+    readonly property color line: (dark ? "#383838" : "#e6e2e5")
     function foreground(c) {
         function linear(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
         return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b) > 0.179 ? "#111113" : "#ffffff"
@@ -29,8 +70,8 @@ Window {
     readonly property int artworkRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginTheme.coverRadius ?? prefs.coverRadius
     property string pluginMessage: ""
 
-    readonly property color ink: "#242426"
-    readonly property color muted: "#858589"
+    readonly property color ink: (dark ? "#f1f1f1" : "#242426")
+    readonly property color muted: (dark ? "#aaaaaa" : "#858589")
     property int section: 5
     property int category: 0
     property int settingGroup: 0
@@ -77,6 +118,7 @@ Window {
 
     Settings { id: prefs; objectName: "uiPreferences"; category: "appleInterface"; property bool gridView: true; property real volume: 0.7; property bool motion: true
         property string hiddenMixTracks: "{}"
+        property bool darkMode: true
         property string savedThemes: "[]"
         property string themeName: ""
         property int animationMs: 240
@@ -175,15 +217,13 @@ Window {
         implicitHeight: 30
         hoverEnabled: true
         Accessible.name: text
-        property bool showHint: true
-        ToolTip.visible: showHint && hovered && !!symbol; ToolTip.text: text; ToolTip.delay: 500
         opacity: enabled ? 1 : 0.4
         scale: down ? 0.96 : 1
         Behavior on scale { NumberAnimation { duration: app.motion / 2; easing.type: Easing.OutCubic } }
         background: Rectangle {
             radius: tool.round ? height / 2 : 7
-            color: tool.primary ? (tool.down ? Qt.darker(app.accent, 1.12) : app.accent) : tool.down ? "#dedcdf" : tool.active ? "#eae7e9" : tool.hovered ? "#efedef" : "transparent"
-            border.color: tool.primary || tool.symbol ? "transparent" : "#dedbde"
+            color: tool.primary ? (tool.down ? Qt.darker(app.accent, 1.12) : app.accent) : tool.down ? (app.dark ? "#383838" : "#dedcdf") : tool.active ? (app.dark ? "#333333" : "#eae7e9") : tool.hovered ? (app.dark ? "#2c2c2c" : "#efedef") : "transparent"
+            border.color: tool.primary || tool.symbol ? "transparent" : (app.dark ? "#404040" : "#dedbde")
             Behavior on color { ColorAnimation { duration: app.motion / 2 } }
         }
         contentItem: Item {
@@ -202,20 +242,20 @@ Window {
     }
     component Field: TextField {
         height: 34; color: app.ink; font.pixelSize: 13; selectByMouse: true
-        leftPadding: 10; rightPadding: 10; placeholderTextColor: "#9a969b"
-        background: Rectangle { radius: 7; color: "white"; border.color: parent.activeFocus ? app.accent : "#dddadd" }
+        leftPadding: 10; rightPadding: 10; placeholderTextColor: (app.dark ? "#aaaaaa" : "#9a969b")
+        background: Rectangle { radius: 7; color: app.surface; border.color: parent.activeFocus ? app.accent : (app.dark ? "#404040" : "#dddadd") }
     }
     component LineSlider: Slider {
         id: lineSlider
         implicitHeight: 22; padding: 0
         background: Rectangle {
             x: lineSlider.leftPadding; y: (lineSlider.height-height)/2
-            width: lineSlider.availableWidth; height: 3; radius: 2; color: "#d7d4d6"
-            Rectangle { width: lineSlider.visualPosition * parent.width; height: parent.height; radius: 2; color: "#777278" }
+            width: lineSlider.availableWidth; height: 3; radius: 2; color: (app.dark ? "#454545" : "#d7d4d6")
+            Rectangle { width: lineSlider.visualPosition * parent.width; height: parent.height; radius: 2; color: (app.dark ? "#aaaaaa" : "#777278") }
         }
         handle: Rectangle {
             x: lineSlider.visualPosition * (lineSlider.availableWidth - width); y: (lineSlider.height-height)/2
-            width: 8; height: 8; radius: 4; color: "#777278"; visible: lineSlider.hovered || lineSlider.pressed
+            width: 8; height: 8; radius: 4; color: (app.dark ? "#aaaaaa" : "#777278"); visible: lineSlider.hovered || lineSlider.pressed
         }
     }
     component VolumeSlider: LineSlider {
@@ -232,10 +272,10 @@ Window {
         property string symbol: "music"
         property bool selected: false
         width: parent.width; height: 36; hoverEnabled: true
-        background: Rectangle { radius: 7; color: navItem.selected ? "#eaeaec" : navItem.hovered ? "#efeff1" : "transparent"; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
+        background: Rectangle { radius: 7; color: navItem.selected ? (app.dark ? "#323232" : "#eaeaec") : navItem.hovered ? (app.dark ? "#2b2b2b" : "#efeff1") : "transparent"; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
         contentItem: Row {
             leftPadding: 10; spacing: 9
-            Glyph { anchors.verticalCenter: parent.verticalCenter; width: 17; height: 17; name: navItem.symbol; ink: navItem.selected ? app.accent : "#454247" }
+            Glyph { anchors.verticalCenter: parent.verticalCenter; width: 17; height: 17; name: navItem.symbol; ink: navItem.selected ? app.accent : (app.dark ? "#c2c2c2" : "#454247") }
             Txt { width: navItem.width - 44; anchors.verticalCenter: parent.verticalCenter; text: navItem.text; color: navItem.selected ? app.accent : app.ink; font.pixelSize: 12 }
         }
     }
@@ -243,14 +283,14 @@ Window {
     Rectangle {
         id: shell
         anchors.fill: parent; radius: app.visibility === Window.Maximized || app.visibility === Window.FullScreen ? 0 : 14
-        color: app.surface; border.color: "#d2cfd3"; clip: true
+        color: app.surface; border.color: (app.dark ? "#3b3b3b" : "#d2cfd3"); clip: true
 
         Rectangle {
             id: sidebar
             x: 1; y: 1; width: 196; height: parent.height - 2
             visible: sc.signedIn; color: app.panel; radius: shell.radius
             Rectangle { anchors.right: parent.right; width: 15; height: parent.height; color: parent.color }
-            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#e6e2e5" }
+            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: (app.dark ? "#383838" : "#e6e2e5") }
             Column {
                 x: 16; y: 76; width: parent.width - 32; spacing: 4
                 NavItem { text: "Главная"; symbol: "home"; selected: app.section === 5; onClicked: app.section = 5 }
@@ -306,12 +346,12 @@ Window {
                 visible: sc.signedIn; anchors.right: parent.right; anchors.rightMargin: app.inspectorWidth + app.gutter; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                 Tool { symbol: prefs.gridView ? "list" : "grid"; text: prefs.gridView ? "Показать списком" : "Показать обложки"; visible: (app.section !== 4 && app.section !== 5); onClicked: prefs.gridView = !prefs.gridView }
                 Rectangle {
-                    width: app.width < 1200 ? 195 : 240; height: 30; radius: 15; color: "#f6f5f6"; border.color: "#efedef"
-                    Glyph { x: 10; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; name: "search"; ink: "#8e898e" }
+                    width: app.width < 1200 ? 195 : 240; height: 30; radius: 15; color: (app.dark ? "#242424" : "#f6f5f6"); border.color: (app.dark ? "#2c2c2c" : "#efedef")
+                    Glyph { x: 10; anchors.verticalCenter: parent.verticalCenter; width: 14; height: 14; name: "search"; ink: (app.dark ? "#aaaaaa" : "#8e898e") }
                     Basic.TextField {
                         id: searchField; verticalAlignment: TextInput.AlignVCenter; x: 29; width: parent.width - 36; height: parent.height
                         background: null; leftPadding: 0; topPadding: 0; bottomPadding: 0; font.pixelSize: 12
-                        color: app.ink; placeholderText: "Поиск в SoundCloud"; placeholderTextColor: "#99949a"; selectByMouse: true
+                        color: app.ink; placeholderText: "Поиск в SoundCloud"; placeholderTextColor: (app.dark ? "#aaaaaa" : "#99949a"); selectByMouse: true
                         text: app.query; onAccepted: app.searchNow()
                     }
                 }
@@ -322,9 +362,9 @@ Window {
             visible: sc.signedIn && app.dockedInspector
             x: parent.width - app.inspectorWidth - 1; y: 1
             width: app.inspectorWidth; height: parent.height - y - player.height - 1
-            color: app.chosenTheme ? app.panel : "#fafafa"; radius: shell.radius
+            color: app.dark || app.themed ? app.panel : "#fafafa"; radius: shell.radius
             Rectangle { width: 14; height: parent.height; color: parent.color }
-            Rectangle { width: 1; height: parent.height; color: "#eaeaec" }
+            Rectangle { width: 1; height: parent.height; color: (app.dark ? "#323232" : "#eaeaec") }
             Inspector { anchors.fill: parent; anchors.margins: app.gutter; anchors.topMargin: 20; onDismiss: app.inspectorOpen = false }
         }
         Item {
@@ -408,7 +448,7 @@ Window {
                         Tool { symbol: "repeat"; text: "Обновить"; onClicked: app.refreshPage(true) }
                     }
                     Loader { width: parent.width; active: app.section === 4; visible: active; sourceComponent: app.settingGroup === 1 ? pluginsPage : settingsPage }
-                    PluginPanels {
+                    PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted;
                         width: pageBody.width
                         manager: app.extensions
                         slotName: app.section === 5 ? "home" : app.section === 3 ? "profile" : "-"
@@ -421,7 +461,7 @@ Window {
                     Column {
                         visible: (app.section !== 4 && app.section !== 5) && !app.api.busy && app.api.tracks.length === 0
                         width: parent.width; topPadding: 90; spacing: 12
-                        Glyph { name: app.section === 0 ? "search" : app.section === 2 ? "grid" : "music"; width: 42; height: 42; ink: "#c5c0c5"; anchors.horizontalCenter: parent.horizontalCenter }
+                        Glyph { name: app.section === 0 ? "search" : app.section === 2 ? "grid" : "music"; width: 42; height: 42; ink: (app.dark ? "#777777" : "#c5c0c5"); anchors.horizontalCenter: parent.horizontalCenter }
                         Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 19; font.weight: Font.DemiBold; text: app.section === 0 ? "Найдите любимую музыку" : app.section === 2 ? "Ваши плейлисты" : "Пока нет треков" }
                         Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: app.muted; text: app.section === 0 ? "Введите название трека или исполнителя в поиске." : app.section === 2 ? "Создайте первый плейлист — он появится и в SoundCloud." : "Здесь появится музыка из вашей коллекции SoundCloud."; wrapMode: Text.WordWrap }
                     }
@@ -434,17 +474,17 @@ Window {
                 readonly property bool narrow: width < 790
                 x: 0; anchors.bottom: parent.bottom
                 width: shell.width - musicArea.x - 1; height: 84
-                color: app.chosenTheme ? app.panel : "#fcfcfd"; radius: shell.radius
+                color: app.dark || app.themed ? app.panel : "#fcfcfd"; radius: shell.radius
                 Rectangle { width: parent.width; height: parent.radius; color: parent.color }
                 Rectangle { width: parent.radius; height: parent.height; color: parent.color }
-                Rectangle { width: parent.width; height: 1; color: "#dfdfe3" }
+                Rectangle { width: parent.width; height: 1; color: (app.dark ? "#383838" : "#dfdfe3") }
 
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: player.narrow ? 14 : 24
                     anchors.rightMargin: player.narrow ? 14 : 24; spacing: player.narrow ? 8 : 16
                     Rectangle {
                         Layout.preferredWidth: 50; Layout.preferredHeight: 50
-                        radius: app.artworkRadius; color: Qt.tint("#faf9fa", Qt.alpha(app.accent, 0.09))
+                        radius: app.artworkRadius; color: Qt.tint(app.surface, Qt.alpha(app.accent, 0.09))
                         Artwork { radius: app.artworkRadius; id: dockArt; anchors.fill: parent; source: app.cover(app.api.current); visible: !!source }
                         Glyph { visible: !dockArt.visible; anchors.centerIn: parent; width: 24; height: 24; name: "music"; ink: app.accent }
                     }
@@ -457,35 +497,45 @@ Window {
                         Layout.fillWidth: true; Layout.preferredWidth: 310; Layout.maximumWidth: 460; spacing: 0
                         Row {
                             Layout.alignment: Qt.AlignHCenter; spacing: player.narrow ? 2 : 6
-                            Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "shuffle"; active: app.api.shuffle; text: "Перемешать"; onClicked: sc.setShuffle(!app.api.shuffle) }
-                            Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "previous"; text: "Предыдущий трек"; enabled: player.hasTrack; onClicked: sc.previous() }
+                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "shuffle"; active: app.api.shuffle; text: "Перемешать"; onClicked: sc.setShuffle(!app.api.shuffle) }
+                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "previous"; text: "Предыдущий трек"; enabled: player.hasTrack; onClicked: sc.previous() }
                             Tool {
-                                showHint: false
                                 symbol: app.api.buffering ? "loading" : app.api.playing ? "pause" : "play"; text: app.api.buffering ? "Загрузка" : app.api.playing ? "Пауза" : "Воспроизвести"
                                 implicitWidth: 38; implicitHeight: 38; primary: true; round: true
                                 enabled: player.hasTrack; opacity: 1; onClicked: sc.togglePlayback()
                                 background: Rectangle { radius: width / 2; color: parent.enabled ? app.accent : "#a7a7af" }
                                 BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: app.api.buffering; visible: running }
                             }
-                            Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!app.api.queue?.length; onClicked: sc.next() }
-                            Tool { showHint: false; anchors.verticalCenter: parent.verticalCenter; symbol: "repeat"; active: app.api.repeat; text: "Повтор трека"; onClicked: sc.setRepeat(!app.api.repeat) }
+                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!app.api.queue?.length; onClicked: sc.next() }
+                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "repeat"; active: app.api.repeat; text: "Повтор трека"; onClicked: sc.setRepeat(!app.api.repeat) }
                         }
                         RowLayout {
                             visible: player.hasTrack; Layout.fillWidth: true; spacing: 8
                             Txt { text: app.time(sc.position); color: app.muted; font.pixelSize: 10 }
-                            LineSlider { Layout.fillWidth: true; implicitHeight: 17; from: 0; to: Math.max(1, sc.duration || 1); value: sc.position || 0; onMoved: sc.seek(value); Accessible.name: "Позиция трека" }
+                            LineSlider {
+                                id: trackProgress
+                                Layout.fillWidth: true; implicitHeight: 17; from: 0; to: Math.max(1, sc.duration || 1)
+                                property bool adjusting: false
+                                Binding { target: trackProgress; property: "value"; value: sc.position || 0; when: !trackProgress.adjusting; restoreMode: Binding.RestoreNone }
+                                onPressedChanged: {
+                                    if (pressed) adjusting = true
+                                    else { sc.seek(value); adjusting = false }
+                                }
+                                onMoved: if (!pressed) sc.seek(value)
+                                Accessible.name: "Позиция трека"
+                            }
                             Txt { text: app.time(sc.duration); color: app.muted; font.pixelSize: 10 }
                         }
                     }
                     Item { Layout.fillWidth: true; Layout.preferredWidth: player.narrow ? 0 : 48 }
-                    LikeButton { showHint: false; visible: player.hasTrack; track: app.api.current }
+                    LikeButton { visible: player.hasTrack; track: app.api.current }
                     RowLayout {
                         Layout.fillWidth: false
                         Layout.minimumWidth: implicitWidth
                         Layout.maximumWidth: implicitWidth
                         spacing: 12
                         Tool { text: "Дополнения"; visible: !!app.extensions && app.extensions.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
-                        Tool { showHint: false; symbol: "list"; text: "Очередь воспроизведения"; active: app.dockedInspector || queuePopup.opened; onClicked: app.toggleInspector() }
+                        Tool { symbol: "list"; text: "Очередь воспроизведения"; active: app.dockedInspector || queuePopup.opened; onClicked: app.toggleInspector() }
                         Glyph { visible: !player.narrow; name: "volume"; Layout.preferredWidth: 18; Layout.preferredHeight: 18; ink: app.muted }
                         VolumeSlider { visible: !player.narrow; Layout.minimumWidth: 96; Layout.preferredWidth: 96; Layout.maximumWidth: 96 }
                     }
@@ -731,24 +781,24 @@ Window {
                 Behavior on opacity { NumberAnimation { duration: prefs.motion ? app.motion + 80 : 0; easing.type: Easing.OutCubic } }
                 HoverHandler { id: tileHover }
                 Rectangle {
-                    id: artwork; width: parent.width; height: width; radius: app.artworkRadius; color: "#f1eded"; border.color: "#eeeaec"; clip: true
-                    Glyph { anchors.centerIn: parent; width: 40; height: 40; name: tile.playlist ? "grid" : "music"; ink: "#c6b6bf" }
+                    id: artwork; width: parent.width; height: width; radius: app.artworkRadius; color: (app.dark ? "#2b2b2b" : "#f0f0f0"); border.color: (app.dark ? "#3b3b3b" : "#eaeaea"); clip: true
+                    Glyph { anchors.centerIn: parent; width: 40; height: 40; name: tile.playlist ? "grid" : "music"; ink: (app.dark ? "#777777" : "#bcbcbc") }
                     Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(tile.modelData); }
                     TapHandler { onTapped: tile.playTrack() }
                     Rectangle { anchors.fill: parent; radius: parent.radius; color: "transparent"; border.color: "#14000000" }
                     Rectangle {
                         visible: !tile.playlist
                         anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 8
-                        width: 30; height: 30; radius: 15; color: "white"
+                        width: 30; height: 30; radius: 15; color: app.dark ? "#262626" : "white"
                         LikeButton { anchors.fill: parent; round: true; track: tile.modelData }
                     }
                     Rectangle {
                         visible: tileHover.hovered; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 9
-                        width: 32; height: 32; radius: 16; color: "#f5ffffff"
+                        width: 32; height: 32; radius: 16; color: app.dark ? "#f5262626" : "#f5ffffff"
                         Tool { anchors.fill: parent; round: true; symbol: tile.playlist ? "arrow" : "play"; text: tile.playlist ? "Открыть плейлист" : "Слушать"; onClicked: tile.playTrack() }
                     }
                     Rectangle {
-                        visible: tileHover.hovered && !tile.playlist; x: 9; y: 9; width: 27; height: 27; radius: 14; color: "#f5ffffff"
+                        visible: tileHover.hovered && !tile.playlist; x: 9; y: 9; width: 27; height: 27; radius: 14; color: app.dark ? "#f5262626" : "#f5ffffff"
                         Tool { anchors.fill: parent; round: true; symbol: "plus"; text: "Добавить в очередь"; onClicked: tile.enqueueTrack() }
                     }
                 }
@@ -795,7 +845,7 @@ Window {
                 width: virtualTrackList.width; height: 58; radius: 5
                 Component.onCompleted: virtualTrackList.activeDelegateCount++
                 Component.onDestruction: virtualTrackList.activeDelegateCount--
-                color: app.api.current.urn === modelData.urn ? Qt.tint("white", Qt.alpha(app.accent, 0.09)) : rowHover.hovered ? "#f6f5f6" : index % 2 ? "#faf9fa" : "white"
+                color: app.api.current.urn === modelData.urn ? Qt.tint(app.surface, Qt.alpha(app.accent, 0.14)) : rowHover.hovered ? app.raised : index % 2 ? app.panel : app.surface
                 HoverHandler { id: rowHover }
                 RowLayout {
                     anchors.fill: parent; anchors.margins: 7; spacing: 10
@@ -807,12 +857,6 @@ Window {
                         Txt { Layout.fillWidth: true; text: row.modelData.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
                     }
                     LikeButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); track: row.modelData }
-                    Tool { text: "⋯"; visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); onClicked: trackMenu.open() }
-                    Menu {
-                        id: trackMenu
-                        MenuItem { text: "Копировать название и исполнителя"; onTriggered: sc.copyText((row.modelData.title || "Без названия") + " — " + (row.modelData.user?.username || "SoundCloud")) }
-                        MenuItem { text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(row.modelData.permalink_url || ""); onTriggered: sc.copyText(row.modelData.permalink_url) }
-                    }
                     Tool { visible: (row.modelData.urn || "").indexOf("soundcloud:tracks:") === 0; symbol: "plus"; text: "В очередь"; onClicked: sc.enqueue(row.modelData) }
                     Txt { text: app.time(row.modelData.duration); color: app.muted; font.pixelSize: 11; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
                 }
@@ -836,7 +880,7 @@ Window {
         spacing: 12
         Txt { text: parent.heading; font.pixelSize: 18; font.weight: Font.DemiBold; bottomPadding: 6 }
     }
-    PluginToolsPopup { id: pluginTools; manager: app.extensions }
+    PluginToolsPopup { dark: app.dark; ink: app.ink; muted: app.muted; id: pluginTools; manager: app.extensions }
     Connections {
         target: app.extensions
         function onNavigationRequested(destination) {
@@ -854,7 +898,7 @@ Window {
         Column {
             spacing: 18
             Tool { text: "‹ Настройки"; onClicked: app.settingGroup = 0 }
-            PluginManagerView { width: parent.width; manager: app.extensions; appearanceHint: app.chosenTheme || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
+            PluginManagerView { dark: app.dark; ink: app.ink; muted: app.muted; width: parent.width; manager: app.extensions; appearanceHint: app.chosenTheme || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
         }
     }
     Component {
@@ -863,6 +907,7 @@ Window {
             spacing: 30
             FormBlock {
                 width: Math.min(parent.width, 480); heading: "Тема оформления"
+                CheckBox { text: "Тёмная тема"; checked: prefs.darkMode; onToggled: app.switchTheme(checked) }
                 ComboBox {
                     width: parent.width; model: ["Стандартная"].concat(app.themes.map(t => t.name))
                     currentIndex: Math.max(0, app.themes.findIndex(t => t.name === prefs.themeName) + 1)
@@ -899,14 +944,14 @@ Window {
                 CheckBox { text: "Автоматически загружать ещё при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
                 Tool { text: "Сбросить оформление"; onClicked: { prefs.coverRadius = 8; prefs.coverRadiusOverride = false; prefs.avatarRoundness = 50; prefs.panelRadius = 12; prefs.animationMs = 240; prefs.motion = true; prefs.autoLoad = true } }
             }
-            Rectangle { width: parent.width; height: 1; color: "#efedef" }
+            Rectangle { width: parent.width; height: 1; color: (app.dark ? "#2c2c2c" : "#efedef") }
             FormBlock {
                 width: Math.min(parent.width, 480); heading: "Аккаунт"
                 Txt { text: app.api.profile.username || "SoundCloud"; font.pixelSize: 14 }
                 Tool { text: "Открыть профиль SoundCloud"; onClicked: sc.openExternal(app.api.profile.permalink_url || "https://soundcloud.com") }
                 Tool { text: "Выйти из аккаунта"; onClicked: disconnectDialog.open() }
             }
-            Rectangle { width: parent.width; height: 1; color: "#efedef" }
+            Rectangle { width: parent.width; height: 1; color: (app.dark ? "#2c2c2c" : "#efedef") }
             FormBlock {
                 width: Math.min(parent.width, 480); heading: "SCrip"
                 Txt { text: "Версия " + Qt.application.version; color: app.muted }
@@ -934,7 +979,7 @@ Window {
         modal: true; focus: true; padding: 24
         width: Math.min(460, app.width - 60)
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        background: Rectangle { color: "#fbfafa"; radius: prefs.panelRadius; border.color: "#dedadd" }
+        background: Rectangle { color: (app.dark ? app.panel : "#fafafa"); radius: prefs.panelRadius; border.color: (app.dark ? "#404040" : "#dadada") }
         Overlay.modal: Rectangle { color: "#28000000" }
     }
     Sheet {
@@ -960,12 +1005,12 @@ Window {
     }
     Sheet {
         id: themeEditor
-        property color draft: app.accent
+        property color draft: app.baseAccent
         property string original: ""
         function begin(edit) {
             original = edit ? prefs.themeName : ""
             themeTitle.text = original
-            draft = app.accent
+            draft = app.baseAccent
             tintSlider.value = edit ? app.chosenTheme.tint : 5
             open()
             themeTitle.forceActiveFocus()
@@ -976,7 +1021,7 @@ Window {
             Field { id: themeTitle; width: parent.width; maximumLength: 40; placeholderText: "Название темы"; Accessible.name: placeholderText }
             Rectangle {
                 width: parent.width; height: 100; radius: 12
-                color: Qt.tint("white", Qt.alpha(themeEditor.draft, tintSlider.value / 100))
+                color: Qt.tint((app.dark ? "#1a1a1a" : "white"), Qt.alpha(themeEditor.draft, app.dark ? tintSlider.value / 200 : tintSlider.value / 100))
                 border.color: "#e6e3e5"
                 BrandMark { anchors.centerIn: parent; width: 126; height: width; color: themeEditor.draft }
             }
@@ -1025,7 +1070,7 @@ Window {
         Column {
             spacing: 24
             Rectangle {
-                width: parent.width; height: 196; radius: prefs.panelRadius; color: "#f3f3f5"
+                width: parent.width; height: 196; radius: prefs.panelRadius; color: (app.dark ? "#242424" : "#f3f3f5")
                 readonly property bool creator: app.displayedProfile.urn === "soundcloud:users:1675018934"
                 border.width: creator ? 2 : 0; border.color: app.accent
                 Rectangle {
@@ -1068,7 +1113,7 @@ Window {
                 }
                 Tool { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 20; symbol: "arrow"; text: "Открыть на SoundCloud"; onClicked: sc.openExternal(app.displayedProfile.permalink_url || "https://soundcloud.com") }
             }
-            Txt { width: parent.width; visible: !!app.displayedProfile.description; text: app.displayedProfile.description || ""; wrapMode: Text.WordWrap; elide: Text.ElideRight; maximumLineCount: 5; lineHeight: 1.5; color: "#656569" }
+            Txt { width: parent.width; visible: !!app.displayedProfile.description; text: app.displayedProfile.description || ""; wrapMode: Text.WordWrap; elide: Text.ElideRight; maximumLineCount: 5; lineHeight: 1.5; color: (app.dark ? "#aaaaaa" : "#656569") }
             Row {
                 width: parent.width; spacing: 24
                 Repeater {
@@ -1098,8 +1143,8 @@ Window {
         }
         Rectangle {
             visible: !!app.api.current.urn && inspector.height >= 480
-            Layout.fillWidth: true; Layout.preferredHeight: Math.min(width, inspector.height * 0.34); radius: app.artworkRadius; color: "#f0eef0"; clip: true
-            Glyph { anchors.centerIn: parent; width: 36; height: 36; name: "music"; ink: "#bbb4bb" }
+            Layout.fillWidth: true; Layout.preferredHeight: Math.min(width, inspector.height * 0.34); radius: app.artworkRadius; color: (app.dark ? "#2b2b2b" : "#f0eef0"); clip: true
+            Glyph { anchors.centerIn: parent; width: 36; height: 36; name: "music"; ink: (app.dark ? "#777777" : "#bbb4bb") }
             Artwork { radius: app.artworkRadius; anchors.fill: parent; source: app.cover(app.api.current); }
         }
         RowLayout {
@@ -1114,18 +1159,22 @@ Window {
         Txt { visible: !!app.api.current.genre; Layout.fillWidth: true; text: app.api.current.genre || ""; color: app.muted; font.pixelSize: 11 }
         Column {
             visible: !app.api.current.urn; Layout.fillWidth: true; spacing: 12; topPadding: 32; bottomPadding: 32
-            Glyph { anchors.horizontalCenter: parent.horizontalCenter; name: "music"; width: 36; height: 36; ink: "#b5afb5" }
+            Glyph { anchors.horizontalCenter: parent.horizontalCenter; name: "music"; width: 36; height: 36; ink: (app.dark ? "#777777" : "#b5afb5") }
             Txt { width: parent.width; text: "Выберите трек"; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 14; font.weight: Font.Medium }
             Txt { width: parent.width; text: "Включите трек в медиатеке.
 Здесь появятся обложка и очередь."; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; color: app.muted; font.pixelSize: 12; lineHeight: 1.4 }
         }
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#eaeaec" }
+        Rectangle { Layout.fillWidth: true; height: 1; color: (app.dark ? "#323232" : "#eaeaec") }
         RowLayout { Layout.fillWidth: true; Txt { text: "Очередь"; font.weight: Font.DemiBold; Layout.fillWidth: true } Txt { text: app.api.queue.length; color: app.muted; font.pixelSize: 11 } }
         Txt { visible: app.api.queue.length === 0; text: "Добавляйте треки кнопкой +"; color: app.muted; font.pixelSize: 12 }
         ListView {
             id: queueList
+            objectName: "queueListView"
             property int dragFrom: -1
             property int dragTo: -1
+            property bool removing: false
+            property real dragY: 0
+            property var dragTrack: ({})
             onDragFromChanged: dragTo = dragFrom
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 64
             clip: true; model: app.api.queue; spacing: 4
@@ -1136,27 +1185,19 @@ Window {
                 required property var modelData
                 required property int index
                 width: Math.max(0, queueList.width - queueBar.implicitWidth - 4); height: 52; radius: 6
-                color: index === app.api.queueIndex ? "#eeecef" : queueHover.hovered ? "#f1eff2" : "transparent"
+                color: index === app.api.queueIndex ? (app.dark ? "#383838" : "#eeecef") : queueHover.hovered ? (app.dark ? "#2c2c2c" : "#f1eff2") : "transparent"
+                opacity: queueList.dragFrom === index ? 0.35 : 1
                 HoverHandler { id: queueHover }
-                DragHandler {
-                    id: queueDrag
-                    target: null; xAxis.enabled: false
-                    acceptedDevices: PointerDevice.Mouse
-                    onActiveChanged: {
-                        if (active) queueList.dragFrom = queuedTrack.index
-                        else if (queueList.dragFrom === queuedTrack.index) {
-                            const to = queueList.dragTo
-                            queueList.dragFrom = -1
-                            if (to >= 0) sc.moveQueue(queuedTrack.index, to)
-                        }
-                    }
-                    onActiveTranslationChanged: if (active) queueList.dragTo = Math.max(0, Math.min(queueList.count - 1, queuedTrack.index + Math.round(activeTranslation.y / (queuedTrack.height + queueList.spacing))))
-                }
                 Rectangle {
                     visible: queueList.dragFrom >= 0 && queueList.dragTo === queuedTrack.index
                     anchors.left: parent.left; anchors.right: parent.right
                     y: queueList.dragTo > queueList.dragFrom ? parent.height - height : 0
                     height: 2; color: app.accent
+                }
+                MouseArea {
+                    anchors.fill: parent; acceptedButtons: Qt.RightButton
+                    enabled: !queueList.removing && queueList.dragFrom < 0
+                    onClicked: { queueList.removing = true; removeAnimation.start() }
                 }
                 RowLayout {
                     anchors.fill: parent; anchors.margins: 6; spacing: 8
@@ -1170,19 +1211,81 @@ Window {
                         Txt { Layout.fillWidth: true; text: queuedTrack.modelData.title || "Трек"; font.pixelSize: 12 }
                         Txt { Layout.fillWidth: true; text: queuedTrack.modelData.user?.username || ""; color: app.muted; font.pixelSize: 10 }
                     }
-                    Tool {
+                    Item {
                         id: queueActions
-                        symbol: "list"; text: "Порядок треков"; implicitWidth: 24
-                        onClicked: orderMenu.open()
-                        Menu {
-                            id: orderMenu
-                            MenuItem { text: "Играть следующим"; enabled: queuedTrack.index !== app.api.queueIndex; onTriggered: sc.queueNext(queuedTrack.index) }
-                            MenuItem { text: "Поднять выше"; enabled: queuedTrack.index > 0; onTriggered: sc.moveQueue(queuedTrack.index, queuedTrack.index - 1) }
-                            MenuItem { text: "Опустить ниже"; enabled: queuedTrack.index + 1 < queueList.count; onTriggered: sc.moveQueue(queuedTrack.index, queuedTrack.index + 1) }
-                            MenuSeparator {}
-                            MenuItem { text: "Удалить из очереди"; onTriggered: sc.removeQueue(queuedTrack.index) }
+                        objectName: "queueHandle" + queuedTrack.index
+                        Layout.preferredWidth: 24; Layout.fillHeight: true
+                        property point pointerPosition
+                        function updateTarget() {
+                            const pos = mapToItem(queueList.contentItem, pointerPosition.x, pointerPosition.y)
+                            queueList.dragTo = Math.max(0, Math.min(queueList.count - 1, Math.floor(pos.y / 56)))
+                            const viewportPos = mapToItem(queueList, pointerPosition.x, pointerPosition.y)
+                            queueList.dragY = Math.max(0, Math.min(queueList.height - 52, viewportPos.y - 26))
+                        }
+                        Glyph { anchors.centerIn: parent; width: 16; height: 16; name: "list"; ink: app.ink }
+                        MouseArea {
+                            id: queueDrag
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            enabled: !queueList.removing
+                            preventStealing: true
+                            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                            onPressed: function(mouse) {
+                                queueActions.pointerPosition = Qt.point(mouse.x, mouse.y)
+                                queueList.dragTrack = queuedTrack.modelData
+                                const pos = queueActions.mapToItem(queueList, mouse.x, mouse.y)
+                                queueList.dragY = Math.max(0, Math.min(queueList.height - 52, pos.y - 26))
+                                queueList.dragFrom = queuedTrack.index
+                                queueActions.updateTarget()
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (!pressed) return
+                                queueActions.pointerPosition = Qt.point(mouse.x, mouse.y)
+                                queueActions.updateTarget()
+                            }
+                            onReleased: {
+                                const from = queueList.dragFrom, to = queueList.dragTo
+                                queueList.dragFrom = -1
+                                if (from >= 0 && to >= 0) sc.moveQueue(from, to)
+                            }
+                            onCanceled: queueList.dragFrom = -1
+                        }
+                        Timer {
+                            interval: 30; repeat: true; running: queueDrag.pressed
+                            onTriggered: {
+                                const pos = queueActions.mapToItem(queueList, queueActions.pointerPosition.x, queueActions.pointerPosition.y)
+                                if (pos.y < 30) queueList.contentY = Math.max(queueList.originY, queueList.contentY - 8)
+                                else if (pos.y > queueList.height - 30) queueList.contentY = Math.min(Math.max(queueList.originY, queueList.contentHeight - queueList.height), queueList.contentY + 8)
+                                queueActions.updateTarget()
+                            }
                         }
                     }
+                }
+                ParallelAnimation {
+                    id: removeAnimation
+                    NumberAnimation { target: queuedTrack; property: "opacity"; to: 0; duration: app.motion; easing.type: Easing.InOutQuad }
+                    NumberAnimation { target: queuedTrack; property: "height"; to: 0; duration: app.motion; easing.type: Easing.InOutQuad }
+                    onFinished: { const index = queuedTrack.index; queueList.removing = false; sc.removeQueue(index) }
+                }
+            }
+            Rectangle {
+                parent: queueList
+                objectName: "queueDragPreview"
+                visible: queueList.dragFrom >= 0
+                z: 10; x: 0; y: queueList.dragY
+                width: Math.max(0, queueList.width - queueBar.implicitWidth - 4); height: 52; radius: 6
+                color: app.dark ? "#383838" : "#eeecef"
+                border.color: app.accent; border.width: 1
+                Behavior on y { enabled: queueList.dragFrom >= 0; NumberAnimation { duration: Math.min(app.motion, 90); easing.type: Easing.OutCubic } }
+                RowLayout {
+                    anchors.fill: parent; anchors.margins: 6; spacing: 8
+                    Artwork { radius: app.artworkRadius; width: 34; height: 34; source: app.cover(queueList.dragTrack) }
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 4
+                        Txt { Layout.fillWidth: true; text: queueList.dragTrack.title || "Трек"; font.pixelSize: 12 }
+                        Txt { Layout.fillWidth: true; text: queueList.dragTrack.user?.username || ""; color: app.muted; font.pixelSize: 10 }
+                    }
+                    Glyph { Layout.preferredWidth: 24; Layout.preferredHeight: 16; name: "list"; ink: app.ink }
                 }
             }
             ScrollBar.vertical: ScrollBar { id: queueBar }
@@ -1193,7 +1296,7 @@ Window {
         x: app.width - width - 28; y: app.height - height - 100
         width: Math.min(340, app.width - 60); height: Math.min(640, app.height - 120)
         padding: 18; focus: true; closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        background: Rectangle { color: "#faf8f8"; radius: 14; border.color: "#dedadd" }
+        background: Rectangle { color: (app.dark ? app.panel : "#fafafa"); radius: 14; border.color: (app.dark ? "#404040" : "#dadada") }
         contentItem: Inspector { onDismiss: queuePopup.close() }
         enter: Transition { ParallelAnimation { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: app.motion } NumberAnimation { property: "scale"; from: 0.98; to: 1; duration: app.motion; easing.type: Easing.OutCubic } } }
         exit: Transition { NumberAnimation { property: "opacity"; to: 0; duration: app.motion / 2 } }
