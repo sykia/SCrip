@@ -13,24 +13,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          curl --fail --retry 4 --max-time 600 -L -o 'SCrip-1.6.0-Android-universal.apk' 'https://joins-coalition-partition-other.trycloudflare.com/SCrip-1.6.0-Android-universal.apk'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'SCrip-1.6.0-Android-universal.apk' 'https://battle-minnesota-effort-monthly.trycloudflare.com/SCrip-1.6.0-Android-universal.apk'
           echo 'c812b7d45d1e100d2bd72192944526b8f3dd9a9021082a31af8311119dcf5e2d  SCrip-1.6.0-Android-universal.apk' | sha256sum -c -
           gh release upload v1.6.0 'SCrip-1.6.0-Android-universal.apk' --repo sykia/SCrip --clobber
-          curl --fail --retry 4 --max-time 600 -L -o 'SCrip-1.6.0-Windows-x64.exe' 'https://joins-coalition-partition-other.trycloudflare.com/SCrip-1.6.0-Windows-x64.exe'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'SCrip-1.6.0-Windows-x64.exe' 'https://battle-minnesota-effort-monthly.trycloudflare.com/SCrip-1.6.0-Windows-x64.exe'
           echo '632a1b8e0de0f1656df553354579a0e94299e612e87c2b9558e9d77acc16814b  SCrip-1.6.0-Windows-x64.exe' | sha256sum -c -
           gh release upload v1.6.0 'SCrip-1.6.0-Windows-x64.exe' --repo sykia/SCrip --clobber
-          curl --fail --retry 4 --max-time 600 -L -o 'SCrip-1.6.0-debian13-amd64.deb' 'https://joins-coalition-partition-other.trycloudflare.com/SCrip-1.6.0-debian13-amd64.deb'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'SCrip-1.6.0-debian13-amd64.deb' 'https://battle-minnesota-effort-monthly.trycloudflare.com/SCrip-1.6.0-debian13-amd64.deb'
           echo '12f933ee57b822300a3ecc8caab499a28545b110f69ddf9210bf5391cf09ddd1  SCrip-1.6.0-debian13-amd64.deb' | sha256sum -c -
           gh release upload v1.6.0 'SCrip-1.6.0-debian13-amd64.deb' --repo sykia/SCrip --clobber
-          curl --fail --retry 4 --max-time 600 -L -o 'SCrip-1.6.0-source.tar.gz' 'https://joins-coalition-partition-other.trycloudflare.com/SCrip-1.6.0-source.tar.gz'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'SCrip-1.6.0-source.tar.gz' 'https://battle-minnesota-effort-monthly.trycloudflare.com/SCrip-1.6.0-source.tar.gz'
           echo 'acff5a808e78aed6ddda17e0ca2b61989495e054bbdc6e26ae1116a3b9d26c1a  SCrip-1.6.0-source.tar.gz' | sha256sum -c -
           gh release upload v1.6.0 'SCrip-1.6.0-source.tar.gz' --repo sykia/SCrip --clobber
-          curl --fail --retry 4 --max-time 600 -L -o 'SHA256SUMS' 'https://joins-coalition-partition-other.trycloudflare.com/SHA256SUMS'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'SHA256SUMS' 'https://battle-minnesota-effort-monthly.trycloudflare.com/SHA256SUMS'
           echo '9063c79ac46dfb0f3e42a8c5af5f7c2a29099da76789e5dc23aa94977809e21b  SHA256SUMS' | sha256sum -c -
           gh release upload v1.6.0 'SHA256SUMS' --repo sykia/SCrip --clobber
-          curl --fail --retry 4 --max-time 600 -L -o 'compliance-update.tar.gz' 'https://joins-coalition-partition-other.trycloudflare.com/compliance-update.tar.gz'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'compliance-update.tar.gz' 'https://battle-minnesota-effort-monthly.trycloudflare.com/compliance-update.tar.gz'
           echo '7d06d0d453d7f3ff0bbc46412fe3cac049bb6a0e2a2a17f0e341b7dda6461827  compliance-update.tar.gz' | sha256sum -c -
           gh release upload v1.6.0 'compliance-update.tar.gz' --repo sykia/SCrip --clobber
-          curl --fail --retry 4 --max-time 600 -L -o 'scrip-1.6.0-1-x86_64.pkg.tar.zst' 'https://joins-coalition-partition-other.trycloudflare.com/scrip-1.6.0-1-x86_64.pkg.tar.zst'
+          curl --fail --retry 4 --retry-all-errors --max-time 600 -L -o 'scrip-1.6.0-1-x86_64.pkg.tar.zst' 'https://battle-minnesota-effort-monthly.trycloudflare.com/scrip-1.6.0-1-x86_64.pkg.tar.zst'
           echo 'f23acd23e89e448d55ade4fbc085497f1453433af09792772049af53a2b719c4  scrip-1.6.0-1-x86_64.pkg.tar.zst' | sha256sum -c -
           gh release upload v1.6.0 'scrip-1.6.0-1-x86_64.pkg.tar.zst' --repo sykia/SCrip --clobber
