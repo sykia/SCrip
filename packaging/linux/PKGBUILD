@@ -9,7 +9,7 @@ url='https://github.com/sykia/SCrip'
 depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
 makedepends=('cmake' 'ninja')
 source=("$url/releases/download/v$pkgver/SCrip-$pkgver-source.tar.gz")
-sha256sums=('acff5a808e78aed6ddda17e0ca2b61989495e054bbdc6e26ae1116a3b9d26c1a')
+sha256sums=('09f767d7c1a8773069a9f9a2f729ed25b59526b3653fc47f4054e62b8a699a1d')
 build() {
     cmake -S "SCrip-$pkgver" -B build -G Ninja -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     cmake --build build --parallel 2
