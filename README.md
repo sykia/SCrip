@@ -58,6 +58,8 @@ ctest --test-dir build/debug --output-on-failure
 
 Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. Build output stays in `build/`. The desktop interface is in `qml/Main.qml`, the Android interface in `qml/android/Main.qml`, and the entry point in `src/main.cpp`.
 
+`tests/` contains regression checks, `worker/` contains the SoundCloud authentication service, and `.github/workflows/` contains automated checks and Windows build workflows. Packaging files are in `packaging/`; reusable example plugins are in `examples/plugins/`. Editor settings and local caches are excluded from Git.
+
 See [SoundCloud integration and secure storage](docs/soundcloud-security.md), the [plugin guide](docs/plugins.md), the [Plugin API reference](docs/plugin-api-v2-reference.md) and [Android playback diagnostics](docs/android-playback-diagnostics.md) for technical details. For installer issues, see [Windows troubleshooting](docs/windows-install.md).
 
 ## License

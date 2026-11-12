@@ -1,3 +1,0 @@
-#!/bin/sh
-# Проверяется содержимое индекса, включая файлы, добавленные через git add -f.
-exec python3 scripts/check_secrets.py

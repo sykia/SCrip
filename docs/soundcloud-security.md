@@ -51,7 +51,7 @@ Source and configuration are in `worker/`. To redeploy, run `npx wrangler@4 depl
 
 ## Repository
 
-`.gitignore` excludes `build/`, `.env`, keys and secret directories. After creating a Git repository, enable the hook with `git config core.hooksPath .githooks`. `scripts/check_secrets.py` checks the Git index without printing detected values. This is a supporting check, not protection for arbitrary images or history.
+`.gitignore` excludes `build/`, local editor settings, caches, `.env`, keys and secret directories. Run `python3 scripts/check_secrets.py` to check the Git index without printing detected values. GitHub Actions also checks tracked files. This is a supporting check, not protection for arbitrary images or history.
 
 ## Secure storage stage validation
 

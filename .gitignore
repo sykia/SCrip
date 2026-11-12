@@ -1,9 +1,19 @@
+# Generated builds and local CMake configuration.
 /build/
 /CMakeUserPresets.json
 *.user
-.DS_Store
 
-# Локальные настройки и секреты (реальные секреты хранить вне проекта).
+# Local editor settings and operating-system metadata.
+/.vscode/
+/.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local configuration and secrets. Store real secrets outside the repository.
 .env
 .env.*
 !.env.example
@@ -14,9 +24,12 @@
 /secrets/
 /credentials/
 
+# Cloudflare local state.
 .wrangler/
 .dev.vars*
 
-# Кэш локальных Python-проверок.
+# Python caches and local environments.
 __pycache__/
-*.pyc
+*.py[cod]
+/.venv/
+/.pytest_cache/
