@@ -1010,7 +1010,7 @@ private slots:
         QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(sc.state()["updateAvailable"].toBool());
         QCoreApplication::setApplicationVersion(previousVersion);
     }
-    void updateDownloadStreamsChunksAndRejectsInvalidLengthAndOversizedBody() {
+    void updateDownloadStreamsChunksAndChecksLengthAndOversizedBody() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         const QByteArray payload("multi-block-payload");
@@ -1036,8 +1036,16 @@ private slots:
 
         Network lengthNet; lengthNet.responses = {guest()}; SoundCloud invalidLength(nullptr, &lengthNet, secrets); QTRY_VERIFY(invalidLength.state()["connected"].toBool());
         QCoreApplication::setApplicationVersion("1.0.0"); lengthNet.responses = {{200, metadata}}; invalidLength.checkForUpdates(); QTRY_VERIFY(!invalidLength.state()["updateChecking"].toBool());
-        lengthNet.responses = {{200, payload, 0, QNetworkReply::NoError, 2, -1}}; invalidLength.downloadUpdate(); QTRY_VERIFY(!invalidLength.state()["updateDownloading"].toBool());
-        QVERIFY(!invalidLength.state()["updateReady"].toBool()); QCoreApplication::setApplicationVersion(previousVersion);
+        // Неизвестная длина допустима: итоговый размер и хеш проверяются по данным.
+        lengthNet.responses = {{200, payload, 0, QNetworkReply::NoError, 2, -1}}; invalidLength.downloadUpdate(); QTRY_VERIFY(invalidLength.state()["updateReady"].toBool());
+        QCOMPARE(lengthNet.requests.last().rawHeader("Accept-Encoding"), QByteArray("identity"));
+        for (const qint64 length : {qint64(0), qint64(-3), qint64(payload.size() + 1)}) {
+            lengthNet.responses = {{200, payload, 0, QNetworkReply::NoError, 2, length}};
+            invalidLength.downloadUpdate(); QTRY_VERIFY(!invalidLength.state()["updateDownloading"].toBool());
+            QVERIFY(!invalidLength.state()["updateReady"].toBool());
+            QVERIFY(invalidLength.state()["updateError"].toString().contains("размер"));
+        }
+        QCoreApplication::setApplicationVersion(previousVersion);
     }
     void updateDownloadRejectsHttpFailuresAndPartialBodies() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");

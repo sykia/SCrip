@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(SCrip VERSION 1.6.0 LANGUAGES CXX)
+project(SCrip VERSION 1.6.1 LANGUAGES CXX)
 
 if(APPLE)
     message(FATAL_ERROR "macOS не поддерживается")
@@ -31,6 +31,10 @@ if(ANDROID)
 endif()
 qt_add_executable(scrip ${executable_options} src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/soundcloud.cpp src/soundcloud.h src/streamcache.cpp src/streamcache.h src/artworknetwork.cpp src/artworknetwork.h)
 set(SCRIP_APP_VERSION "${PROJECT_VERSION}")
+# Выпуск 1.6.1 предназначен только для ПК. Версия Android остаётся прежней.
+if(ANDROID)
+    set(SCRIP_APP_VERSION "1.6.0")
+endif()
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)

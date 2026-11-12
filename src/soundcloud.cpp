@@ -1346,8 +1346,10 @@ void SoundCloud::downloadUpdate() {
     m_updateFile = new QSaveFile(m_updatePath, this);
     if (!m_updateFile->open(QIODevice::WriteOnly)) { delete m_updateFile; m_updateFile = nullptr; set("updateError", "Не удалось подготовить файл обновления."); return; }
     m_updateHash = std::make_unique<QCryptographicHash>(QCryptographicHash::Sha256);
-    m_updateReceived = 0; set("updateError", ""); set("updateDownloading", true); set("updateResult", "Скачивание обновления…");
+    m_updateReceived = 0; set("updateDownloaded", 0); set("updateTotal", m_updateExpectedSize); set("updateReady", false); set("updateError", ""); set("updateDownloading", true); set("updateResult", "Скачивание обновления…");
     QNetworkRequest req(url); req.setTransferTimeout(60000);
+    // Скачиваем исходный пакет: размер и SHA-256 в релизе относятся к его байтам.
+    req.setRawHeader("Accept-Encoding", "identity");
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     m_updateReply = m_network->get(req);
     connect(m_updateReply, &QNetworkReply::metaDataChanged, this, [this] {
@@ -1357,7 +1359,7 @@ void SoundCloud::downloadUpdate() {
             !(finalUrl.host() == "github.com" || finalUrl.host().endsWith(".githubusercontent.com"))) {
             set("updateError", "Сервер перенаправил загрузку на запрещённый адрес."); cancelUpdateDownload(); return;
         }
-        // Размер промежуточного ответа перенаправления не относится к APK.
+        // Размер промежуточного ответа перенаправления не относится к файлу обновления.
         // Само перенаправление проверяется политикой Qt; адрес и размер итогового
         // ответа проверяем при получении его метаданных.
         const int status = m_updateReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -1365,7 +1367,9 @@ void SoundCloud::downloadUpdate() {
         const auto length = m_updateReply->header(QNetworkRequest::ContentLengthHeader);
         if (length.isValid()) {
             bool valid = false; const qint64 n = length.toString().toLongLong(&valid);
-            if (!valid || n <= 0 || n > 1024LL*1024*1024 || (m_updateExpectedSize >= 0 && n != m_updateExpectedSize)) {
+            // Qt обозначает неизвестный размер значением -1 (например, при chunked).
+            // В этом случае проверяем реальные байты и SHA-256 после загрузки.
+            if (!valid || n < -1 || n == 0 || n > 1024LL*1024*1024 || (n > 0 && m_updateExpectedSize >= 0 && n != m_updateExpectedSize)) {
                 set("updateError", "Сервер указал некорректный размер обновления."); cancelUpdateDownload(); return;
             }
         }
@@ -1402,7 +1406,7 @@ void SoundCloud::downloadUpdate() {
             }
         }
         const int status = reply ? reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() : 0;
-        const bool ok = reply && reply->error() == QNetworkReply::NoError && status == 200 && m_updateExpectedSize > 0 && m_updateReceived == m_updateExpectedSize &&
+        const bool ok = m_state.value("updateError").toString().isEmpty() && reply && reply->error() == QNetworkReply::NoError && status == 200 && m_updateExpectedSize > 0 && m_updateReceived == m_updateExpectedSize &&
             ("sha256:" + QString::fromLatin1(m_updateHash->result().toHex()) == m_updateDigest);
         m_updateHash.reset();
         m_updateReply = nullptr;
