@@ -1,66 +1,40 @@
-# План и результат интеграции
+# Integration plan and results
 
-## Исходное состояние
+## Initial state
 
-Проект содержал QML-оболочку с пустыми разделами и настройками прозрачности.
-Сетевого слоя, авторизации и проигрывателя не было. Выданные ключи пользователь
-предоставил на скриншоте; они сохранены вне checkout. Ошибка распознавания регистра
-была исправлена. После настройки Redirect URI пользователь успешно вошёл в аккаунт.
+The project contained a QML shell with empty sections and transparency settings. Networking, authentication and playback were absent. The user supplied issued keys in a screenshot; they were stored outside the checkout. A case-recognition error was corrected. After configuring the Redirect URI, the user signed in successfully.
 
-## Выполненные этапы
+## Completed stages
 
-1. Добавлен SoundCloud QObject: OAuth, API, модели коллекций и управление аудио.
-2. Подключены Qt Network и Qt Multimedia, без сторонних сетевых зависимостей.
-3. Подключены поиск, коллекция, профиль, плейлисты, очередь и плеер.
-4. По новому референсу полностью заменён QML-дизайн на светлый Apple-style:
-   узкая боковая панель, сетка обложек, список, плавающий плеер, компактные диалоги.
-   Старые шейдеры и нативное размытие не участвуют в сборке.
-5. До входа отображается только приветствие, кнопка входа и настройки подключения.
-6. Добавлены QtTest-проверки с подменой транспорта и снимки интерфейса в build/.
+1. Added a SoundCloud QObject for OAuth, API calls, collection models and audio control.
+2. Connected Qt Network and Qt Multimedia without third-party networking dependencies.
+3. Connected search, collection, profile, playlists, queue and player.
+4. Replaced the QML design with a light Apple-style interface based on a new reference: narrow sidebar, artwork grid, list, floating player and compact dialogs. Old shaders and native blur are excluded from the build.
+5. Before sign-in, show only the welcome screen, sign-in button and connection settings.
+6. Added QtTest checks with a substituted transport and interface snapshots in `build/`.
 
-## Проверки
+## Validation
 
-Живой API: успешный обмен Client Credentials, поиск, профиль `/me`, любимые треки,
-плейлисты и выдача HLS-потока с ответом HTTP 200. Пользователь завершил OAuth,
-сохранена действующая пользовательская сессия. Проверено фактическое воспроизведение
-треков через Qt Multimedia: позиция растёт, ошибки проигрывателя отсутствуют.
+Live API: successful Client Credentials exchange, search, `/me` profile, likes, playlists and an HLS stream response with HTTP 200. The user completed OAuth and a valid user session was saved. Actual playback through Qt Multimedia was checked: position advances without player errors.
 
-Автотесты проверяют заголовки и кодирование запросов, пагинацию, запрет сторонних
-next_href, гонки поиска, однократное обновление токена, ошибки 401/429, ограничения
-гостевой сессии, недоступный трек, локальный callback, PKCE, неправильный state,
-обмен кода, выход при незавершённых запросах и создание QML-экранов.
+Automated tests cover request headers and encoding, pagination, rejection of third-party next_href, search races, single token refresh, 401/429 errors, guest-session restrictions, unavailable tracks, local callback, PKCE, incorrect state, code exchange, logout with pending requests and QML screen creation.
 
-Тестовые данные существуют только в tests/, рабочий UI получает данные из API.
-Проверки не меняют пользовательские лайки и плейлисты. Запуск:
-`ctest --test-dir build/debug --output-on-failure`.
+Test data exists only in `tests/`; the production UI receives API data. Checks do not alter user likes or playlists. Run `ctest --test-dir build/debug --output-on-failure`.
 
-## Границы версии
+## Version boundaries
 
-- Полноценное офлайн-копирование потоков не предусмотрено.
-- Публикация аудиофайлов, редактирование чужих данных, сообщения и комментарии
-  не добавлены: это клиент прослушивания и личной коллекции.
-- Недоступные/регионально ограниченные треки зависят от ответа SoundCloud.
-- Linux сборка проверяется локально; Windows требует отдельной сборки и
-  проверки мультимедийных плагинов на соответствующей системе.
-- Публичный сервер и его тестирование отложены пользователем.
+- Full offline copying of streams is not provided.
+- Audio uploads, editing other users' data, messages and comments were not added: this is a listening and personal-collection client.
+- Unavailable and region-restricted tracks depend on SoundCloud's response.
+- Linux builds are checked locally; Windows requires a separate build and multimedia-plugin validation on that system.
+- The user deferred a public server and its testing.
 
-## Развитие дизайна: три колонки и движение
+## Design evolution: three columns and motion
 
-Светлый Apple-style объединён с плоскими поверхностями и трёхколоночной структурой.
-Боковая навигация — 196 px; отступы контента и правой панели — 24 px; сетка обложек
-использует одинаковые интервалы 24 px. При ширине менее 1100 px правая колонка
-заменяется всплывающей панелью, доступной из плеера.
+The light Apple-style design was combined with flat surfaces and a three-column layout. Sidebar navigation is 196 px; content and right-panel padding is 24 px; the artwork grid uses consistent 24 px gaps. Below 1100 px, the right column becomes a popup panel accessible from the player.
 
-Профиль вынесен на отдельную страницу: аватар, имя, местоположение, реальные счётчики,
-описание и вкладки коллекций. Доступен API-раздел репостов. Основной сайт SoundCloud
-во время проверки не ответил; структура сверена с официальным Help Center:
-https://help.soundcloud.com/hc/en-us/articles/115003570748-Anatomy-of-SoundCloud .
+Profiles have a dedicated page with avatar, name, location, real counters, description and collection tabs. The reposts API section is available. The main SoundCloud website did not respond during validation; structure was checked against the official Help Center: https://help.soundcloud.com/hc/en-us/articles/115003570748-Anatomy-of-SoundCloud .
 
-На https://antigravity.google/ непосредственно просмотрены несколько экранов при
-прокрутке. Адаптированы мягкое появление элементов, замедление движения и свободная
-композиция: переходы разделов 240 ms, появление обложек 320 ms, короткий отклик кнопок.
-Это самостоятельная реализация в QML, не копия кода сайта. Прокрутка мышью сглажена,
-тачпад остаётся нативным. В настройках есть выключатель движения.
+Several screens on https://antigravity.google/ were viewed while scrolling. Soft entrances, eased motion and spacious composition were adapted: 240 ms section transitions, 320 ms artwork entrances and short button feedback. This is an independent QML implementation, rather than copied website code. Mouse scrolling is smoothed; touchpad scrolling remains native. Settings include a motion toggle.
 
-Проверки охватывают широкий и узкий экраны, профиль, прокрутку настоящим QWheelEvent,
-а также живую коллекцию, обложки и воспроизведение подключённого аккаунта.
+Checks cover wide and narrow screens, profiles, scrolling with real QWheelEvent input, and the connected account's live collection, artwork and playback.

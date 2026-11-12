@@ -1,21 +1,21 @@
-# Выпуск с проверяемыми лицензиями
+# Releases with verifiable licensing materials
 
-Собственный код и оригинальная графика: Copyright (c) 2026 sykia, GPL-3.0-only. Полный текст — LICENSE. Авторские права сохраняются; GPL разрешает коммерческие форки. Политика обозначений — TRADEMARKS.md.
+Project code and original artwork: Copyright (c) 2026 sykia, GPL-3.0-only. Full text: LICENSE. Copyright is retained; the GPL permits commercial forks. Naming policy: TRADEMARKS.md.
 
-Для каждого распакованного релизного пакета нужен файл `compliance.json` рядом с ним и каталог исходников. Запустите:
+Each extracted release package requires a companion `compliance.json` and source directory. Run:
 
 ```sh
 python scripts/check_licenses.py --payload build/stage --manifest build/compliance.json
 ```
 
-Манифест: `files` — точное отображение относительного пути каждого поставляемого файла в объект `sha256`, `components` (непустой список идентификаторов). `components` — отображение идентификатора в `license`, `notice`, `source`, `source_sha256`. `notice` и `source` — относительные пути от каталога манифеста. `source` должен быть архивом соответствующих исходников с патчами, конфигурацией и инструкциями сборки; ссылка на upstream или бинарный пакет вместо этого недостаточна. Архивы распространяются вместе с бинарниками. Тексты лицензий и уведомлений должны входить и в сам пакет. Все файлы, включая Java DEX, JAR и ресурсы, требуют учёта. Один DEX может включать несколько компонентов.
+Manifest format: `files` maps every shipped file's relative path to an object containing `sha256` and `components` (a nonempty list of IDs). `components` maps each ID to `license`, `notice`, `source`, `source_sha256`. `notice` and `source` are paths relative to the manifest directory. `source` must be a corresponding source archive with patches, configuration and build instructions; an upstream link or binary package is insufficient. Archives are distributed alongside binaries. License texts and notices must also be included in the package itself. All files, including Java DEX, JAR and resources, must be accounted for. One DEX may contain multiple components.
 
-Проверка блокирует неизвестные выражения лицензий до ручного изучения, недостающие файлы, изменения SHA-256 и отсутствие исходников/уведомлений. Она не является юридическим заключением и не доказывает соответствие содержимого архива исходников бинарнику: это проверяется воспроизводимой сборкой и ревью. Не подставляйте GPL для всех DLL без проверки происхождения.
+Validation blocks unknown license expressions pending manual review, missing files, SHA-256 changes and missing sources/notices. It is not legal advice and does not prove the source archive corresponds to the binary; reproducible builds and review establish that. Do not assign GPL to every DLL without checking provenance.
 
-В CI опубликованного релиза ожидается `compliance.tar.gz`: каталоги `Windows`, `Linux-DEB`, `Linux-Arch`, `Android` с `payload/`, `compliance.json`, архивами исходников и уведомлениями. Манифест каждой платформы также содержит `artifact_sha256` — SHA-256 исходного релизного файла. CI скачивает реальные EXE/APK/DEB/Arch-пакеты, проверяет эту сумму, распаковывает их и сравнивает весь состав и хеши с манифестом, а не доверяет копии payload внутри материалов. В манифест включаются также служебные файлы установщика, содержимое DEX и метаданные пакетов. Пока материал отсутствует, проверка должна завершаться ошибкой, а не отмечать выпуск соответствующим лицензиям.
+Published-release CI expects `compliance.tar.gz`: `Windows`, `Linux-DEB`, `Linux-Arch`, `Android` directories with `payload/`, `compliance.json`, source archives and notices. Each platform manifest also contains `artifact_sha256`, the original release file's SHA-256. CI downloads actual EXE/APK/DEB/Arch packages, verifies that hash, extracts them and compares the complete inventory and hashes with the manifest instead of trusting the materials' payload copy. Manifests also account for installer support files, DEX contents and package metadata. Missing materials must cause validation to fail, rather than mark the release compliant.
 
-## Выпуски для отдельной платформы
+## Single-platform releases
 
-Релиз 1.4.1 содержит только Android APK. Его соответствующие исходники приложения и пофайловый манифест находятся в `licensing/releases/1.4.1/`; ссылки на них даны рядом с APK в описании релиза. Неизменённые исходники зависимостей доступны в прежнем публичном `compliance.tar.gz` 1.4.0. `release.json` закрепляет SHA-256 этого архива и явно перечисляет платформы. Новый манифест связывает материалы с SHA-256 нового APK; старый манифест приложения не переиспользуется.
+Release 1.4.1 contains only an Android APK. Corresponding application sources and the per-file manifest are in `licensing/releases/1.4.1/`, linked beside the APK in the release description. Unchanged dependency sources are available in the earlier public 1.4.0 `compliance.tar.gz`. `release.json` pins that archive's SHA-256 and explicitly lists platforms. The new manifest binds the materials to the new APK's SHA-256; the old application manifest is not reused.
 
-CI проверяет хеш базового архива, восстанавливает материалы скриптом `scripts/prepare_release_materials.py`, подставляет новые исходники приложения и проверяет настоящий APK командой `scripts/audit_release.py --platform Android`. Остальные проверки состава, лицензий, уведомлений и исходников сохраняются. В выпусках без такого описателя по-прежнему обязательны материалы всех четырёх платформ.
+CI verifies the base archive hash, restores materials using `scripts/prepare_release_materials.py`, substitutes new application sources and checks the actual APK with `scripts/audit_release.py --platform Android`. All other inventory, license, notice and source checks remain in place. Releases without such a descriptor still require materials for all four platforms.

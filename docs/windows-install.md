@@ -1,21 +1,21 @@
-# Если Windows отказала в доступе к установщику
+# If Windows denies access to the installer
 
-Откройте папку «Загрузки» через Проводник и проверьте, остался ли в ней скачанный EXE. Если файл исчез, откройте «Безопасность Windows → Журнал защиты» и посмотрите запись за время запуска. Для обращения в поддержку пригодятся название события и имя файла.
+Open **Downloads** in File Explorer and check whether the downloaded EXE is still there. If it disappeared, open **Windows Security → Protection history** and find the event at the time of launch. The event name and filename are useful when contacting support.
 
-Если файл на месте, откройте PowerShell в его папке и проверьте SHA-256:
+If the file is present, open PowerShell in its folder and check SHA-256:
 
 ```powershell
 Get-FileHash -Algorithm SHA256 -LiteralPath '.\SCrip-1.5.0-Windows-x64.exe'
 ```
 
-Сравните результат со значением для установщика в `SHA256SUMS` из [релиза 1.5.0](https://github.com/sykia/SCrip/releases/tag/v1.5.0). При несовпадении скачайте установщик заново. Если сумма совпадает, для диагностики укажите, когда появляется ошибка, и приложите событие из журнала защиты. На управляемом ПК администратор может проверить политику запуска по имени файла и времени события.
+Compare the result with the installer's entry in `SHA256SUMS` from [release 1.5.0](https://github.com/sykia/SCrip/releases/tag/v1.5.0). Download the installer again if it differs. If the hash matches, report when the error appears and include the Protection history event. On a managed PC, an administrator can check execution policy using the filename and event time.
 
-## Для сборки с подписью
+## Building with a signature
 
-В Windows откройте терминал с SignTool из Windows SDK и укажите отпечаток доверенного сертификата издателя для подписи кода и адрес его службы меток времени:
+On Windows, open a terminal with SignTool from Windows SDK and provide the thumbprint of a trusted code-signing publisher certificate and its timestamp service URL:
 
 ```powershell
 python packaging/windows/package.py payload build/SCrip-Setup-x64.exe --sign-certificate $env:SCRIP_CERT_SHA1 --timestamp-url $env:SCRIP_TIMESTAMP_URL
 ```
 
-Упаковщик подписывает копию приложения до упаковки, затем подписывает готовый установщик и проверяет обе подписи. Закрытый ключ остаётся у издателя. Публичный установщик 1.5.0 не подписан сертификатом издателя.
+The packager signs an application copy before packaging, then signs the finished installer and verifies both signatures. The private key stays with the publisher. The public 1.5.0 installer is not signed with a publisher certificate.

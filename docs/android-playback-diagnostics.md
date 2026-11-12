@@ -1,203 +1,56 @@
-# Диагностика запуска трека на Android
+# Android track startup diagnostics
 
-Цепочка: нажатие плитки в `qml/android/Main.qml` → `SoundCloud::play` →
-`startTrack` → проверка токена и `GET /tracks/{urn}/streams` → выбор AAC HLS
-160/96 кбит/с → разрешение API-адреса (если нужен редирект) → CDN-источник
-`QMediaPlayer` → статус загрузки/буфера → состояние `PlayingState` → первое
-изменение позиции. `AndroidMedia` параллельно передаёт снимок состояния в
-`MediaBridge` и запускает `PlaybackService`. Служба удерживает процесс,
-уведомление, аудиофокус и wake lock; отдельного декодера в ней нет.
+Pipeline: tap a tile in `qml/android/Main.qml` → `SoundCloud::play` → `startTrack` → token check and `GET /tracks/{urn}/streams` → AAC HLS 160/96 kbps selection → API URL resolution (if a redirect is needed) → CDN source for `QMediaPlayer` → loading/buffering status → `PlayingState` → first position advance. In parallel, `AndroidMedia` sends a state snapshot to `MediaBridge` and starts `PlaybackService`. The service maintains the process, notification, audio focus and wake lock; it has no separate decoder.
 
-Строки `SCripStartup` в журнале содержат номер попытки, этап,
-`delta_ms` с предыдущего этапа и `total_ms` от выбора трека. На Android
-`streams_token_wait` отмечает начало ожидания проверки/обновления OAuth;
-`streams_http_start` фиксирует фактическую отправку `/streams` после готовности
-токена, поэтому `streams_http_start → streams_response` отдельно показывает
-время ответа API. Токен и данные запроса не журналируются.
+`SCripStartup` log lines contain the attempt number, stage, `delta_ms` since the previous stage and `total_ms` since track selection. On Android, `streams_token_wait` marks the start of OAuth validation/refresh waiting; `streams_http_start` records actual `/streams` dispatch after the token is ready. Thus `streams_http_start → streams_response` measures API response time separately. Tokens and request data are not logged.
 
-`android_prepare_dispatch_ms` и `android_foreground_ms` измеряются отдельными
-монотонными часами Java от вызова подготовки службы. `qt_playing` — сигнал Qt
-о состоянии Playing. `first_progress` фиксируется только после продвижения
-позиции выше начальной/восстановленной позиции, уже после `qt_playing`; простая
-установка seek position не считается прогрессом. Это не акустический замер:
-`qt_playing` может предшествовать первому аудиоблоку. Для точного времени звука
-нужен внешний аудиозахват. `qt_loaded` относится только к установленному URL
-текущего источника и пишется один раз; статус старого источника исключён.
-При переключении на заранее заданный источник пишется
-`preloaded_ready_switch` или `preloaded_loading_switch`. В журнал не добавляются
-токены, URN, заголовки ответов и URL с подписями. Не включайте подробный сетевой
-лог Qt при сборе обезличенных данных.
+`android_prepare_dispatch_ms` and `android_foreground_ms` use a separate Java monotonic clock starting at the service preparation call. `qt_playing` is Qt's Playing-state signal. `first_progress` is recorded only when position advances beyond the initial/restored position after `qt_playing`; simply setting a seek position does not count. This is not an acoustic measurement: `qt_playing` may precede the first audio block. Precise audible startup timing requires external audio capture. `qt_loaded` applies only to the current source's assigned URL and is logged once; old-source status is excluded. Switching to a source assigned in advance logs `preloaded_ready_switch` or `preloaded_loading_switch`. Tokens, URNs, response headers and signed URLs are excluded from logs. Do not enable verbose Qt network logs when collecting anonymized data.
 
-Команда для устройства: `adb logcat -c`, затем выбрать один трек и выполнить
-`adb logcat -d | grep SCripStartup`. Для сравнения выполнить несколько
-холодных запусков одного трека в одинаковой сети. Android по умолчанию
-предзагружает следующий источник. Для контролируемого запуска без
-предзагрузки нужно установить `SCRIP_ANDROID_PRELOAD=0` в окружении процесса
-до создания `SoundCloud` (например, через intent extra `extraenvvars` в
-локальной debug-сборке Qt). Сравнивать
-медиану `total_ms` для `qt_playing`, долю ошибок и расход батареи;
-диагностический переключатель не является пользовательской настройкой.
+On the device, run `adb logcat -c`, select one track, then run `adb logcat -d | grep SCripStartup`. Compare several cold starts of the same track on the same network. Android preloads the next source by default. For a controlled run without preloading, set `SCRIP_ANDROID_PRELOAD=0` in the process environment before constructing `SoundCloud` (for example, through the `extraenvvars` intent extra in a local Qt debug build). Compare median `total_ms` for `qt_playing`, failure rates and battery usage. This diagnostic switch is not a user setting.
 
-При первой проверке 10 ноября 2026 года устройство к ADB не было подключено.
-Позже найден и запущен локальный эмулятор `SCrip-Test` (Android 35, x86_64).
-Отдельная Debug-сборка с исправлениями установлена рядом с SCrip 1.4.1 и
-открывается. Инструментальный тест службы прошёл: foreground, буферизация
-дольше 30 секунд, пауза, продолжение и остановка. В тесте подготовка
-службы заняла 0 мс до обработки на главном потоке и 3–15 мс до foreground.
-До входа в отдельную установку SoundCloud нельзя было измерить музыку.
-Проверка с подменённой сетью показала `streams_response` за 11 мс от запроса
-и `stream_resolve_response` ещё за 10 мс, всего 21 мс. Эти числа отражают
-только тестовый транспорт, не SoundCloud и не Android. HTTP 429 и тайм-ауты
-проверены регрессионными тестами, но их частота на серверах не измерена.
+At the first check on November 10, 2026, no ADB device was connected. A local `SCrip-Test` emulator (Android 35, x86_64) was later found and started. A separate corrected Debug build was installed alongside SCrip 1.4.1 and opened successfully. Service instrumentation passed: foreground operation, buffering beyond 30 seconds, pause, resume and stop. Service preparation took 0 ms to main-thread handling and 3–15 ms to foreground state. Music could not be measured before signing into the separate installation. A substituted-network check reported `streams_response` 11 ms after the request and `stream_resolve_response` another 10 ms later, 21 ms total. These figures describe only the test transport, not SoundCloud or Android. HTTP 429 and timeouts were covered by regression tests, but their server-side frequency was not measured.
 
-После входа в отдельную Debug-сборку на том же эмуляторе удалось запустить
-настоящие треки SoundCloud. Для одного и того же MP3 HLS-трека измерено время
-от выбора до `first_progress`: без предзагрузки 2383, 1977, 2083 и 1974 мс
-(медиана 2030 мс); с предзагрузкой 1580, 1379, 1375, 1820 и 1271 мс
-(медиана 1379 мс). Один дополнительный запуск без предзагрузки не дал
-`first_progress` за пять секунд и исключён из медианы: нельзя отличить
-пропущенное нажатие от задержки по этой трассе. При повторе тот же трек
-запустился за 1974 мс. Эмуляторные данные не подтверждают конкуренцию
-предзагрузки при старте; поэтому обычный режим Android оставлен с
-предзагрузкой. Влияние на настоящих устройствах остаётся открытым.
-Три других трека выбрали `hls_aac_160_url` и дошли до `first_progress` за
-1965, 2110 и 3065 мс. Пауза, возобновление и воспроизведение с выключенным
-экраном прошли: MediaSession осталась в состоянии PLAYING, позиция росла.
-Акустический сигнал внешним захватом не измерялся. AAC 96, HTTP 429 и
-тайм-ауты на живом SoundCloud в этих опытах не встретились.
-После возврата предзагрузки по умолчанию и пересборки отдельная Debug-сборка
-повторно установлена; тот же MP3 HLS-трек дошёл до `first_progress` за 2558 мс,
-MediaSession показала PLAYING. Разброс показывает, что эти короткие серии нельзя
-считать точной оценкой выигрыша предзагрузки.
+After signing into the separate Debug build on the same emulator, real SoundCloud tracks played. For the same MP3 HLS track, selection to `first_progress` took 2383, 1977, 2083 and 1974 ms without preloading (median 2030 ms), and 1580, 1379, 1375, 1820 and 1271 ms with preloading (median 1379 ms). One additional run without preloading produced no `first_progress` within five seconds and was excluded from the median: the trace cannot distinguish a missed tap from a delay. Retrying the same track took 1974 ms. Emulator data did not show preloading contention at startup, so normal Android mode retained preloading. Effects on physical devices remain open. Three other tracks selected `hls_aac_160_url` and reached `first_progress` in 1965, 2110 and 3065 ms. Pause, resume and screen-off playback passed: MediaSession remained PLAYING and position advanced. No external acoustic capture was made. AAC 96, HTTP 429 and timeouts were not encountered on live SoundCloud in these experiments.
 
-## Повторная проверка и корректировка измерений, 10 ноября 2026 года
+After restoring default preloading and rebuilding, the separate Debug build was reinstalled; the same MP3 HLS track reached `first_progress` in 2558 ms and MediaSession showed PLAYING. The variation means these short series cannot precisely quantify preloading benefits.
 
-Официальная заметка SoundCloud указывает AAC HLS 160 как предпочтительный
-поток, AAC HLS 96 как альтернативу, а MP3 HLS — как старый формат, который
-планировали удалить после 31 декабря 2025 года ([SoundCloud: переход на AAC
-HLS](https://developers.soundcloud.com/blog/api-streaming-urls/)). Текущие
-серии на одном треке использовали `hls_aac_160_url`; подписанные URL не
-сохранялись. Порядок fallback остаётся AAC 160 → AAC 96 → legacy MP3 HLS →
-preview MP3.
+## Repeat validation and measurement corrections — November 10, 2026
 
-Qt указывает, что `QMediaPlayer::setSource()` возвращается до окончания
-загрузки, а состояние нужно отслеживать по `mediaStatusChanged` ([Qt 6.8
-QMediaPlayer](https://doc.qt.io/qt-6.8/qmediaplayer.html)). В измерении были
-исправлены две ошибки: старый `LoadedMedia` мог попасть в новую попытку, а
-восстановление позиции могло выглядеть как начало продвижения. `qt_loaded`
-теперь относится к новому источнику и записывается один раз. Регрессионный
-тест проверяет эти границы. Также закрыт сценарий истёкшего URL
-предзагруженного трека: при ошибке до первого продвижения приложение один раз
-повторно запрашивает `/streams`, сохраняя режим воспроизведения и позицию;
-ошибка свежего URL завершает попытку без бесконечных повторов.
+SoundCloud's official note identifies AAC HLS 160 as preferred, AAC HLS 96 as an alternative, and MP3 HLS as a legacy format scheduled for removal after December 31, 2025 ([SoundCloud: AAC HLS migration](https://developers.soundcloud.com/blog/api-streaming-urls/)). The current single-track series used `hls_aac_160_url`; signed URLs were not retained. Fallback order remains AAC 160 → AAC 96 → legacy MP3 HLS → preview MP3.
 
-Серия проведена на одном AAC 160 треке, Android 35 x86_64, одном аккаунте и
-Wi-Fi. В каждом режиме было 5 повторных запусков; затем выполнены две
-чередующиеся пары холодного процесса с `force-stop`. Все 14 измерений дошли до
-`first_progress` в пределах 6 секунд. P95 для этой малой выборки рассчитан по
-ближайшему рангу и равен максимуму.
+Qt documents that `QMediaPlayer::setSource()` returns before loading finishes and that state should be tracked through `mediaStatusChanged` ([Qt 6.8 QMediaPlayer](https://doc.qt.io/qt-6.8/qmediaplayer.html)). Two measurement errors were corrected: an old `LoadedMedia` could enter a new attempt, and position restoration could resemble initial progress. `qt_loaded` now belongs to the new source and is logged once. A regression test checks these boundaries. An expired preloaded URL is also handled: on error before first progress, the app requests `/streams` once again while retaining playback mode and position; failure of the fresh URL ends the attempt without endless retries.
 
-| Предзагрузка | Повторные запуски, n=5 | Медиана / P95 | Холодные запуски, n=2 | Медиана / P95 | Успешно |
-|---|---|---:|---|---:|---:|
-| Включена | 1948, 1732, 2298, 1463, 1615 мс | 1732 / 2298 мс | 1443, 1669 мс | 1556 / 1669 мс | 7/7 |
-| Выключена | 2495, 2431, 3298, 2748, 2449 мс | 2495 / 3298 мс | 3238, 3186 мс | 3212 / 3238 мс | 7/7 |
+The series used one AAC 160 track, Android 35 x86_64, one account and Wi-Fi. Each mode had five repeated starts, followed by two alternating pairs of cold-process starts using `force-stop`. All 14 measurements reached `first_progress` within six seconds. For this small sample, nearest-rank P95 equals the maximum.
 
-Объединённые медианы составляют 1669 мс с предзагрузкой и 2748 мс без неё.
-Эта разница не доказывает, что предзагрузка следующего источника ускоряет
-первый трек: режимы могли прогреть CDN, DNS и системный медиастек, а холодная
-пара содержит только два наблюдения. Предзагрузка не создала ошибок в серии;
-поэтому оставлена включённой по умолчанию. Готовится только один следующий
-трек, без запуска его декодирования и постоянных запросов.
+| Preloading | Repeated starts, n=5 | Median / P95 | Cold starts, n=2 | Median / P95 | Success |
+| --- | --- | ---: | --- | ---: | ---: |
+| Enabled | 1948, 1732, 2298, 1463, 1615 ms | 1732 / 2298 ms | 1443, 1669 ms | 1556 / 1669 ms | 7/7 |
+| Disabled | 2495, 2431, 3298, 2748, 2449 ms | 2495 / 3298 ms | 3238, 3186 ms | 3212 / 3238 ms | 7/7 |
 
-По детальным логам пяти повторов с предзагрузкой и четырёх без неё медиана
-`/streams` составила 146 и 169 мс; разрешение URL — 201 и 232 мс. Медиана
-`cdn_source → qt_loaded` составила 1217 и 2092 мс соответственно.
-Основная измеренная пауза возникает после передачи URL в Qt: от 1.0 до
-2.8 секунд до готового состояния источника. После `qt_loaded` переход к
-`qt_playing` занимал 8–11 мс, до первого продвижения позиции — ещё 53–59 мс.
-В одном запуске `first_progress` наступил за 77 мс после выбора уже
-предварительно подготовленного источника; эта отдельная старая запись не
-включена в таблицу первичных запусков.
+Combined medians are 1669 ms with preloading and 2748 ms without. This difference does not prove that preloading the next source speeds up the first track: modes may have warmed CDN, DNS and system media caches, and the cold pair contains only two observations. Preloading introduced no failures in the series and remains enabled by default. Only one next track is prepared, without starting its decoding or issuing continuous requests.
 
-После разделения OAuth и HTTP на той же сборке получена полная безопасная
-трасса итоговой сборки: выбор → OAuth/token check 21 мс, запрос `/streams`
-146 мс, resolver 200 мс, `cdn_source → qt_loaded` 1667 мс,
-`qt_loaded → qt_playing` 26 мс, `qt_playing → first_progress` 45 мс,
-итого 2110 мс. Токен был действителен, поэтому 21 мс — проверка и
-диспетчеризация, а не обновление токена. Этот
-последний запуск подтверждает, что на актуальной сборке `/streams` и resolver
-быстры, а наибольшая наблюдаемая часть всё ещё находится между передачей
-CDN URL и готовностью источника в Qt.
+Detailed logs from five preloaded runs and four non-preloaded runs gave median `/streams` times of 146 and 169 ms, and URL resolution times of 201 and 232 ms. Median `cdn_source → qt_loaded` was 1217 and 2092 ms respectively. The main measured delay occurred after handing the URL to Qt: 1.0–2.8 seconds until source readiness. After `qt_loaded`, reaching `qt_playing` took 8–11 ms; first position advance took another 53–59 ms. One run reached `first_progress` 77 ms after selecting an already prepared source; this separate older record is excluded from the initial-start table.
 
-Служба оставалась foreground, Android выдал Audio Focus; AAudio показывал
-активный стереовыход 44,1 кГц, MediaSession — PLAYING и растущую позицию.
-Подготовка службы заняла 0–35 мс. Эмулятор работал со звуком, но акустический
-сигнал не записывался. Физический телефон не подключался.
+After separating OAuth and HTTP timing, the same build produced a complete safe trace of the final build: selection → OAuth/token check 21 ms, `/streams` request 146 ms, resolver 200 ms, `cdn_source → qt_loaded` 1667 ms, `qt_loaded → qt_playing` 26 ms, `qt_playing → first_progress` 45 ms, total 2110 ms. The token was valid, so 21 ms measures checking and dispatch, not token refresh. This final run confirms that `/streams` and the resolver are fast on the current build, while the largest observed portion remains between handing off the CDN URL and Qt source readiness.
 
-В одном ресурсном снимке на эмуляторе PSS был 172000 КБ при включённой
-предзагрузке и 173287 КБ при выключенной; мгновенный `top` показывал 8% CPU
-в обоих режимах. Эти единичные значения не показывают существенного overhead,
-но не заменяют длительный тест на телефоне. Счётчики сетевого трафика Android
-суммировали все предыдущие запуски UID, поэтому добавочный трафик предзагрузки
-точно выделить нельзя. Код готовит один следующий источник и не запускает его
-на воспроизведение. Надёжную оценку батареи можно получить только на физическом
-устройстве в длительном A/B-тесте; эмуляторный расход мА·ч здесь не приводится.
+The service remained foreground and Android granted Audio Focus; AAudio showed active stereo output at 44.1 kHz, and MediaSession showed PLAYING with advancing position. Service preparation took 0–35 ms. The emulator had audio enabled, but no acoustic signal was recorded. No physical phone was connected.
 
-Измерения не подтверждают неисправность серверов SoundCloud: `/streams` и
-resolver отвечали, а основной интервал наблюдался после `cdn_source` внутри
-границы загрузки Qt/CDN. Чтобы разделить задержку Qt и CDN на конкретной сети,
-нужны временные метки запросов HLS playlist/segments или внешний аудиозахват.
-Безопасные клиентские логи не содержат подписанных URL и потому не позволяют
-проверить отдельные CDN-ответы.
+One emulator resource snapshot showed PSS of 172000 KB with preloading and 173287 KB without; instantaneous `top` showed 8% CPU in both modes. These single observations show no substantial overhead, but do not replace a long phone test. Android network counters accumulated all previous UID runs, so incremental preloading traffic could not be isolated precisely. The code prepares one next source without playing it. Reliable battery estimates require a long A/B test on a physical device; no emulator mAh figures are reported here.
 
-### Проверка Android MediaCodec backend Qt
+Measurements do not establish a SoundCloud server fault: `/streams` and the resolver responded, while the main interval occurred after `cdn_source` within the Qt/CDN loading boundary. Separating Qt and CDN delay on a specific network requires HLS playlist/segment request timestamps or external audio capture. Safe client logs exclude signed URLs and therefore cannot validate individual CDN responses.
 
-Для проверки холодного медиастека временно включён `QT_MEDIA_BACKEND=android`
-в отдельном процессе эмулятора. На одном AAC 160 native MediaCodec backend
-вернул `PlaylistFetcher -1007` при обработке HLS; fallback повторил ошибку на
-legacy MP3 HLS и запустил только preview MP3. `first_progress` наступил за
-5539 мс, после выбора preview. Такой режим не сохраняет полный трек и качество,
-поэтому backend в приложение не включён. После теста стандартный FFmpeg backend
-восстановлен: тот же AAC 160 дошёл до `qt_loaded` за 1233 мс после `cdn_source`,
-`qt_playing` — за 27 мс после Loaded, `first_progress` — за 45 мс после
-Playing; MediaSession продвигала позицию. Qt 6.8 указывает FFmpeg как backend
-по умолчанию, а Android MediaCodec — как устаревший с ограниченной поддержкой
-([Qt Multimedia 6.8 backends](https://doc.qt.io/qt-6.8/qtmultimedia-index.html)).
+### Checking Qt's Android MediaCodec backend
 
-### Исправление перемотки fMP4 HLS, 10 ноября 2026 года
+To check a cold media stack, `QT_MEDIA_BACKEND=android` was temporarily enabled in a separate emulator process. For one AAC 160 track, the native MediaCodec backend returned `PlaylistFetcher -1007` while processing HLS; fallback repeated the error for legacy MP3 HLS and played only preview MP3. `first_progress` occurred after 5539 ms, following preview selection. This mode does not preserve the full track or quality and was not enabled in the app. After the test, the default FFmpeg backend was restored: the same AAC 160 track reached `qt_loaded` 1233 ms after `cdn_source`, `qt_playing` 27 ms after Loaded, and `first_progress` 45 ms after Playing; MediaSession advanced position. Qt 6.8 lists FFmpeg as the default backend and Android MediaCodec as deprecated with limited support ([Qt Multimedia 6.8 backends](https://doc.qt.io/qt-6.8/qtmultimedia-index.html)).
 
-Причина воспроизведена отдельно от SCrip: `av_seek_frame()` в поставляемом
-с Qt 6.10.1 FFmpeg 7.1.2 возвращает успех, но следующий `av_read_frame()`
-возвращает EOF. MOV-demuxer сохраняет индексы фрагментов после сброса
-виртуального HLS-потока на позицию 0. Поэтому Qt остаётся в PlayingState
-без аудиопакетов. Перезапуск Qt с той же позицией повторяет ошибку.
+### fMP4 HLS seeking fix — November 10, 2026
 
-В Android APK подменяется только `libavformat.so` той же версии/ABI:
-backport [исправления FFmpeg 380a518](https://github.com/FFmpeg/FFmpeg/commit/380a518c439d4e5e3cf17b97e4a06259e8048f99)
-с освобождением `stream_info` при очистке индекса, как в текущем upstream.
-Патч находится в `packaging/android/patches/ffmpeg-7.1-hls-seek.patch`,
-воспроизводимая сборка — `scripts/build_android_ffmpeg.sh`. Исходный архив
-7.1.2 проверяется по SHA-256; исходники, объекты и результат остаются в
-`build/android-ffmpeg-seek/`. CMake включает исправленную библиотеку через
-QT_ANDROID_EXTRA_LIBS и останавливает Android-сборку, если её нет.
-Обычный `scripts/build_android.sh` сначала собирает библиотеку для трёх ABI.
-Остальные библиотеки Qt/FFmpeg не заменяются. LGPL-2.1-or-later сохраняется;
-при выпуске APK в комплект соответствующих исходников FFmpeg нужно включить
-этот патч и сценарий сборки. Прошлые материалы релизов не изменяются.
+The cause was reproduced independently of SCrip: `av_seek_frame()` in FFmpeg 7.1.2 bundled with Qt 6.10.1 returns success, but the next `av_read_frame()` returns EOF. The MOV demuxer retains fragment indexes after the virtual HLS stream resets to position 0. Qt consequently remains in PlayingState without audio packets. Restarting Qt at the same position repeats the error.
 
-Неудавшиеся обходы через pause/play, переключение запасного плеера и таймер
-восстановления удалены. Перемотка снова вызывает `QMediaPlayer::setPosition()`.
+The Android APK replaces only `libavformat.so` with the same version/ABI: a backport of [FFmpeg fix 380a518](https://github.com/FFmpeg/FFmpeg/commit/380a518c439d4e5e3cf17b97e4a06259e8048f99), freeing `stream_info` when clearing the index as in current upstream. Patch: `packaging/android/patches/ffmpeg-7.1-hls-seek.patch`; reproducible build: `scripts/build_android_ffmpeg.sh`. The 7.1.2 source archive is verified by SHA-256; sources, objects and output stay in `build/android-ffmpeg-seek/`. CMake includes the corrected library through QT_ANDROID_EXTRA_LIBS and stops the Android build if it is missing. The regular `scripts/build_android.sh` first builds the library for all three ABIs. Other Qt/FFmpeg libraries are unchanged. LGPL-2.1-or-later is retained; APK releases must include this patch and build script in corresponding FFmpeg source materials. Past release materials are unchanged.
 
-Регрессионный `tests/run-hls-seek.sh` генерирует 90 секунд синусоиды в AAC/fMP4
-HLS и проверяет продвижение позиции **и получение декодированных PCM-буферов**
-после перемоток 60 → 15 → 70 → 0 секунд, перемотки на паузе и серии быстрых
-перемоток. Тест не использует аккаунт или музыку пользователя. Путь к готовому
-плейлисту можно передать через SCRIP_HLS_TEST_PLAYLIST. Без него обычный ctest
-пропускает интеграционный сценарий.
+Unsuccessful workarounds using pause/play, spare-player switching and a recovery timer were removed. Seeking again calls `QMediaPlayer::setPosition()`.
 
-На Android 35 x86_64 после перехода к 60,352 с позиция выросла до 62,693 с;
-после перемотки назад — до 15,650 с. Перемотка на паузе сохранила PAUSED
-на 30,835 с; после продолжения позиция выросла до 32,507 с. Системный
-AudioPlaybackConfiguration показал активный AAudio-выход, стерео 44,1 кГц.
-До исправления тот же AAC 160 трек оставался на 60,352 с после восстановления.
-Физический телефон не подключался; акустическая запись не выполнялась.
+The `tests/run-hls-seek.sh` regression test generates 90 seconds of sine-wave AAC/fMP4 HLS and checks both position advance **and receipt of decoded PCM buffers** after seeks to 60 → 15 → 70 → 0 seconds, seeking while paused and rapid seek sequences. It uses neither the user's account nor music. Supply an existing playlist through SCRIP_HLS_TEST_PLAYLIST; without it, regular ctest skips the integration scenario.
+
+On Android 35 x86_64, after seeking to 60.352 s, position advanced to 62.693 s; after seeking backward, to 15.650 s. Seeking while paused retained PAUSED at 30.835 s; resuming advanced position to 32.507 s. System AudioPlaybackConfiguration showed active AAudio stereo output at 44.1 kHz. Before the fix, the same AAC 160 track stayed at 60.352 s after recovery. No physical phone was connected and no acoustic recording was made.

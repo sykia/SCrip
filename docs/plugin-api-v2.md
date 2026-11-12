@@ -1,19 +1,19 @@
-# Архитектура системы плагинов
+# Plugin system architecture
 
-SCrip использует единый декларативный runtime и формат манифеста API 2. Реализация и полный контракт описаны в [справочнике](plugin-api-v2-reference.md). Этот файл фиксирует архитектурные границы, а не отдельный runtime.
+SCrip uses a single declarative runtime and the API 2 manifest format. The implementation and full contract are described in the [reference](plugin-api-v2-reference.md). This document defines architectural boundaries, rather than a separate runtime.
 
-## Граница доверия
+## Trust boundary
 
-Плагин — UTF-8 JSON без исполняемого кода, ресурсов и путей. C++ строго проверяет манифест и выполняет конечный набор команд. QML отображает только штатные панели и настройки. QML/JavaScript, HTML, библиотеки, процессы, произвольные URL, файловый API и динамическое вычисление запрещены.
+A plugin is UTF-8 JSON without executable code, resources or paths. C++ strictly validates the manifest and executes a finite set of commands. QML displays only built-in panels and settings. QML/JavaScript, HTML, libraries, processes, arbitrary URLs, file APIs and dynamic evaluation are prohibited.
 
-Вклады и команды ограничены разрешениями пользователя. Данные плеера выдаются только явно подписанным событиям. Очередь, таймеры, причинная глубина, действия и хранилище имеют квоты; зависимости проверяются до активации. Ошибка сохранения не меняет активное состояние. Существующие тесты покрывают валидацию, разрешения, команды, события, таймеры, данные и обновления.
+Contributions and commands are limited by user permissions. Player data is exposed only through explicitly subscribed events. Queues, timers, causal depth, actions and storage have quotas; dependencies are checked before activation. A save failure leaves the active state unchanged. Existing tests cover validation, permissions, commands, events, timers, data and updates.
 
-## Манифесты и реестр
+## Manifests and registry
 
-Версия формата манифеста API 2 — публичный контракт пакета. Отдельно сохраняется внутренняя версия реестра `format: 2`; она не зависит от имени файла и API манифеста. Единый файл хранения — `plugins.json` в AppDataLocation. Изменения пишутся через QSaveFile, сверяются по SHA-256 и защищаются QLockFile. Лимиты: 24 записи, 16 МиБ на реестр, 256 КиБ данных плагина, 128 ключей и глубина 8.
+The API 2 manifest format is the public package contract. The internal registry version, `format: 2`, is stored separately and does not depend on the filename or manifest API. The single storage file is `plugins.json` in AppDataLocation. Changes are written through QSaveFile, checked with SHA-256 and protected by QLockFile. Limits: 24 entries, 16 MiB per registry, 256 KiB of plugin data, 128 keys and depth 8.
 
-## Перенос старых данных
+## Migrating older data
 
-Если `plugins.json` отсутствует, менеджер читает прежние `plugins-v1.json` и `plugins-v2.json`. Записи проверяются до изменений; текущий реестр сохраняет порядок, уникальные записи из прежнего добавляются в конце. Дубликаты с различающимися настройками или данными блокируют перенос. Перед записью создаются побайтовые резервные копии `.bak`, затем единый реестр атомарно фиксируется. Исходники не удаляются.
+If `plugins.json` is absent, the manager reads the older `plugins-v1.json` and `plugins-v2.json` files. Entries are validated before any changes; the current registry retains its order, and unique entries from the older registry are appended. Duplicates with different settings or data block migration. Byte-for-byte `.bak` backups are created before the unified registry is committed atomically. The original files are retained.
 
-Старые группы оформления превращаются в манифест API 2 с отдельной boolean-настройкой для каждой группы, стандартными вкладами темы и панелей, а также прежними разрешёнными действиями. Они не загружаются и не работают в отдельном runtime. Новые установки принимают только декларативный формат API 2.
+Older appearance groups become API 2 manifests with a separate boolean setting for each group, standard theme and panel contributions, and the previously allowed actions. They do not load or run in a separate runtime. New installations accept only the declarative API 2 format.

@@ -1,9 +1,9 @@
-# Разработка SCrip
+# SCrip development
 
-Общайтесь с пользователем и ведите документацию на русском. Используйте C++20, Qt Quick и CMake. Интерфейс находится в `qml/Main.qml`, точка входа — в `src/main.cpp`. Учитывайте Linux, Windows и Android.
+Communicate with the user in Russian and maintain project documentation in English. Use C++20, Qt Quick and CMake. The interface is in `qml/Main.qml`, and the entry point is `src/main.cpp`. Account for Linux, Windows and Android.
 
-Добавляйте ресурсы и зависимости только по необходимости. Храните сгенерированные файлы в `build/`, а личные данные и секреты вне репозитория.
+Add resources and dependencies only when needed. Keep generated files in `build/`, and personal data and secrets outside the repository.
 
-После правок соберите приложение командой `cmake --build --preset debug`, проверьте результат и оставьте актуальную сборку открытой. При чистой сборке сначала выполните `cmake --preset debug`.
+After making changes, build the application with `cmake --build --preset debug`, check the result and leave the current build open. For a clean build, run `cmake --preset debug` first.
 
-После каждой выполненной задачи запускайте актуальную сборку SCrip и оставляйте окно открытым.
+After every completed task, launch the current SCrip build and leave its window open.

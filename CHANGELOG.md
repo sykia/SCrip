@@ -1,95 +1,92 @@
-# История изменений
+# Changelog
 
-## 1.6.1 — 12 ноября 2026
+## 1.6.1 — November 12, 2026
 
-- Исправлена загрузка обновлений на ПК при неизвестном размере HTTP-ответа.
-- Добавлен запрос исходных байтов пакета без транспортного сжатия; сохранена обязательная проверка фактического размера и SHA-256.
-- При повторном скачивании сбрасываются прогресс и состояние готовности; ошибка записи блокирует установку.
-- Выпуск только для Windows, Debian и Arch Linux. Android остаётся на версии 1.6.0.
+- Fixed desktop update downloads when the HTTP response size is unknown.
+- Request raw package bytes without transport compression; actual size and SHA-256 verification remain mandatory.
+- Reset progress and readiness on retry; write failures block installation.
+- Windows, Debian and Arch Linux release only. Android remains at 1.6.0.
 
-## 1.6.0 — 10 ноября 2026
+## 1.6.0 — November 10, 2026
 
-- Проведена большая работа над стабильностью воспроизведения и интерфейсом настольной и Android-версий.
-- Исправлено быстрое переключение песен: отмена устаревших запросов, подготовка следующего трека и кэширование потоков согласованы с текущей очередью.
-- Улучшены светлая и тёмная темы, плавное переключение оформления и отображение панелей плагинов.
-- На Android обновлены значки приложения, исправлены работа службы воспроизведения и перемотка HLS благодаря патчу FFmpeg.
-- Добавлены проверки кэша потоков, быстрых переключений и жизненного цикла Android-плеера.
+- Extensive playback and interface stability improvements on desktop and Android.
+- Fixed rapid track switching: stale request cancellation, next-track preparation and stream caching now follow the current queue.
+- Improved light and dark themes, smooth appearance transitions and plugin panel rendering.
+- Updated Android icons, fixed playback service behavior and patched FFmpeg HLS seeking.
+- Added checks for stream caching, rapid switching and the Android player lifecycle.
 
 ## 1.5.3 — Android
 
-- Следующий трек подготавливается без беззвучного запуска; служба сохраняет работу при фоновой буферизации и временной потере аудиофокуса.
-- Очередь сохраняется при изменении, позиция — во время воспроизведения; после повторного входа можно продолжить с сохранённого места.
-- Добавлены индикатор загрузки, свайпы плеера, возврат назад и переход в профиль исполнителя. Исправлено отображение лайков в репостах и цветов интерфейса.
-- Упрощены экран плагинов и сообщение об отсутствии обновления для системы.
+- Prepare the next track without silent playback; keep the service running during background buffering and temporary audio-focus loss.
+- Save the queue when it changes and the position during playback; resume from the saved position after signing in again.
+- Added a loading indicator, player swipes, back navigation and artist-profile navigation. Fixed likes on reposts and interface colors.
+- Simplified the plugin screen and the message shown when no update is available for the platform.
 
 ## 1.5.0
 
-- Сессия SoundCloud защищена системным хранилищем; исправлены отмена входа, смена аккаунта и обработка ошибок обновления токена.
-- Очередь и позиция воспроизведения восстанавливаются для того же аккаунта. Исправлены восстановление Android-плеера и работа очереди.
-- Оптимизированы списки и сетевые запросы, исправлен порядок разделов главной страницы.
-- Расширен API плагинов; исправлены импорт плагинов Android и установка обновлений.
-- Улучшены системное управление воспроизведением Android и обновление установок Windows и Linux.
+- Protect the SoundCloud session with system storage; fixed sign-in cancellation, account switching and token-refresh error handling.
+- Restore queue and playback position for the same account. Fixed Android player restoration and queue behavior.
+- Optimized lists and network requests; fixed the order of Home sections.
+- Expanded the plugin API; fixed Android plugin imports and update installation.
+- Improved Android system media controls and updating existing Windows/Linux installations.
 
 ## 1.4.2
 
-- В системной карточке плеера Android крестик заменён на лайк: контурное сердечко добавляет трек в любимые, залитое снимает лайк. Состояние синхронизируется с приложением.
+- Replaced the close button in Android's system player card with a like button: an outline heart adds a like, a filled heart removes it. State stays synchronized with the app.
+- Network errors and incomplete update downloads are no longer reported as SHA-256 mismatches. Checksum verification remains in place; retrying does not start a parallel download.
 
-- Ошибки сети и неполная загрузка обновления больше не выдаются за несовпадение SHA-256. Проверка контрольной суммы сохранена; повторный запрос не запускает параллельное скачивание.
+## 1.4.1 — November 8, 2026 (Android)
 
-## 1.4.1 — 8 ноября 2026 (Android)
+- Keep the Android foreground service and wake lock during track changes and buffering, separately from user pause. Removed a 30-second timer that could stop the service during the next load.
+- System controls support a separate full stop that releases players.
+- Next-stream preloading automatically retains its buffer in memory; removed a deferred timer that could pause the player after switching.
+- Removed the offline library, music downloads and local SoundCloud playback.
+- Both players update the output device when headphones connect or disconnect.
+- Android hands APKs to the installer through FileProvider with the APK MIME type and read permission; packages are stored outside the clearable cache.
 
-- Android сохраняет foreground-службу и wake lock во время смены трека и буферизации; эти состояния отделены от пользовательской паузы. Удалён 30-секундный таймер, способный остановить службу во время следующей загрузки.
-- Системное управление поддерживает отдельную полную остановку с освобождением плееров.
-- Предзагрузка следующего потока автоматически удерживает буфер в памяти; удалён отложенный таймер, который мог приостановить плеер после переключения.
+Development checks: desktop and universal APK builds, CTest (2/2), Android 15 instrumentation covering foreground service during transitions and buffering beyond 30 seconds, pause, resume, stop and rapid preparation cancellation. The author tested the corrected build on a phone: background playback and headphones work.
 
-- Удалены офлайн-библиотека, скачивание музыки и локальное воспроизведение SoundCloud.
-- Оба плеера обновляют устройство вывода при подключении и отключении наушников.
-- Android передаёт APK установщику через FileProvider с MIME-типом APK и правом чтения; пакет хранится вне очищаемого кэша.
+Before release, test upgrading a previous APK signed with the same key on a real Android device, including installation permission. Check wired, Bluetooth and USB headphones: connection before launch and during playback, disconnection, next-track transitions and crossfade.
 
-Проверки разработки: сборки ПК и универсального APK, CTest (2/2), Android 15 instrumentation — foreground-служба при переходе и буферизации более 30 секунд, пауза, продолжение, остановка и быстрая отмена подготовки. Автор проверил исправленную сборку на своём телефоне: фоновое воспроизведение и наушники работают.
+## 1.4.0 — November 7, 2026
 
-Перед релизом на реальном Android проверить обновление с предыдущей версии APK с тем же ключом подписи, включая выдачу разрешения на установку. Проверить проводные, Bluetooth и USB-наушники: подключение до запуска и во время трека, отключение, переход к следующему треку и кроссфейд.
+### Playback and library
 
-## 1.4.0 — 7 ноября 2026
+- Removed the gap below the right queue panel and fixed sizing of the player's right section.
+- Added an optional three-second crossfade with next-track preloading on desktop and Android.
+- Start Android's media service during track preparation while the app is still open, helping prevent playback from stopping when the app enters the background.
+- Android saves available SoundCloud originals for offline listening. Added individual downloads, batch downloads of all downloadable likes, an offline file list and deletion.
+- Offline downloads use the highest-quality original SoundCloud permits the author to make downloadable.
 
-### Воспроизведение и библиотека
+### Updates
 
-- Убран зазор под правой панелью очереди и исправлены размеры правого блока плеера.
+- Check GitHub Releases at startup, download a suitable package automatically, verify SHA-256 and start installation. Windows and Linux restart the app after installation; Android requires system APK confirmation.
+- Increased the app version and Android versionCode to 1.4.0 / 10400.
 
-- В настройках можно включить трёхсекундный кроссфейд с предварительной загрузкой следующего трека на настольной и Android-версиях.
-- На Android служба медиаплеера запускается во время подготовки трека, пока приложение ещё открыто. Это помогает Android не останавливать плеер при сворачивании приложения.
-- Android сохраняет доступные оригинальные файлы SoundCloud для прослушивания без сети. Добавлены загрузка отдельного трека, пакетная загрузка всех разрешённых к скачиванию лайков, список офлайн-файлов и удаление.
-- Офлайн-загрузка использует оригинал в максимальном качестве, которое SoundCloud разрешает скачать автору.
+## 1.3.0 — November 7, 2026
 
-### Обновления
-
-- Приложение проверяет GitHub Releases при запуске, автоматически скачивает подходящий пакет, проверяет SHA-256 и запускает установку. Windows и Linux перезапускают приложение после установки; Android показывает обязательное системное подтверждение APK.
-- Версия приложения и Android versionCode увеличены до 1.4.0 / 10400.
-
-## 1.3.0 — 7 ноября 2026
-
-Изменения относительно опубликованной версии 1.0.0, включая мобильную разработку из рабочего дерева. Отдельные публичные релизы 1.1.0 и 1.2.0 не выпускались.
+Changes since published version 1.0.0, including mobile development from the working tree. Separate public releases 1.1.0 and 1.2.0 were not published.
 
 ### Android
 
-- Отдельный интерфейс Qt Quick: нижняя навигация, главная с персональными подборками, лента, медиатека и поиск.
-- Мини-плеер и полноэкранный плеер с обложкой, перемоткой, избранным, очередью, повтором и случайным порядком.
-- Вход в SoundCloud через системный браузер.
-- Фоновое воспроизведение через foreground-службу, управление из уведомления и с экрана блокировки через MediaSession.
-- Виджет рабочего стола с обложкой и кнопками управления.
-- Обработка потери аудиофокуса и отключения наушников.
-- Предварительная подготовка следующего трека, в том числе при случайном порядке.
-- HTTPS через включённые библиотеки OpenSSL; поддержка Android 9+ и архитектур ARM64, ARMv7, x86-64 в одном APK.
+- Dedicated Qt Quick interface: bottom navigation, Home with personal collections, feed, library and search.
+- Mini player and full-screen player with artwork, seeking, likes, queue, repeat and shuffle.
+- SoundCloud sign-in through the system browser.
+- Background playback through a foreground service, notification and lock-screen controls through MediaSession.
+- Home-screen widget with artwork and playback controls.
+- Audio-focus loss and headphone disconnection handling.
+- Next-track preparation, including shuffle mode.
+- HTTPS through bundled OpenSSL; Android 9+ and ARM64, ARMv7, x86-64 in one APK.
 
-### Настольная версия и упаковка
+### Desktop and packaging
 
-- Предварительное получение адреса следующего потока; фоновые ошибки не прерывают текущий трек.
-- Разделение настольной и мобильной точки инициализации; режим мобильного предпросмотра на компьютере.
-- Упаковщик Windows поддерживает подпись приложения и установщика через Windows SDK при наличии сертификата издателя.
-- В CI добавлена проверка SHA-256 опубликованного установщика, сканирование Microsoft Defender, установка и ожидание открытия окна.
-- Обновлены README, скриншоты и сведения о загрузках.
-- Номер 1.3.0 согласован в приложении, CMake, APK, установщике Windows и пакетах Linux.
+- Fetch the next stream URL ahead of time; background errors do not interrupt the current track.
+- Separate desktop and mobile initialization; mobile preview mode on desktop.
+- Windows packager supports application and installer signing through Windows SDK when a publisher certificate is available.
+- CI verifies the published installer's SHA-256, scans it with Microsoft Defender, installs it and waits for the window to open.
+- Updated README, screenshots and download information.
+- Aligned version 1.3.0 across the app, CMake, APK, Windows installer and Linux packages.
 
-### Сохранено из 1.0.0
+### Retained from 1.0.0
 
-Персональные миксы, станции исполнителей, новые релизы, любимые треки и плейлисты; очередь с перетаскиванием и командой «Играть следующим»; настольный трей, темы и плагины. Эти возможности не являются новыми в 1.3.0.
+Personal mixes, artist stations, new releases, likes and playlists; a draggable queue with **Play next**; desktop tray, themes and plugins. These features are not new in 1.3.0.

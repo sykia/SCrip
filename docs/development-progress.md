@@ -1,67 +1,73 @@
-# Ход разработки
+# Development progress
 
-## Этап 1 — производительность Android (завершён, 08.11.2026)
+## Stage 1 — Android performance (completed November 8, 2026)
 
-Выполнено:
-- Проверены Android QML, загрузка обложек, списки, Repeater, эффекты, обработчики плеера и Android MediaSession. Loader в этом интерфейсе отсутствует; основные треки и очередь уже используют ListView. Небольшие Repeater вкладок оставлены без изменений.
-- Подтверждена цепочка: positionChanged → set(position) → changed → sc.state → все привязки api, включая модели списков. Android переведён на catalogState/catalogChanged; позиция и длительность получают отдельные свойства и progressChanged. Старые state/changed сохранены для совместимости. Изменение порядка очереди уведомляет оба интерфейса.
-- Android MediaSession больше не планирует публикацию на каждый тик позиции: сохранены секундный таймер и немедленная публикация изменений каталога/состояния. Кнопки, смена трека и управление воспроизведением сохранены.
-- Декодируемые обложки ограничены физическим размером отображения с учётом DPR. Ранее даже миниатюры 44×44 запрашивали декодирование исходной обложки до 500×500. Сохранены асинхронная загрузка, дисковый кеш, маски, тени и анимации.
-- Регрессионный тест проверяет раздельные уведомления позиции/длительности, игнорирование запасного плеера, повторного значения и уведомления остальных данных. До изменения каждый новый тик уведомлял каталог через общий changed; теперь тест подтверждает отсутствие catalogChanged при сохранении старого changed.
+Completed:
 
-Проверки:
-- `cmake --build --preset debug` — успешно.
-- `ctest --test-dir build/debug --output-on-failure` — оба набора успешно.
-- `cmake --build build/mobile-preview -j2` — успешно; приложение запущено, главная с обложками визуально проверена, QML-ошибок в журнале запуска нет.
-- `cmake --build build/android --target scrip -j2` — успешно, libscrip_arm64-v8a.so (Qt 6.8.3); локальному CMake указан имеющийся build/android-tools/openssl. APK не собирался.
-- `git diff --check` — успешно. Журналы проверок находятся в build/stage1/.
+- Reviewed Android QML, artwork loading, lists, Repeater, effects, player handlers and Android MediaSession. This interface has no Loader; main tracks and queue already use ListView. Small tab Repeaters were left unchanged.
+- Confirmed the chain: positionChanged → set(position) → changed → sc.state → all api bindings, including list models. Android now uses catalogState/catalogChanged; position and duration have separate properties and progressChanged. Older state/changed remain for compatibility. Queue reordering notifies both interfaces.
+- Android MediaSession no longer schedules publication on every position tick: the one-second timer and immediate catalog/state publication remain. Buttons, track changes and playback controls are retained.
+- Decoded artwork is limited to physical display size with DPR accounted for. Previously, even 44×44 thumbnails requested decoding of artwork up to 500×500. Asynchronous loading, disk cache, masks, shadows and animations remain.
+- A regression test checks separate position/duration notifications, ignoring the spare player and repeated values, and notifications for other data. Previously every new tick notified the catalog through shared changed; the test now confirms no catalogChanged while retaining legacy changed.
 
-Ограничения:
-- `build/android-tools/sdk/platform-tools/adb devices` не обнаружил устройств. Замеры frame time/FPS до/после, Android GPU profiling, прокрутка и реальное воспроизведение на устройстве не выполнены; численные ускорения и отсутствие всех Android-регрессий не заявляются.
-- Крупные изменения каталога по-прежнему уведомляют карту целиком. Переход на QAbstractListModel требует отдельного профилирования и не включён без подтверждения необходимости.
-- Пользовательские изменения, имевшиеся до этапа, сохранены вне коммита этапа.
+Validation:
 
-Осталось: на устройстве проверить длинные списки во время воспроизведения, горизонтальные подборки, открытие плеера и seek с Qt Quick Profiler/Android frame timeline.
+- `cmake --build --preset debug` — passed.
+- `ctest --test-dir build/debug --output-on-failure` — both suites passed.
+- `cmake --build build/mobile-preview -j2` — passed; app launched, Home with artwork visually checked, no QML errors in startup logs.
+- `cmake --build build/android --target scrip -j2` — passed, libscrip_arm64-v8a.so (Qt 6.8.3); local CMake used the existing build/android-tools/openssl. No APK was built.
+- `git diff --check` — passed. Logs are in build/stage1/.
 
-Следующий этап (только по команде «Продолжай»): архитектура Plugin API v2 с совместимостью v1 и безопасным разделением декларативных и исполняемых расширений. На этом этапе плагины не изменялись.
+Limitations:
 
-## Этап 2 — архитектура Plugin API v2 (завершён, 08.11.2026)
+- `build/android-tools/sdk/platform-tools/adb devices` found no devices. Before/after frame time/FPS, Android GPU profiling, scrolling and real playback on a device were not measured; numerical speedups and absence of all Android regressions are not claimed.
+- Large catalog changes still notify the entire map. Moving to QAbstractListModel requires separate profiling and was not included without evidence of need.
+- User changes predating the stage were kept outside its commit.
 
-Выполнено: изучены plugins.cpp/.h, документация, оба QML-интерфейса, подключение в main.cpp и тесты v1. Контракт и план реализации записаны в [plugin-api-v2.md](plugin-api-v2.md): manifest/версии, v1-адаптер, зависимости, разрешения, lifecycle, ограниченные события/команды/правила, настройки/данные, атомарные обновления, UI-слоты, content URI и тестовая матрица.
+Remaining: check long lists during playback, horizontal collections, player opening and seeking on a device using Qt Quick Profiler/Android frame timeline.
 
-Решение: JSON declarative без пользовательского QML/JS; executable отклоняется до реализации и проверки отдельной платформенной изоляции. Исполняемый runtime, магазин и автоматическое обновление не заявляются. Найденные различия: Android отклоняет content://, не показывает profile-панели; приоритет тем и маршрутизация действий различаются между платформами. Исправления относятся к этапу 3.
+The next stage required the user's “Continue”: Plugin API v2 architecture with v1 compatibility and safe separation of declarative and executable extensions. Plugins were unchanged in this stage.
 
-Изменения этапа — только документация; API v2 ещё не реализован. Пользовательские правки сохранены. `cmake --build --preset debug`, оба набора CTest и `git diff --check` прошли; актуальная debug-сборка запущена и оставлена открытой. Новые runtime-тесты не добавлялись: изменений исполнения нет. Проверки Android/Windows для v2 отложены до реализации; спецификация не является подтверждением их работоспособности. Следующий этап — реализация по группам из архитектуры, только после «Продолжай».
+## Stage 2 — Plugin API v2 architecture (completed November 8, 2026)
 
-## Этап 3 — реализация декларативного API v2 (08.11.2026)
+Completed: reviewed plugins.cpp/.h, documentation, both QML interfaces, main.cpp integration and v1 tests. The contract and implementation plan were recorded in [plugin-api-v2.md](plugin-api-v2.md): manifests/versions, v1 adapter, dependencies, permissions, lifecycle, bounded events/commands/rules, settings/data, atomic updates, UI slots, content URIs and a test matrix.
 
-Выполнено:
-- Строгий UTF-8/JSON-парсер с проверкой дубликатов, глубины, типов, лимитов, версий, ссылок и полномочий. Исполняемые пакеты отклоняются; пользовательский QML/JS не загружается.
-- Реестр v2, миграция v1 с сохранением включения и флагов, QSaveFile, блокировка и проверка изменений другого экземпляра. Предпросмотр установки/обновления, согласование разрешений, сохранение настроек и данных, восстановление удалённых настроек, зависимости/циклы, безопасное отключение и удаление с сохранением конфигурации.
-- Ограниченные события плеера, dispatcher команд, одноразовые таймеры, собственные данные. Проверки при каждом действии, квоты, отмена очереди/таймеров при disable/logout, защита от синхронных и асинхронных циклов. Частые backend-тики не обновляют весь каталог и не копируют его в менеджер; прогресс запрашивается раз в секунду только при подписках.
-- Общие QML-менеджер, панели home/profile и инструменты плеера. Исправлены Android profile-панели, маршрутизация действий, чтение content:// без преобразования в локальный путь, приоритет пользовательского оформления и сообщения о конфликтах тем.
-- Рабочие примеры sleep-timer, queue-tools, calm-studio; [справочник реализованного API](plugin-api-v2-reference.md). Существующие пользовательские изменения не включены в этап.
+Decision: declarative JSON without user QML/JS; executable packages are rejected until separate platform isolation is implemented and validated. An executable runtime, store and automatic updates are not claimed. Identified differences: Android rejected content:// and omitted profile panels; theme priority and action routing differed across platforms. Fixes belonged to stage 3.
 
-Фактически выполненные проверки:
-- `cmake --build --preset debug` — успешно; оба набора CTest — успешно (Qt Test сообщает 18 passed для plugins и 25 passed для soundcloud, включая init/cleanup).
-- 13 Python unit-тестов — успешно. JSON примеров проходит реальный валидатор; примеры устанавливаются/включаются в тестах.
-- QML-тесты менеджера шириной 320/960, диалога подтверждения, всех трёх слотов и вызова команды настоящей QML-кнопкой — без предупреждений. Снимки в build/debug/plugin-manager-*.png и plugin-review*.png визуально проверены.
-- `cmake --build build/mobile-preview -j2` — успешно.
-- Android arm64 и актуальный debug APK — успешно: `JAVA_HOME=build/android-tools/jdk GRADLE_USER_HOME=build/android-tools/gradle cmake --build build/android --target apk -j2` (в выполненной команде использованы абсолютные пути). Первые попытки упаковки обнаружили старый Gradle 8.10 и повреждённый локальный архив; только сгенерированный wrapper в build/android переведён на проверенный имеющийся gradle-mirror.zip с Gradle 8.14.3. Исходные Gradle-настройки проекта не менялись. APK: build/android/android-build/build/outputs/apk/debug/android-build-debug.apk. Это локальная debug-сборка, не релиз.
-- `git diff --check` — успешно; журналы в build/stage3/.
+This stage changed documentation only; API v2 was not yet implemented. User edits were preserved. `cmake --build --preset debug`, both CTest suites and `git diff --check` passed; the current debug build was launched and left open. No runtime tests were added because execution was unchanged. Android/Windows v2 checks were deferred until implementation; the specification does not prove platform functionality. Implementation by architecture groups was the next stage, requiring “Continue”.
 
-Ограничения и оставшаяся приёмка:
-- adb не обнаружил устройств. Реальная работа SAF/content provider (неизвестная длина, отказ/отзыв grant, медленный provider), фоновый таймер и воспроизведение на Android не проверены; сборка APK не заменяет эти проверки. Блокирующее чтение provider нельзя принудительно отменить: GUI свободен, но worker и завершение процесса могут ждать ОС; таких чтений не более двух.
-- Windows не запускались. Кроссплатформенные изменения используют Qt 6/C++20, но отсутствие регрессий на этих ОС не подтверждено запуском.
-- Запись реестра атомарна, но синхронна; производительность предельного реестра на медленном накопителе не измерялась. Таймер сна не является точным Android-будильником. Исполняемый runtime, подписи издателя, магазин и автозагрузка обновлений намеренно отсутствуют и не рекламируются как готовые функции.
-- Следующая работа при наличии устройства: platform acceptance из архитектуры — SAF, фон, установка/обновление/отзыв полномочий, отключение и удаление на Android; затем те же сценарии на Windows. Доступные локальные проверки завершены; полная платформенная приёмка остаётся открытой.
+## Stage 3 — declarative API v2 implementation (November 8, 2026)
 
-Актуальные desktop debug и мобильный preview запущены после финальной сборки; окна оставлены открытыми.
+Completed:
 
-## Исправление Android-шапки и системной строки (08.11.2026)
+- Strict UTF-8/JSON parser checking duplicates, depth, types, limits, versions, references and permissions. Executable packages are rejected; user QML/JS is not loaded.
+- v2 registry, v1 migration retaining enablement and flags, QSaveFile, locking and detection of other-instance changes. Installation/update preview, permission consent, settings/data retention, removed-setting restoration, dependencies/cycles, safe disabling and removal with retained configuration.
+- Bounded player events, command dispatcher, one-shot timers and private data. Per-action checks, quotas, queue/timer cancellation on disable/logout, protection against synchronous and asynchronous loops. Frequent backend ticks neither refresh the whole catalog nor copy it into the manager; progress is requested once per second only with subscriptions.
+- Shared QML manager, home/profile panels and player tools. Fixed Android profile panels, action routing, content:// reads without local-path conversion, user appearance priority and theme-conflict messages.
+- Working sleep-timer, queue-tools and calm-studio examples; [implemented API reference](plugin-api-v2-reference.md). Existing user changes were excluded from this stage.
 
-Причина перекрытия заголовка подтверждена на Qt 6.8.3: SafeArea доступен с Qt 6.9, поэтому прежняя привязка height давала ошибку и шапка теряла высоту. Добавлен совместимый верхний inset с fallback 0 и сохранением базовых 66 логических пикселей. Геометрический тест настоящего Android Main.qml до исправления падал на нулевой высоте, после проходит на Qt 6.8.3 и Qt 6.10 при портретных/широких размерах. Снимки в build/preview-683/android-header.png и build/debug/android-header.png проверены.
+Checks actually performed:
 
-По дополнительному запросу добавлена SCripActivity: после resume/получения фокуса включается setAppearanceLightStatusBars(true) через уже имеющийся AndroidX Core. Это тёмные системные значки на светлом фоне; настройки нижней системной панели не меняются. Дополнен Android instrumentation-тест проверкой соответствующего флага (скомпилирован javac, не запускался: adb не видит устройств). Документация API: [WindowInsetsControllerCompat](https://developer.android.com/reference/androidx/core/view/WindowInsetsControllerCompat), [Qt ApplicationWindow](https://doc.qt.io/qt-6/qml-qtquick-controls-applicationwindow.html).
+- `cmake --build --preset debug` — passed; both CTest suites passed (Qt Test reports 18 passed for plugins and 25 for soundcloud, including init/cleanup).
+- 13 Python unit tests passed. Example JSON passes the actual validator; examples are installed/enabled in tests.
+- QML checks for the manager at widths 320/960, confirmation dialog, all three slots and command invocation from a real QML button — no warnings. Snapshots in build/debug/plugin-manager-*.png and plugin-review*.png were visually checked.
+- `cmake --build build/mobile-preview -j2` — passed.
+- Android arm64 and current debug APK — passed: `JAVA_HOME=build/android-tools/jdk GRADLE_USER_HOME=build/android-tools/gradle cmake --build build/android --target apk -j2` (the actual command used absolute paths). Initial packaging attempts found old Gradle 8.10 and a corrupt local archive; only the generated wrapper in build/android was changed to the verified existing gradle-mirror.zip with Gradle 8.14.3. Source Gradle settings were unchanged. APK: build/android/android-build/build/outputs/apk/debug/android-build-debug.apk. This is a local debug build, not a release.
+- `git diff --check` — passed; logs in build/stage3/.
 
-Проверки: debug preset и мобильный preview собраны, набор plugins проходит на обеих версиях Qt, обновлённый debug APK arm64 собран. Журналы — build/header-fix/. Реальный вид системных значков требует проверки на телефоне. Нижние кнопки, оформление и обработчики navigationFooter сохранены побайтово относительно рабочего файла на начало задачи; ранее имевшиеся изменения нижней панели не включаются в коммит исправления.
+Limitations and remaining acceptance:
+
+- adb found no devices. Actual SAF/content provider behavior (unknown length, denied/revoked grant, slow provider), background timers and Android playback were not checked; building an APK does not replace these checks. Blocking provider reads cannot be forcibly canceled: the GUI remains free, but workers and process exit may wait for the OS; at most two such reads are allowed.
+- Windows was not run. Cross-platform changes use Qt 6/C++20, but runtime absence of regressions on those systems is unconfirmed.
+- Registry writes are atomic but synchronous; maximum-size registry performance on slow storage was not measured. The sleep timer is not a precise Android alarm. An executable runtime, publisher signatures, store and automatic update downloads are intentionally absent and are not advertised as ready.
+- Next work with a device: platform acceptance from the architecture — SAF, background operation, installation/update/permission revocation, disabling and removal on Android; then the same Windows scenarios. Available local checks are complete; full platform acceptance remains open.
+
+The current desktop debug build and mobile preview were launched after the final build and left open.
+
+## Android header and status bar fix (November 8, 2026)
+
+The overlapping-title cause was confirmed on Qt 6.8.3: SafeArea is available from Qt 6.9, so the old height binding failed and the header lost its height. Added a compatible top inset with fallback 0 while retaining the base 66 logical pixels. The geometry test using the real Android Main.qml failed on zero height before the fix and passes afterward on Qt 6.8.3 and Qt 6.10 at portrait/wide sizes. Snapshots in build/preview-683/android-header.png and build/debug/android-header.png were reviewed.
+
+At an additional request, SCripActivity was added: after resume/focus, it enables setAppearanceLightStatusBars(true) through the existing AndroidX Core. This produces dark system icons on a light background; bottom system bar settings are unchanged. Android instrumentation was extended to check the flag (compiled with javac, not run because adb found no devices). API documentation: [WindowInsetsControllerCompat](https://developer.android.com/reference/androidx/core/view/WindowInsetsControllerCompat), [Qt ApplicationWindow](https://doc.qt.io/qt-6/qml-qtquick-controls-applicationwindow.html).
+
+Validation: debug preset and mobile preview built, plugins suite passes on both Qt versions, updated arm64 debug APK built. Logs: build/header-fix/. Actual system icon appearance requires phone testing. Bottom buttons, appearance and navigationFooter handlers were retained byte-for-byte relative to the working file at task start; pre-existing bottom-panel changes are excluded from the fix commit.

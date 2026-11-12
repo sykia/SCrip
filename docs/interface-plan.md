@@ -1,12 +1,10 @@
-# План обновления интерфейса
+# Interface refresh plan
 
-- [x] 1. Настраиваемое скругление обложек, аватаров и панелей.
-- [x] 2. Единая сетка, отступы и выравнивание.
-- [x] 3. Включение анимаций, настройка скорости, плавные переходы.
-- [x] 4. Автоматическая подгрузка с защитой от повторных запросов и ошибок.
-- [x] 5. Главная: миксы, свежие треки подписок, похожая музыка.
-- [x] 6. Проверки, README, запуск актуальной сборки.
+- [x] 1. Configurable corner radius for artwork, avatars and panels.
+- [x] 2. Consistent grid, spacing and alignment.
+- [x] 3. Animation toggle, speed control and smooth transitions.
+- [x] 4. Automatic loading with protection against duplicate requests and errors.
+- [x] 5. Home: mixes, new tracks from followed artists and related music.
+- [x] 6. Checks, README and launch of the current build.
 
-Главная использует публичный API SoundCloud. Подборки SCrip не выдаются за
-персональные рекомендации официального приложения. Пустые ответы и ошибки
-отображаются явно, без демонстрационных треков.
+Home uses the public SoundCloud API. SCrip collections are not presented as personal recommendations from the official app. Empty responses and errors are shown explicitly, without demo tracks.

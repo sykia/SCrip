@@ -1,9 +1,9 @@
-# Авторские права и применение GPL
+# Copyright and GPL application
 
 Copyright (c) 2026 sykia.
 
-Собственный код SCrip и оригинальные графические материалы предоставляются по GNU GPL версии 3, SPDX: GPL-3.0-only. Полный неизменённый текст содержится в LICENSE. Это разрешение также предоставляется на собственный код релиза 1.3.0 (коммит b7b7c013c94d29df38a610fb233e018aaf38c071). Оно не присваивает прав на сторонний код или контент SoundCloud и не заменяет обязанности по предоставлению соответствующих исходников зависимостей.
+SCrip's own code and original artwork are provided under GNU GPL version 3, SPDX: GPL-3.0-only. The complete, unmodified text is in LICENSE. This permission also applies to the project's own code in release 1.3.0 (commit b7b7c013c94d29df38a610fb233e018aaf38c071). It grants no rights to third-party code or SoundCloud content and does not replace obligations to provide corresponding dependency sources.
 
-Программа предоставляется без гарантий в пределах GPLv3 и применимого закона. Получатели могут использовать, изучать, изменять и распространять программу, включая коммерческое распространение, на условиях GPLv3. Никакого дополнительного запрета на форки, копирование или коммерческое использование не вводится.
+The program is provided without warranty to the extent permitted by GPLv3 and applicable law. Recipients may use, study, modify and redistribute it, including commercially, under GPLv3. No additional prohibition on forks, copying or commercial use is imposed.
 
-Указание автора должно сохраняться. Политика названия и логотипа в TRADEMARKS.md касается авторства и обозначения происхождения; она не ограничивает предоставленные GPL авторские права.
+Author attribution must be retained. The name and logo policy in TRADEMARKS.md concerns authorship and identification of origin; it does not restrict copyright permissions granted by the GPL.

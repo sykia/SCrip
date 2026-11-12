@@ -1,102 +1,102 @@
-# Plugin API v2: использование и контракт реализации
+# Plugin API v2: usage and implementation contract
 
-SCrip принимает декларативные JSON-плагины API 2. Исполняемые QML/JS, библиотеки и процессы не поддерживаются. Формат executable отклоняется с unsupported-runtime: безопасная изолированная среда не реализована. [Архитектурное решение](plugin-api-v2.md) объясняет выбранную границу доверия.
+SCrip accepts declarative API 2 JSON plugins. Executable QML/JS, libraries and processes are unsupported. The executable format is rejected with `unsupported-runtime`: a secure isolated environment has not been implemented. The [architecture](plugin-api-v2.md) explains the trust boundary.
 
-## Установка и управление
+## Installation and management
 
-Откройте Настройки → Плагины. Нажмите «Установить / обновить из файла…», выберите JSON, проверьте название, версию, SHA-256, изменения настроек и разрешения. Файл не подписан: контрольная сумма и совпадение ID не доказывают авторство. Подтвердите перечисленные полномочия. Новый плагин устанавливается выключенным; нажмите «Включить» в карточке.
+Open **Settings → Plugins**. Choose **Install / update from file…**, select JSON, and review the name, version, SHA-256, setting changes and permissions. Files are unsigned: a checksum and matching ID do not prove authorship. Approve the listed permissions. New plugins are installed disabled; choose **Enable** in the card.
 
-В карточке доступны описание, ID и версия, состояние с причиной, разрешения, настройки и ошибки. Отзыв обязательного разрешения прекращает работу, снимает панели и отменяет таймеры; повторная выдача позволяет продолжить, но отменённые таймеры не восстанавливает. После ошибки лимитов отключите и включите плагин для повторного запуска. Кнопка «Очистить журнал» удаляет диагностические сообщения, но не снимает блокировку выполнения.
+Each card shows the description, ID, version, status and reason, permissions, settings and errors. Revoking a required permission stops execution, removes panels and cancels timers. Granting it again allows execution to resume, but does not restore canceled timers. After a quota error, disable and re-enable the plugin to restart it. **Clear log** removes diagnostic messages without clearing the execution block.
 
-«Обновить из файла» использует тот же предпросмотр. Для обновления нужны тот же ID и большая версия. Настройки сохраняются по стабильному ID, совместимые со старым типом и новыми пределами; остальные заменяются defaults с предупреждением в предпросмотре. Удалённые настройки хранятся для восстановления при возвращении ID. Данные сохраняются. Для ранее установленных пакетов их группы и переключатели преобразуются в независимые вклады и настройки; новые файлы прежнего формата не устанавливаются. Не выбирайте другой ID, если намерены обновить существующий пакет: он будет показан как отдельная новая установка.
+**Update from file** uses the same preview. Updates require the same ID and a higher version. Settings are retained by stable ID if compatible with the old type and new limits; others revert to defaults with a preview warning. Removed settings are retained for restoration if their IDs return. Data is preserved. Groups and toggles from previously installed packages become independent contributions and settings; new files in the older format cannot be installed. Use the existing ID to update a package: a different ID creates a separate installation.
 
-Зависимости не скачиваются и не включаются автоматически. В карточке показывается причина блокировки. Перед несовместимым обновлением зависимости отключите зависимые плагины. При удалении диалог перечисляет зависимых и подтверждает их отключение. Можно сохранить конфигурацию для переустановки; такая запись видна как удалённый пакет, учитывается в лимите и может быть окончательно удалена.
+Dependencies are neither downloaded nor enabled automatically. The card shows why activation is blocked. Disable dependent plugins before an incompatible dependency update. Removal lists dependent plugins and asks to confirm disabling them. Configuration can be kept for reinstallation; the retained entry appears as a removed package, counts toward the limit and can be deleted permanently.
 
-Пользовательская тема/явно выбранный радиус имеют приоритет над соответствующими свойствами плагина. Между плагинами действует порядок установки: последний активный вклад побеждает. Карточка показывает, какие свойства применяются или перекрыты другим плагином. Android: кнопка «Использовать оформление плагинов» снимает пользовательские overrides; desktop: сброс оформления и выбор стандартной темы.
+The user's theme and explicitly chosen radius take precedence over corresponding plugin properties. Among plugins, installation order applies: the last active contribution wins. Cards show which properties are applied or overridden. On Android, **Use plugin appearance** clears user overrides; on desktop, reset appearance and select the default theme.
 
-## Рабочие примеры
+## Working examples
 
-| Файл | Назначение |
+| File | Purpose |
 | --- | --- |
-| [Таймер сна](../examples/plugins/sleep-timer.json) | В плеере → Дополнения: запуск/отмена паузы через настраиваемые 1–180 минут |
-| [Управление очередью](../examples/plugins/queue-tools.json) | Предыдущий/следующий трек через штатный плеер, с ошибкой при недоступности |
-| [Спокойная студия](../examples/plugins/calm-studio.json) | Зелёная тема и панель любимых/плейлистов в профиле; независимые переключатели |
+| [Sleep timer](../examples/plugins/sleep-timer.json) | Player → Add-ons: start/cancel a pause after a configurable 1–180 minutes |
+| [Queue tools](../examples/plugins/queue-tools.json) | Previous/next through the built-in player, with an error when unavailable |
+| [Calm studio](../examples/plugins/calm-studio.json) | Green theme and a likes/playlists profile panel, with independent toggles |
 
-Панели доступны в home.panels, profile.panels и player.tools на desktop и Android. Последний слот открывается кнопкой «Дополнения» в плеере. Команды выполняются только при активном плагине и действующих разрешениях.
+Panels are available in `home.panels`, `profile.panels` and `player.tools` on desktop and Android. The last slot opens through the player's **Add-ons** button. Commands run only while the plugin is active and permissions are valid.
 
-Таймеры одноразовые, не переживают отключение, logout и перезапуск. Это таймер Qt event loop, не системный будильник. При сне Android выполнение может задержаться до возобновления приложения. Время срабатывания показывается в панели; точность фоновой паузы не гарантируется. Два таймера на плагин, повторный запуск того же ID заменяет прежний.
+Timers are one-shot and do not survive disabling, logout or restart. They use the Qt event loop, rather than a system alarm. Android sleep may delay execution until the app resumes. The scheduled time appears in the panel; precise background pausing is not guaranteed. Each plugin may have two timers; starting the same ID replaces the previous timer.
 
-## Манифест
+## Manifest
 
-Смотрите JSON примеров: обязательны api=2, kind=declarative, id, name, version, requiresHost, permissions, settings, contributions, rules. description и dependencies необязательны. Неизвестные поля, повторяющиеся ключи, неверные типы, команды/ссылки и превышение лимитов отклоняются до установки. UTF-8, до 128 КиБ, глубина ≤16. Текст PlainText; нет путей, произвольных URL, eval, HTML или ресурсов. ID: `[a-z][a-z0-9.-]{0,47}`. Название ≤48 печатных символов, описание ≤1000.
+See the JSON examples. Required fields: `api=2`, `kind=declarative`, `id`, `name`, `version`, `requiresHost`, `permissions`, `settings`, `contributions`, `rules`. `description` and `dependencies` are optional. Unknown fields, duplicate keys, invalid types, commands/references and exceeded limits are rejected before installation. UTF-8, up to 128 KiB, depth ≤16. Text is PlainText; paths, arbitrary URLs, eval, HTML and resources are unavailable. ID: `[a-z][a-z0-9.-]{0,47}`. Name: ≤48 printable characters; description: ≤1000.
 
-Версия — ровно major.minor.patch, числа 0–65535 без ведущих нулей и суффиксов. requiresHost={min,maxExclusive}, обе границы обязательны. Совместимость API проверяется отдельно; сам факт версии SCrip из диапазона не добавляет поддержку нового API. dependencies — до 8 `{id,min,maxExclusive}`, только v2; циклы запрещены. Не хватает зависимости/подходящего хоста — пакет остаётся заблокированным, а не частично работающим.
+Versions are exactly `major.minor.patch`, with numbers 0–65535 and no leading zeros or suffixes. `requiresHost={min,maxExclusive}` requires both bounds. API compatibility is checked separately; a matching SCrip version does not add support for a new API. `dependencies` allows up to eight `{id,min,maxExclusive}` entries, v2 only; cycles are forbidden. A missing dependency or incompatible host blocks the whole package.
 
-permissions — уникальный набор из ui.panels, ui.theme, player.observe, player.control, navigation, storage, timers. Все заявленные разрешения обязательны для активации. player.observe раскрывает названия/исполнителей треков и состояние воспроизведения — это персональные данные. Токены, профиль, потоковые URL, сеть и произвольные файлы недоступны. Полномочия зависимостей не наследуются.
+`permissions` is a unique set drawn from `ui.panels`, `ui.theme`, `player.observe`, `player.control`, `navigation`, `storage`, `timers`. All declared permissions are required for activation. `player.observe` exposes track titles/artists and playback state, which are personal data. Tokens, profiles, stream URLs, networking and arbitrary files are unavailable. Dependency permissions are not inherited.
 
-settings — до 16 записей `{id,type,label,default}`. Типы: boolean; integer с обязательными min/max (целые в диапазоне ±2147483647); enum с options (1–16 уникальных строк до 48 знаков). Подстановок и секретных/произвольных текстовых настроек нет. Ссылки на настройки допустимы в предусмотренных полях enabledSetting, minutesSetting и в типизированных элементах панели.
+`settings` allows up to 16 `{id,type,label,default}` entries. Types: boolean; integer with required min/max (integers within ±2147483647); enum with options (1–16 unique strings of up to 48 characters). Substitution, secret settings and arbitrary text settings are unavailable. Setting references are allowed in the designated `enabledSetting`, `minutesSetting` and typed panel item fields.
 
-contributions — до 8 записей с уникальными ID:
+`contributions` allows up to eight entries with unique IDs:
 
-- panel: `{id,type:"panel",slot,title,text?,buttons?,items?,enabledSetting?}`. Слоты перечислены выше; title ≤48, text ≤1000, до четырёх кнопок `{label,action}`, label ≤32. enabledSetting ссылается на boolean. `items` — до восьми `{type,source,key,valueType,label}`. `source` — `setting` или собственный `storage`; `valueType` — `boolean`, `integer` или `text`, а `type` — `toggle` только для boolean либо `text` для остальных. Настройки проверяются по типу манифеста; storage-значение отображается только при совпадении фактического JSON-типа. Для чтения storage требуется разрешение `storage`. Текст ограничен 160 символами; нет выражений и подстановок.
-- theme: `{id,type:"theme",values,enabledSetting?}`, не более шести вкладов на плагин. values содержит только accent (#RRGGBB), covers (artwork/artist), coverRadius (целое 0–24); хотя бы одно поле. Изменять фон/цвета текста нельзя. Вклады одного плагина применяются в порядке манифеста; последний вклад с тем же свойством побеждает.
+- `panel`: `{id,type:"panel",slot,title,text?,buttons?,items?,enabledSetting?}`. Slots are listed above; title ≤48, text ≤1000; up to four `{label,action}` buttons, label ≤32. `enabledSetting` references a boolean. `items` allows up to eight `{type,source,key,valueType,label}` entries. `source` is `setting` or the plugin's own `storage`; `valueType` is `boolean`, `integer` or `text`; `type` is `toggle` for boolean only, or `text` otherwise. Settings are checked against manifest types; storage values are displayed only when the actual JSON type matches. Reading storage requires `storage` permission. Text is limited to 160 characters, with no expressions or substitution.
+- `theme`: `{id,type:"theme",values,enabledSetting?}`, at most six per plugin. `values` contains only `accent` (#RRGGBB), `covers` (artwork/artist), `coverRadius` (integer 0–24), with at least one field. Background and text colors cannot be changed. Contributions within one plugin apply in manifest order; the last value for a property wins.
 
-rules — до 16 `{id,event,conditions,actions}`. conditions — до четырёх `{field,equals}`; AND и точное сравнение типа/значения, пустой массив означает любое событие данного вида. actions — 1–4 команды. Нет шаблонов, циклов или вызова другого плагина. Начальная синхронизация хоста не запускает правил.
+`rules` allows up to 16 `{id,event,conditions,actions}` entries. `conditions` allows up to four `{field,equals}` entries, combined with AND and exact type/value comparison; an empty array matches any event of that kind. `actions` contains 1–4 commands. Templates, loops and calls to another plugin are unavailable. Initial host synchronization does not trigger rules.
 
-| Событие | Доступные поля conditions | Разрешение |
+| Event | Available condition fields | Permission |
 | --- | --- | --- |
 | player.trackChanged | urn/title/artist (string), durationMs (number) | player.observe |
 | player.playbackChanged | playing/buffering (bool) | player.observe |
-| player.progress | positionMs/durationMs (number), максимум раз в секунду | player.observe |
-| player.queueChanged | count/index (number); содержимое очереди не передаётся | player.observe |
-| timer.expired | timerId (string), только собственный таймер | timers |
+| player.progress | positionMs/durationMs (number), at most once per second | player.observe |
+| player.queueChanged | count/index (number); queue contents are not exposed | player.observe |
+| timer.expired | timerId (string), own timers only | timers |
 
-Полный внутренний sc.state никогда не передаётся пакету. События используются для условий правил; произвольных callback-функций и интерполяции полей событий в команды нет. Для каждого timerId в действиях необходимо правило timer.expired с условием equals этого ID.
+The full internal `sc.state` is never passed to a package. Events supply rule conditions; arbitrary callbacks and interpolation of event fields into commands are unavailable. Each `timerId` used in actions requires a `timer.expired` rule with an `equals` condition for that ID.
 
-## Команды
+## Commands
 
-| command | Аргументы кроме command | Полномочие |
+| command | Arguments besides command | Permission |
 | --- | --- | --- |
-| player.pause / resume / next / previous | Нет | player.control |
-| player.seek | positionMs: целое ≥0, ≤9007199254740991; хост ограничивает длительностью и проверяет seekable | player.control |
-| player.seekRelative | offsetMs: знаковое целое в пределах ±9007199254740991; хост проверяет seekable и текущую позицию, результат ограничивает длительностью | player.control |
-| player.volume | value: конечное число от 0 до 1; использует штатную модель громкости приложения | player.control |
+| player.pause / resume / next / previous | None | player.control |
+| player.seek | positionMs: integer ≥0, ≤9007199254740991; host clamps to duration and checks seekable | player.control |
+| player.seekRelative | offsetMs: signed integer within ±9007199254740991; host checks seekable and current position, then clamps the result to duration | player.control |
+| player.volume | value: finite number from 0 to 1; uses the app's built-in volume model | player.control |
 | player.repeat / shuffle | enabled: bool | player.control |
-| navigation.open | destination: likes/history/feed/playlists/profile/search; только кнопка | navigation |
-| timer.start | timerId, minutesSetting: ID integer-настройки с min≥1 и max≤180; только кнопка | timers |
+| navigation.open | destination: likes/history/feed/playlists/profile/search; buttons only | navigation |
+| timer.start | timerId, minutesSetting: integer setting ID with min≥1 and max≤180; buttons only | timers |
 | timer.cancel | timerId | timers |
-| storage.set | key (ID), value (литерал JSON) | storage |
+| storage.set | key (ID), value (JSON literal) | storage |
 | storage.remove | key (ID) | storage |
 
-Команды в правилах проходят те же проверки разрешений, активности и доступности. Кнопка передаёт только ID плагина, вклада и индекс кнопки: хост сам извлекает проверенную команду. Нет строкового invokeMethod из манифеста. Ошибки недоступного трека/seek показываются в карточке и возвращаются вызывающему UI.
+Rule commands undergo the same permission, activity and availability checks. A button passes only the plugin ID, contribution ID and button index; the host retrieves the validated command itself. Manifests cannot invoke methods by string. Unavailable track/seek errors appear in the card and are returned to the calling UI.
 
-storage — собственный key/value JSON: до 128 ключей и 256 КиБ вместе с orphanSettings, глубина ≤8. Значения литеральные, без подстановок данных плеера; это не программируемая база данных. Менеджер показывает данные и позволяет очистить их. Запись за пределами квоты отклоняется без изменения старых данных. Основные пользовательские настройки не требуют разрешения storage.
+`storage` is private key/value JSON: up to 128 keys and 256 KiB including `orphanSettings`, depth ≤8. Values are literal, with no player-data substitution; this is not a programmable database. The manager displays data and allows clearing it. Over-quota writes are rejected without changing old data. Basic user settings do not require storage permission.
 
-Новые команды и элементы панели распознаются только совместимыми версиями SCrip после выпуска обновления. Старый хост не получает поддержку автоматически от `requiresHost`: указывайте диапазон версии хоста, соответствующий фактически проверенной версии.
+New commands and panel items are recognized only by compatible SCrip releases after an update. `requiresHost` does not automatically add support to older hosts: specify the host version range actually tested.
 
-При выпуске сборки с новыми командами поднимайте версию приложения выше последней опубликованной версии и задавайте `requiresHost.min` не ниже этой новой версии. Плагины с командами, добавленными после 1.4.2, должны указывать минимум `1.5.0`. Отдельного номера реализации Plugin API в манифесте сейчас нет.
+When releasing a build with new commands, increase the app version beyond the last published release and set `requiresHost.min` to at least that new version. Plugins using commands added after 1.4.2 must require at least `1.5.0`. The manifest currently has no separate Plugin API implementation version.
 
-События обрабатываются через очередь: до 32 на плагин, progress схлопывается. До 8 действий за проход event loop, до 8 действий/секунду на плагин и 64 суммарно (фиксированное окно в 1 с). Переполнение и глубина причинной цепочки >4 приводят к error, снимают UI и таймеры. Для асинхронных сигналов плеера хост сохраняет причинную метку до 30 секунд; неизвестные внешние изменения могут консервативно получить эту метку. Это ограниченный механизм защиты от реактивных циклов, а не точная трассировка backend. Не проектируйте правила, которые бесконечно меняют состояние в ответ на собственные изменения.
+Events are queued: up to 32 per plugin, with progress events coalesced. Limits are eight actions per event-loop pass, eight actions/second per plugin and 64 overall (fixed one-second window). Overflow or causal-chain depth >4 causes `error` and removes UI and timers. For asynchronous player signals, the host retains a causal tag for up to 30 seconds; unknown external changes may conservatively receive that tag. This is a limited defense against reactive loops, rather than exact backend tracing. Do not design rules that endlessly change state in response to their own changes.
 
-## Фасад C++ / QML
+## C++ / QML facade
 
-Plugins публикует installed, panels, theme и error, сигнал changed. Установка и обновление выполняются через prepareInstall:
+`Plugins` exposes `installed`, `panels`, `theme`, `error` and the `changed` signal. Installation and updates use `prepareInstall`:
 
-1. prepareInstall(QUrl) возвращает `{operationId,error}`. Чтение и проверка JSON идут в worker, максимум два чтения на процесс.
-2. installPrepared сообщает тот же operationId, error либо plugin/permissions/changes/previousVersion/sha256. Только после этого показывать подтверждение.
-3. commitInstall(operationId, QStringList acceptedPermissions) проверяет точное совпадение разрешений и неизменность реестра; возвращает пустую строку при успехе. Предпросмотр одноразовый, срок 5 минут.
-4. cancelInstall(operationId) отменяет ожидание/предпросмотр. Уже блокирующее чтение внешнего Android provider нельзя принудительно прервать: оно не удерживает GUI, но слот worker освобождается лишь после возврата provider.
+1. `prepareInstall(QUrl)` returns `{operationId,error}`. JSON reading and validation run in a worker, with at most two reads per process.
+2. `installPrepared` reports the same operationId and either error or plugin/permissions/changes/previousVersion/sha256. Show confirmation only after this signal.
+3. `commitInstall(operationId, QStringList acceptedPermissions)` checks an exact permission match and unchanged registry; success returns an empty string. The preview is single-use and expires after five minutes.
+4. `cancelInstall(operationId)` cancels waiting/preview. An already-blocking external Android provider read cannot be forcibly interrupted: the GUI remains free, but the worker slot is released only when the provider returns.
 
-enable(id,bool), setPermission(id,name,bool), setSetting(id,key,value), remove(id,keepData=false), clearData(id) возвращают строку ошибки или пустую строку. dependents(id) возвращает транзитивный список. invokeButton(id,contributionId,index) проверяет сохранённый вклад и возвращает ошибку; commandFinished сообщает requestId/pluginId/ok/code/message. navigationRequested содержит только разрешённое destination. clearError очищает сообщения. C++ player adapter привязан в main.cpp, не доступен пакету.
+`enable(id,bool)`, `setPermission(id,name,bool)`, `setSetting(id,key,value)`, `remove(id,keepData=false)` and `clearData(id)` return an error string or an empty string. `dependents(id)` returns a transitive list. `invokeButton(id,contributionId,index)` validates the stored contribution and returns an error; `commandFinished` reports requestId/pluginId/ok/code/message. `navigationRequested` contains only an allowed destination. `clearError` clears messages. The C++ player adapter is bound in `main.cpp` and is unavailable to packages.
 
-installed содержит plugin, enabled (намерение пользователя), status/reason, version, grants, permissionRows, settings/settingRows, data/orphanSettings, themeStatus, timers и lastError/log (до 20 сообщений в памяти). Состояния: disabled, awaiting-permissions, blocked, active, error, removed. Ошибка лимитов сбрасывается только явным отключением/включением. enabled=true не означает active.
+`installed` contains plugin, enabled (user intent), status/reason, version, grants, permissionRows, settings/settingRows, data/orphanSettings, themeStatus, timers and lastError/log (up to 20 messages in memory). States: disabled, awaiting-permissions, blocked, active, error, removed. Quota errors reset only after explicitly disabling/re-enabling. `enabled=true` does not mean active.
 
-## Хранение и ограничения проверки
+## Storage and validation limits
 
-plugins.json находится в AppDataLocation. Манифесты копируются внутрь, исходник можно переместить. QSaveFile сохраняет кандидат атомарно до изменения состояния в памяти; лимит реестра 16 МиБ, 24 записи вместе с сохранёнными конфигурациями. QLockFile и SHA-256 текущего реестра предотвращают перезапись изменений другого экземпляра: при конфликте требуется перезапуск. Запись настроек/данных синхронна; лимиты ограничивают её объём, но производительность на медленном накопителе отдельно не измерялась.
+`plugins.json` resides in AppDataLocation. Manifests are copied into it, so the source file can be moved. QSaveFile commits the candidate atomically before changing memory state; the registry limit is 16 MiB and 24 entries including retained configurations. QLockFile and the current registry's SHA-256 prevent overwriting another instance's changes; conflicts require a restart. Setting/data writes are synchronous; quotas bound their size, but performance on slow storage has not been measured separately.
 
-При отсутствии plugins.json объединяются существующие plugins-v1.json и plugins-v2.json: порядок текущего реестра сохраняется, а остальные записи добавляются вслед за ним. Исходники остаются на месте, рядом атомарно создаются побайтовые резервные копии. Группы прежнего формата превращаются в отдельные настройки и вклады. Повреждённый источник или дубликат ID с отличающимся состоянием блокирует миграцию без записи нового файла.
+When `plugins.json` is absent, existing `plugins-v1.json` and `plugins-v2.json` are merged: current registry order is retained and other entries are appended. Originals remain in place, with byte-for-byte backups created atomically alongside them. Older groups become separate settings and contributions. A corrupt source or duplicate ID with different state blocks migration without writing a new file.
 
-Desktop принимает локальные file:// без удалённого host. Android дополнительно принимает content:// из системного picker и читает QFile по исходному URI без QFileInfo/isLocalFile-проверки; неизвестный размер ограничивается фактическим чтением 128 КиБ + 1 байт. URI/grant не сохраняется. Отмена не останавливает зависший ContentProvider и может задержать завершение процесса, если ОС не вернёт чтение; число таких работ ограничено двумя. Android provider, отзыв grant и неизвестная длина требуют проверки на устройстве; desktop QML-тест этого не заменяет.
+Desktop accepts local `file://` URLs without a remote host. Android additionally accepts `content://` from the system picker and reads QFile using the original URI without QFileInfo/isLocalFile checks. Unknown size is bounded by reading at most 128 KiB + 1 byte. URI/grant is not retained. Canceling does not stop a stalled ContentProvider and may delay process exit if the OS never returns the read; at most two such jobs are allowed. Android providers, grant revocation and unknown lengths require device testing; desktop QML tests do not replace it.
 
-Нет автоматической проверки обновлений плагинов, магазина, подписей издателя, исполняемого runtime, точного фонового будильника и скриптов миграции. Это явные ограничения, а не скрытые заглушки. Тесты и фактически выполненные сборки перечислены в [статусе разработки](development-progress.md).
+There is no automatic plugin update checking, store, publisher signing, executable runtime, precise background alarm or migration scripting. These are explicit limitations. Tests and completed builds are listed in [development progress](development-progress.md).

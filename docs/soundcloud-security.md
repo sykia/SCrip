@@ -1,141 +1,64 @@
-# Подключение SoundCloud и хранение данных
+# SoundCloud integration and data storage
 
-## Личный локальный режим
+## Personal local mode
 
-При `SCRIP_AUTH_MODE=local` SCrip обращается к официальному API SoundCloud напрямую. Это режим для владельца
-зарегистрированного приложения, использующего свои ключи на своём компьютере.
-Секреты не встроены в исходники, QML или исполняемый файл.
+With `SCRIP_AUTH_MODE=local`, SCrip calls the official SoundCloud API directly. This mode is for the owner of a registered application using their own keys on their own computer. Secrets are not embedded in source code, QML or the executable.
 
-OAuth access/refresh tokens, время истечения и локальный Client Secret хранятся
-только через внутренний `SecretStore`, недоступный QML и Plugin API:
+OAuth access/refresh tokens, expiry time and the local Client Secret are stored only through the internal `SecretStore`, which is inaccessible to QML and the Plugin API:
 
-- **Windows:** DPAPI `CryptProtectData` в контексте текущего пользователя, без
-  `CRYPTPROTECT_LOCAL_MACHINE`. Атомарно сохраняется только зашифрованный blob в
-  `QStandardPaths::AppLocalDataLocation/auth/*.dpapi`; доступ наследует ACL профиля.
-- **Linux:** Secret Service через системную libsecret (зависимость `libsecret-1`).
-  Для сборки нужны pkg-config и заголовки libsecret (Debian/Ubuntu: `libsecret-1-dev`;
-  Arch: `libsecret`). Нужен работающий и разблокированный сервис, например GNOME Keyring или совместимый
-  KWallet. Ожидание каждой операции ограничено 10 секундами с отменой через GCancellable.
-  Шифрование связки на диске и её резервных копий определяется настройками
-  системного сервиса: используйте защищённую паролем связку.
-- **Android (API 28+):** AES-256-GCM с новым случайным IV при каждой записи;
-  ключ создаётся в Android Keystore и не экспортируется. Имя записи включено в AAD.
-  Зашифрованные файлы атомарно сохраняются в приватном `noBackupFilesDir/oauth`.
-  Аппаратная защита ключа зависит от устройства; StrongBox не является обязательным.
+- **Windows:** DPAPI `CryptProtectData` in the current user's context, without `CRYPTPROTECT_LOCAL_MACHINE`. Only an encrypted blob is saved atomically in `QStandardPaths::AppLocalDataLocation/auth/*.dpapi`; access inherits the profile ACL.
+- **Linux:** Secret Service through system libsecret (`libsecret-1` dependency). Building requires pkg-config and libsecret headers (Debian/Ubuntu: `libsecret-1-dev`; Arch: `libsecret`). A running, unlocked service such as GNOME Keyring or compatible KWallet is required. Each operation has a 10-second timeout with GCancellable cancellation. On-disk and backup keyring encryption depends on system service settings: use a password-protected keyring.
+- **Android (API 28+):** AES-256-GCM with a new random IV for every write; the key is created in Android Keystore and is non-exportable. The entry name is included in AAD. Encrypted files are saved atomically in private `noBackupFilesDir/oauth`. Hardware-backed key protection depends on the device; StrongBox is not required.
 
-При первом запуске старые `GenericConfigLocation/SCrip/soundcloud.json` и
-`session.json` автоматически переносятся целиком, включая существующую сессию.
-На Android это приватный `files/settings/SCrip`, на Linux обычно `~/.config/SCrip`.
-Каждая запись удаляется из старого места только после успешной записи и проверки
-обратным чтением. При прерывании после записи системная копия имеет приоритет;
-повторный запуск завершает удаление старой. Повреждённые JSON и символьные ссылки
-не мигрируются. Ошибка чтения, записи, проверки или удаления показывается пользователю
-без системных подробностей и значений секретов. Открытого JSON fallback нет.
-Если перенос не завершился, старые файлы могут оставаться на диске: не включайте
-их в архивы. После разблокировки хранилища перезапустите SCrip.
+On first launch, old `GenericConfigLocation/SCrip/soundcloud.json` and `session.json` files are migrated in full, including an existing session. On Android this is private `files/settings/SCrip`; on Linux, usually `~/.config/SCrip`. Each entry is removed from its old location only after a successful write and read-back verification. If interrupted after writing, the system copy takes precedence and the next launch finishes deleting the old one. Corrupt JSON and symbolic links are not migrated. Read, write, verification or deletion failures are shown without system details or secret values. There is no plaintext JSON fallback. Incomplete migration may leave old files on disk: exclude them from archives. Restart SCrip after unlocking storage.
 
-Обновлённый OAuth-токен подтверждается хранилищем до продолжения API-запросов.
-При ошибке сохранения авторизация останавливается с сообщением; новая сессия не
-объявляется сохранённой. Если сервер уже ротировал refresh token, а запись не
-удалась, после перезапуска может понадобиться повторный вход. Транзакция с OAuth-
-сервером и локальным хранилищем не может быть атомарной.
-Выход удаляет сессию из системного хранилища и памяти; ошибка удаления не скрывается.
-Локальные параметры приложения SoundCloud сохраняются отдельно от сессии.
-Настройки, библиотека и данные плагинов не мигрируются и не удаляются.
+Refreshed OAuth tokens must be confirmed by storage before API requests continue. Save failures stop authorization with a message; the new session is not reported as saved. If the server has already rotated the refresh token but saving fails, signing in again may be necessary after restart. Transactions across the OAuth server and local storage cannot be atomic.
 
-Android Backup и перенос между устройствами исключают старый каталог OAuth через
-`fullBackupContent` и `dataExtractionRules`; `noBackupFilesDir` исключён системой.
-Остальные настройки и данные плагинов сохраняют прежние правила резервного копирования.
-Уже существующие внешние резервные копии приложение удалить не может.
-В резервных копиях Windows остаётся только DPAPI blob; защита полного профиля и
-системных хранилищ Windows/Linux определяется политикой ОС и программы backup.
-Защита не распространяется на вредоносный процесс с правами пользователя или root.
+Logout removes the session from system storage and memory; deletion errors are not hidden. Local SoundCloud application parameters are retained separately from the session. Settings, library and plugin data are neither migrated nor deleted.
 
-Плагины v1/v2 остаются декларативными, без исполнения JavaScript, произвольных
-файловых/сетевых операций или доступа к OAuth. Внутренний снимок плеера содержит
-только разрешённые поля API; профиль, URL потоков и произвольные поля ответа API
-не передаются плагинам. Тела ошибок OAuth/API и исключения хранилища не выводятся
-в сообщения и журналы. TLS, HTTPS allowlist и ограничения перенаправлений сохранены.
+Android Backup and device transfer exclude the old OAuth directory through `fullBackupContent` and `dataExtractionRules`; `noBackupFilesDir` is excluded by the system. Other settings and plugin data retain their previous backup rules. The app cannot delete existing external backups. Windows backups retain only the DPAPI blob; protection of the complete profile and Windows/Linux system stores depends on OS and backup policies. Protection does not cover malicious processes running as the user or root.
 
-Документация системных механизмов:
-[DPAPI](https://learn.microsoft.com/en-us/windows/win32/SecCrypto/example-c-program-using-cryptprotectdata),
-[libsecret](https://gnome.pages.gitlab.gnome.org/libsecret/),
-[Android Keystore](https://developer.android.com/privacy-and-security/keystore),
-[Android Backup](https://developer.android.com/identity/data/autobackup).
+Plugins v1/v2 remain declarative, without JavaScript execution, arbitrary file/network operations or OAuth access. The internal player snapshot contains only allowed API fields; profiles, stream URLs and arbitrary API response fields are not exposed to plugins. OAuth/API error bodies and storage exceptions are excluded from messages and logs. TLS, HTTPS allowlists and redirect restrictions remain in place.
 
-Переменные `SOUNDCLOUD_CLIENT_ID` и `SOUNDCLOUD_CLIENT_SECRET` имеют приоритет
-над сохранёнными параметрами. При использовании переменных окружения меняйте их вне приложения.
-Экран входа и настройки не показывают ключи. Интерфейс получает только признак готовности подключения.
-Настройка громкости и вида медиатеки не содержит секретов и сохраняется в QSettings.
+System mechanism documentation: [DPAPI](https://learn.microsoft.com/en-us/windows/win32/SecCrypto/example-c-program-using-cryptprotectdata), [libsecret](https://gnome.pages.gitlab.gnome.org/libsecret/), [Android Keystore](https://developer.android.com/privacy-and-security/keystore), [Android Backup](https://developer.android.com/identity/data/autobackup).
 
-## Вход
+`SOUNDCLOUD_CLIENT_ID` and `SOUNDCLOUD_CLIENT_SECRET` override saved parameters. When using environment variables, change them outside the app. Sign-in and settings screens do not display keys. The interface receives only a connection-readiness flag. Volume and library appearance settings contain no secrets and are saved in QSettings.
 
-- Authorization Code + PKCE S256; verifier и state генерируются системным RNG.
-- Слушатель доступен только на loopback `127.0.0.1`, не на сетевых интерфейсах.
-- Проверяются путь `/callback` и непустой state текущей попытки.
-- Ожидание ограничено десятью минутами, есть отмена. Код не попадает в журнал.
-- В локальном режиме обмен кода и обновление токена идут только на `secure.soundcloud.com` по HTTPS.
-- API-запросы идут только на `api.soundcloud.com`; `next_href` проверяется.
-- Обновление сериализовано: одноразовый refresh token не расходуется параллельно.
-- Запоздалые ответы поиска и старой сессии не заменяют новые результаты.
-- OAuth-заголовок не передаётся аудио-CDN: плеер получает подписанный HTTPS URL.
-- `/disconnect` отзывает доступ приложения, не завершает браузерную сессию SoundCloud.
+## Sign-in
 
-Официальный экран открывается в обычном браузере, а не в Qt WebView: это позволяет
-использовать предусмотренные SoundCloud способы входа, включая Google без обхода
-ограничений Google на встроенные user-agent.
+- Authorization Code + PKCE S256; verifier and state are generated using the system RNG.
+- The listener binds only to loopback `127.0.0.1`, not network interfaces.
+- The `/callback` path and nonempty state for the current attempt are checked.
+- Waiting is limited to ten minutes and can be canceled. Codes are not logged.
+- In local mode, code exchange and token refresh use only `secure.soundcloud.com` over HTTPS.
+- API requests use only `api.soundcloud.com`; `next_href` is validated.
+- Refresh is serialized so a single-use refresh token is not consumed concurrently.
+- Late search and old-session responses cannot replace newer results.
+- OAuth headers are not forwarded to audio CDNs: the player receives a signed HTTPS URL.
+- `/disconnect` revokes app access without ending the SoundCloud browser session.
 
-## Загрузка обложек
+The official page opens in a regular browser rather than Qt WebView. This allows SoundCloud's supported sign-in methods, including Google, without bypassing Google's restrictions on embedded user agents.
 
-На текущей сети системное разрешение `i1.sndcdn.com` возвращало недоступный узел.
-Для изображений клиент запрашивает DNS-запись этого публичного имени через
-Cloudflare DNS-over-HTTPS и использует официальный CNAME в `.cloudfront.net`.
-Системные DNS-настройки не меняются. Проверка сертификата CDN остаётся включённой;
-OAuth-токены и ключи не передаются ни DNS-службе, ни серверу изображений.
-Если DNS-over-HTTPS недоступен, остаётся обычный адрес SoundCloud. Запросы имеют
-ограниченное время ожидания. Это отдельный транспорт QML-изображений, не API.
+## Artwork loading
 
-## Публичная версия
+On the network used during testing, system resolution of `i1.sndcdn.com` returned an unreachable node. For images, the client queries the public name through Cloudflare DNS-over-HTTPS and uses its official `.cloudfront.net` CNAME. System DNS settings are unchanged. CDN certificate verification remains enabled; OAuth tokens and keys are sent to neither the DNS service nor the image server. If DNS-over-HTTPS is unavailable, the regular SoundCloud address remains the fallback. Requests have bounded timeouts. This is a separate QML image transport, not the API transport.
 
-По умолчанию клиент отправляет код с PKCE verifier или refresh token по HTTPS
-на `scrip-auth.scrip-desktop-aca3d9.workers.dev/oauth/token`. Worker подставляет
-учётные данные приложения и обращается к фиксированному endpoint SoundCloud.
-Адрес возврата фиксирован на `http://127.0.0.1:43821/callback`. Сессия хранится
-на компьютере пользователя. Worker ограничивает частоту обмена по IP и
-не предоставляет гостевых токенов. Профиль, коллекция и музыка идут напрямую.
+## Public version
 
-Исходники и конфигурация находятся в `worker/`. Для повторной публикации
-выполните `npx wrangler@4 deploy -c worker/wrangler.jsonc`. Существующие секреты
-сохраняются. После ротации ключа в SoundCloud задайте новое значение командой
-`npx wrangler@4 secret put CLIENT_SECRET -c worker/wrangler.jsonc`.
-Маршрут `GET /health` проверяет доступность Worker и наличие его секретов.
+By default, the client sends the code with its PKCE verifier or refresh token over HTTPS to `scrip-auth.scrip-desktop-aca3d9.workers.dev/oauth/token`. The Worker supplies application credentials and calls a fixed SoundCloud endpoint. The redirect URI is fixed to `http://127.0.0.1:43821/callback`. The session is stored on the user's computer. The Worker rate-limits exchanges by IP and provides no guest tokens. Profiles, collections and music are fetched directly.
 
-## Репозиторий
+Source and configuration are in `worker/`. To redeploy, run `npx wrangler@4 deploy -c worker/wrangler.jsonc`. Existing secrets are retained. After rotating the SoundCloud key, set the new value with `npx wrangler@4 secret put CLIENT_SECRET -c worker/wrangler.jsonc`. `GET /health` checks Worker availability and presence of its secrets.
 
-`.gitignore` исключает `build/`, `.env`, ключи и каталоги секретов. После создания
-Git-репозитория можно включить hook: `git config core.hooksPath .githooks`.
-`scripts/check_secrets.py` проверяет индекс Git и не печатает найденные значения.
-Это вспомогательная проверка, а не защита произвольных изображений и истории.
+## Repository
 
-## Проверки этапа защиты хранилища
+`.gitignore` excludes `build/`, `.env`, keys and secret directories. After creating a Git repository, enable the hook with `git config core.hooksPath .githooks`. `scripts/check_secrets.py` checks the Git index without printing detected values. This is a supporting check, not protection for arbitrary images or history.
 
-`cmake --build --preset debug` и `ctest --test-dir build/debug --output-on-failure`
-проверяют OAuth, миграцию, сбои чтения/записи/проверки/удаления, восстановление сессии,
-неразглашение секретов в состоянии/ошибках и совместимость плагинов.
-Тесты используют подмену хранилища через C++-конструктор; рабочего переключателя
-на незашифрованное тестовое хранилище нет.
+## Secure storage stage validation
 
-`tests/run-secretstore-linux.sh` проверяет настоящий libsecret в изолированной
-D-Bus-сессии и связке GNOME Keyring, а также отказ недоступного сервиса.
-Нужны `dbus-run-session` и `gnome-keyring-daemon`. Пользовательская связка не затрагивается.
-`secretstore_tests roundTrip` также можно вручную запустить на Windows.
+`cmake --build --preset debug` and `ctest --test-dir build/debug --output-on-failure` check OAuth, migration, read/write/verification/deletion failures, session restoration, secret non-disclosure in state/errors and plugin compatibility. Tests inject storage through the C++ constructor; there is no production switch to an unencrypted test store.
 
-`tests/run-secretstore-android.sh` запускает `tests/android/SecretVaultCheck.java` — instrumentation для отдельного тестового
-приложения/UID: запись/чтение, разные IV, отсутствие открытого секрета в файле,
-отказ при подмене ciphertext или утрате ключа, удаление и запрет обхода пути.
-Эта проверка не использует данные установленного SCrip.
+`tests/run-secretstore-linux.sh` checks real libsecret in an isolated D-Bus session and GNOME Keyring, plus failure when the service is unavailable. Requires `dbus-run-session` and `gnome-keyring-daemon`. The user's keyring is untouched. `secretstore_tests roundTrip` can also be run manually on Windows.
 
-Для Android задайте `ANDROID_HOME`, `JAVA_HOME`, при необходимости `GRADLE_USER_HOME`
-и `SCRIP_GRADLE` (путь к существующему Gradle/gradlew). Запустите тестовый эмулятор
-и выполните `tests/run-secretstore-android.sh`. Сборка тестового APK выполняется
-офлайн из имеющегося кеша. Это отдельное приложение `org.scrip.vaulttest`, не SCrip.
+`tests/run-secretstore-android.sh` runs `tests/android/SecretVaultCheck.java` instrumentation in a separate test app/UID: write/read, distinct IVs, no plaintext secrets in files, rejection of ciphertext tampering or key loss, deletion and path traversal prevention. It does not use installed SCrip data.
+
+For Android, set `ANDROID_HOME`, `JAVA_HOME` and, if necessary, `GRADLE_USER_HOME` and `SCRIP_GRADLE` (path to an existing Gradle/gradlew). Start a test emulator and run `tests/run-secretstore-android.sh`. The test APK builds offline from the existing cache. It is a separate `org.scrip.vaulttest` app, not SCrip.

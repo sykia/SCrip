@@ -1,21 +1,21 @@
-# Плагины SCrip
+# SCrip plugins
 
-SCrip поддерживает декларативные JSON-плагины. Приложение само отображает панели и обрабатывает команды, перечисленные в манифесте. QML, JavaScript, библиотеки, процессы, произвольные URL и файлы плагина не исполняются.
+SCrip supports declarative JSON plugins. The application renders panels and handles the commands listed in each manifest. Plugin QML, JavaScript, libraries, processes, arbitrary URLs and files are not executed.
 
-Для установки выберите файл JSON в разделе «Плагины», проверьте запрошенные разрешения и подтвердите установку. Новый плагин устанавливается выключенным. Настройки и каждое разрешение можно изменить в его карточке; оформление из разных вкладов применяется в порядке установки, а независимые вклады можно переключать отдельно.
+To install a plugin, select its JSON file in **Plugins**, review the requested permissions and confirm installation. New plugins are disabled by default. Settings and individual permissions can be changed in the plugin card. Appearance contributions are applied in installation order, and independent contributions can be toggled separately.
 
-## Структура манифеста
+## Manifest structure
 
-Обязательные поля: `api: 2`, `kind: "declarative"`, `id`, `name`, `version`, `requiresHost`, `permissions`, `settings`, `contributions`, `rules`. Поле `description` и массив `dependencies` необязательны. Смотрите готовые файлы в [каталоге примеров](../examples/plugins) и точные ограничения в [справочнике API](plugin-api-v2-reference.md).
+Required fields: `api: 2`, `kind: "declarative"`, `id`, `name`, `version`, `requiresHost`, `permissions`, `settings`, `contributions`, `rules`. The `description` field and `dependencies` array are optional. See the [examples directory](../examples/plugins) for complete files and the [API reference](plugin-api-v2-reference.md) for exact limits.
 
-Вклады `theme` задают акцент, вид обложек и радиус. Вклады `panel` создают блоки на главной странице, в профиле или панели плеера. Настройка boolean может управлять каждым вкладом отдельно. Кнопки вызывают только команды, разрешённые манифестом и подтверждённые пользователем.
+`theme` contributions define the accent, artwork style and corner radius. `panel` contributions create sections on Home, profiles or the player panel. A boolean setting can control each contribution independently. Buttons invoke only commands allowed by the manifest and approved by the user.
 
-## Обновление и хранение
+## Updates and storage
 
-Обновление выполняется из JSON-файла. Настройки сохраняются по стабильным ID, совместимые разрешения остаются выданными, данные плагина сохраняются. Если плагин удалён с сохранением конфигурации, его можно установить обратно с тем же ID.
+Updates are installed from JSON files. Settings are retained by stable IDs, compatible permissions remain granted, and plugin data is preserved. A plugin removed with its configuration retained can be reinstalled with the same ID.
 
-Реестр находится в `plugins.json` внутри каталога данных приложения. Он сохраняется атомарно, защищён блокировкой от одновременного изменения и ограничен 16 МиБ и 24 записями. При первом запуске новые данные переносятся из прежних файлов реестра в `plugins.json`; исходники не удаляются, а рядом создаются резервные копии. Для прежних групп оформления создаются отдельные переключатели настроек.
+The registry is stored in `plugins.json` in the application data directory. Saves are atomic, concurrent changes are protected by a lock, and the registry is limited to 16 MiB and 24 entries. On first launch, data from older registries is migrated to `plugins.json`; original files are retained and backups are created alongside them. Older appearance groups receive separate setting toggles.
 
-## Граница доступа
+## Access boundary
 
-Манифесты строго проверяются до установки. Действуют лимиты размера, глубины JSON, настроек, вкладов, правил, зависимостей, данных и числа команд. Плагин получает только перечисленные разрешения и не имеет доступа к объектам SoundCloud, токенам, сетевому клиенту или произвольной файловой системе.
+Manifests are strictly validated before installation. Limits apply to size, JSON depth, settings, contributions, rules, dependencies, data and command counts. Plugins receive only the listed permissions and cannot access SoundCloud objects, tokens, the network client or arbitrary filesystem locations.

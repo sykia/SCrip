@@ -1,13 +1,13 @@
-# Проверка фоновой службы Android
+# Android background service checks
 
-После сборки `bash scripts/build_android.sh` запустите отдельный эмулятор Android 15 и выполните из корня проекта:
+After building with `bash scripts/build_android.sh`, start a separate Android 15 emulator and run from the project root:
 
 ```bash
 bash tests/android/run_lifecycle.sh
 ```
 
-Используются SDK Build Tools 35.0.0 и Android SDK 35. При необходимости задайте `JAVA_HOME`, `ANDROID_SDK_ROOT`, `GRADLE_USER_HOME`, `ANDROID_SERIAL` (только эмулятор).
+Requires SDK Build Tools 35.0.0 and Android SDK 35. Set `JAVA_HOME`, `ANDROID_SDK_ROOT`, `GRADLE_USER_HOME` and `ANDROID_SERIAL` (emulator only) as needed.
 
-Тест устанавливает отдельные пакеты `org.scrip.lifecycle` и `org.scrip.lifecycletest`, не заменяя пользовательское приложение. Проверяет настоящие Java-мост, foreground-службу, wake lock и MediaSession по синтетическим снимкам Qt-плеера: воспроизведение, уход приложения в фон, переход между треками, буферизация дольше 30 секунд, пауза, продолжение и полная остановка. Отдельно проверяется отмена подготовки до создания службы, чтобы исключить падение по тайм-ауту startForegroundService. Для пакетов создаётся отдельный тестовый ключ в `build/android-lifecycle/`.
+The test installs separate `org.scrip.lifecycle` and `org.scrip.lifecycletest` packages without replacing the user's app. It checks the real Java bridge, foreground service, wake lock and MediaSession using synthetic Qt player snapshots: playback, backgrounding, track transitions, buffering beyond 30 seconds, pause, resume and full stop. It also checks preparation cancellation before service creation to rule out a startForegroundService timeout crash. A separate test signing key is created in `build/android-lifecycle/`.
 
-Перед тестом в эмуляторе не должно быть пакетов `org.scrip.lifecycle` и `org.scrip.lifecycletest` с другим ключом подписи. Тест не удаляет их автоматически. Воспроизведение реальных потоков и прошивку телефона проверяют отдельно.
+Before testing, the emulator must not contain `org.scrip.lifecycle` or `org.scrip.lifecycletest` packages signed with another key. The test does not remove them automatically. Real stream playback and phone firmware require separate checks.

@@ -1,58 +1,58 @@
-# Сторонние компоненты и состояние проверки
+# Third-party components and review status
 
-Лицензия SCrip применяется к собственным материалам проекта. Права на зависимости и пользовательский контент сохраняются у их правообладателей. Этот документ — начальный перечень и выявленные ограничения, а не полный комплект лицензий или подтверждение соответствия релиза.
+SCrip's license applies to the project's own materials. Rights to dependencies and user content remain with their respective holders. This document is an initial inventory and record of known limitations, rather than a complete license bundle or confirmation of release compliance.
 
 ## Qt
 
-Используются Qt Core, GUI, Widgets (на компьютере), QML, Quick, Network и Multimedia. Конкретные модули и включённые в них сторонние компоненты имеют собственные лицензии. Для применимых модулей возможна LGPLv3 при выполнении её условий; отдельные компоненты Qt могут требовать GPL или коммерческой лицензии.
+SCrip uses Qt Core, GUI, Widgets (desktop), QML, Quick, Network and Multimedia. Individual modules and their bundled third-party components have their own licenses. Applicable modules may be used under LGPLv3 if its conditions are met; some Qt components may require GPL or a commercial license.
 
-Для распространения по LGPL требуются тексты лицензий и уведомления, соответствующий исходный код библиотек либо надлежащее предложение его предоставления, а также возможность заменить библиотеки и запустить повторно связанное приложение. На Android необходимо учитывать пересборку и подпись APK. Динамическое связывание само по себе не выполняет все условия.
+LGPL distribution requires license texts and notices, corresponding library sources or an appropriate offer to provide them, and the ability to replace libraries and run the relinked application. Android also requires consideration of APK rebuilding and signing. Dynamic linking alone does not satisfy every condition.
 
 - https://www.qt.io/development/open-source-lgpl-obligations
 - https://doc.qt.io/qt-6/licenses-used-in-qt.html
 
-## FFmpeg — выявленное ограничение Windows 1.3.0
+## FFmpeg — identified Windows 1.3.0 limitation
 
-При проверке `build/windows-installer/payload/avutil-61.dll`, включённой в опубликованный установщик 1.3.0, обнаружены `--enable-gpl`, `--enable-version3` и строка `libavutil license: GPL version 3 or later`.
+Inspection of `build/windows-installer/payload/avutil-61.dll`, included in the published 1.3.0 installer, found `--enable-gpl`, `--enable-version3` and the string `libavutil license: GPL version 3 or later`.
 
-SCrip теперь распространяется под GNU GPLv3, что устраняет прежнее противоречие с GPLv3-компонентами FFmpeg на уровне лицензии собственного кода.
+SCrip is now distributed under GNU GPLv3, resolving the earlier conflict with GPLv3 FFmpeg components at the level of the project's own code license.
 
-Однако необходимо дополнительно проверить совместимость остальных зависимостей и выполнить требования GPL по предоставлению исходного кода, лицензионных уведомлений и материалов, необходимых для сборки. Изменение LICENSE само по себе не подтверждает соответствие ранее опубликованных сборок.
+Compatibility of other dependencies and GPL requirements for sources, license notices and build materials still require verification. Changing LICENSE alone does not confirm compliance of previously published builds.
 
 - https://ffmpeg.org/legal.html
 
-## Другие зависимости
+## Other dependencies
 
-Linux использует системную libsecret (LGPL-2.1-or-later) для Secret Service; библиотека динамически связывается и не встраивается в пакет SCrip. Исходники и лицензия: https://gitlab.gnome.org/GNOME/libsecret.
+Linux uses system libsecret (LGPL-2.1-or-later) for Secret Service; it is dynamically linked and is not bundled in the SCrip package. Source and license: https://gitlab.gnome.org/GNOME/libsecret.
 
-Android включает OpenSSL из android_openssl. Для OpenSSL 3 применяется Apache License 2.0, при этом нужно проверить точные версии и дополнительные материалы используемой сборки. Установщик Windows также содержит транзитивные библиотеки из комплекта MSYS2; часть текстов находится в каталоге `licenses` установленного приложения. Наличие этого каталога не заменяет проверки полноты уведомлений и предоставления исходников по применимым лицензиям.
+Android includes OpenSSL from android_openssl. OpenSSL 3 uses Apache License 2.0; exact versions and additional materials for the selected build must be checked. The Windows installer also contains transitive MSYS2 libraries; some license texts are in the installed application's `licenses` directory. That directory does not replace checking notice completeness and providing sources under applicable licenses.
 
-Перед следующим выпуском необходим полный перечень реально поставляемых библиотек, тексты их лицензий, соответствующие исходники/предложения и инструкции по замене LGPL-библиотек. Для Linux отдельно различайте системные зависимости и библиотеки, которые поставляются непосредственно в пакете.
+Before the next release, a complete inventory of actually shipped libraries, license texts, corresponding sources/offers and LGPL library replacement instructions is required. On Linux, distinguish system dependencies from libraries shipped directly in the package.
 
-## SoundCloud и контент
+## SoundCloud and content
 
-SCrip — независимый клиент. Название SoundCloud и связанные обозначения принадлежат их правообладателям; аудио, обложки, аватары и другие материалы пользователей не покрываются лицензией SCrip. Их отображение на скриншотах не означает передачи прав.
+SCrip is an independent client. The SoundCloud name and related identifiers belong to their respective holders; user audio, artwork, avatars and other materials are not covered by SCrip's license. Their appearance in screenshots does not transfer rights.
 
-Условия API требуют, среди прочего, соблюдения правил атрибуции, обработки данных и наличия политики конфиденциальности. Они также ограничивают альтернативные сервисы прослушивания. Соответствие конкретной функциональности и объём выданного разрешения требуют отдельной проверки; лицензия SCrip не является согласием SoundCloud.
+API terms require, among other things, attribution, data handling rules and a privacy policy. They also restrict alternative listening services. Compliance of specific functionality and the scope of granted permission require separate review; SCrip's license is not SoundCloud's consent.
 
 - https://developers.soundcloud.com/docs/api/terms-of-use
 
-## Аудит 7 ноября 2026: GPL-3.0-only
+## November 7, 2026 audit: GPL-3.0-only
 
-Сохранён выбор автора GPL-3.0-only. GPLv3 FFmpeg совместима с этой лицензией; замена кодеков или отключение функций не требуется. OpenSSL 3 под Apache-2.0 совместим с GPLv3 (https://www.apache.org/licenses/GPL-compatibility). LGPLv2.1-or-later/LGPLv3 и GPLv3-варианты основных модулей Qt также допускают GPLv3-приложение. Это вывод о названных лицензиях, а не сертификат всего установщика.
+The author's GPL-3.0-only choice is retained. GPLv3 FFmpeg is compatible with this license; replacing codecs or disabling features is unnecessary. OpenSSL 3 under Apache-2.0 is compatible with GPLv3 (https://www.apache.org/licenses/GPL-compatibility). LGPLv2.1-or-later/LGPLv3 and GPLv3 options for core Qt modules also permit a GPLv3 application. This conclusion concerns the named licenses, rather than certification of the entire installer.
 
-Фактический локальный Windows payload содержит 199 DLL, включая плагины; APK содержит 285 native `.so` и один DEX. Системные зависимости DEB/Arch перечислены в packaging/linux/control и PKGBUILD; они отличаются от библиотек, вложенных в EXE/APK. Android включает Java-код Qt, AndroidX Core и транзитивные зависимости: их нельзя игнорировать при учёте DEX.
+The actual local Windows payload contains 199 DLLs, including plugins; the APK contains 285 native `.so` files and one DEX. DEB/Arch system dependencies are listed in packaging/linux/control and PKGBUILD; they differ from libraries bundled in EXE/APK packages. Android includes Qt Java code, AndroidX Core and transitive dependencies, which must be accounted for in DEX analysis.
 
-Полная пофайловая атрибуция 199 DLL и 285 SO, зависимости DEX, точные исходники с патчами и инструкциями сборки пока **не подтверждены**. Наличие каталога licenses MSYS2 или upstream-ссылок не заменяет соответствующие исходники. Статус релиза 1.3.0: соответствие требованиям предоставления исходников и уведомлений не подтверждено. Старые пакеты не заменены и не объявлены исправленными.
+Complete per-file attribution for the 199 DLLs and 285 SOs, DEX dependencies, and exact sources with patches and build instructions are **not yet confirmed**. An MSYS2 licenses directory or upstream links do not replace corresponding sources. Release 1.3.0 status: source and notice provision compliance is unconfirmed. Older packages have not been replaced or declared corrected.
 
-Добавлены распаковка фактических релизных пакетов, привязка манифеста к SHA-256 релизного файла, проверка точного состава, SHA-256 файлов, локальных исходников и включения уведомлений, отрицательные тесты и CI. CI требует отдельные материалы для каждой платформы и не пропускает их отсутствие. Это контроль наличия и целостности, а не автоматическое доказательство юридической совместимости или воспроизводимости. Формат: licensing/README.md.
+Added extraction of actual release packages, binding manifests to release-file SHA-256, exact inventory checks, file SHA-256 checks, local source and bundled notice checks, negative tests and CI. CI requires separate materials per platform and fails when they are missing. This checks presence and integrity, rather than automatically proving legal compatibility or reproducibility. Format: licensing/README.md.
 
-## Выпуск 1.4.0
+## Release 1.4.0
 
-Материалы состава, SHA-256, уведомлений и соответствующих исходников поставляются в `compliance.tar.gz` отдельно для Windows, Android, Debian и Arch. Проверка сопоставляет их с распакованными фактическими пакетами. Это проверка наличия и целостности материалов; она не заменяет юридическое заключение или подтверждение воспроизводимости.
+Inventory, SHA-256, notice and corresponding source materials are supplied in `compliance.tar.gz` separately for Windows, Android, Debian and Arch. Validation compares them with the actual extracted packages. This checks presence and integrity of materials; it does not replace legal advice or reproducibility verification.
 
-Для Windows FFmpeg 9.0.2 пересобран из исходников без внешних кодеков и libavfilter, с HTTPS через Windows Schannel. В поставку больше не входит цепочка librsvg → gdk-pixbuf → TIFF → JBIG. Используется вариант LGPL-2.1-or-later FFmpeg. Рецепт: `packaging/windows/build-ffmpeg.sh`. Соответствующие версии и патчи MSYS2 сохраняются в архивах исходников. Для Qt выбран доступный GPLv3-вариант; исходные уведомления сторонних компонентов Qt сохранены. Исключение LLVM, bzip2 и составная лицензия libjpeg-turbo проверены по включённым текстам NOTICE и внесены в точный список допустимых выражений проверки.
+For Windows, FFmpeg 9.0.2 was rebuilt from source without external codecs or libavfilter, with HTTPS through Windows Schannel. The librsvg → gdk-pixbuf → TIFF → JBIG chain is no longer shipped. The LGPL-2.1-or-later FFmpeg option is used. Recipe: `packaging/windows/build-ffmpeg.sh`. Corresponding MSYS2 versions and patches are retained in source archives. Qt uses its available GPLv3 option, with original third-party notices preserved. The LLVM exception, bzip2 and composite libjpeg-turbo license were checked against bundled NOTICE texts and added to the validator's exact allowlist of expressions.
 
-Android использует Qt 6.10.1, FFmpeg 7.1.2, OpenSSL 3.1.8 и NDK r27c. Для FFmpeg в сочетании с OpenSSL 3 используется разрешённый LGPLv3-вариант из LGPL-2.1-or-later. Полный исходный архив Qt, исходники FFmpeg и OpenSSL с параметрами сборки, базовая ревизия LLVM с Android-патчами и опубликованные исходники Java runtime-зависимостей включены в материалы. Уведомления находятся также в assets/licenses APK. Дерево Maven runtime-зависимостей и координаты версий зафиксированы.
+Android uses Qt 6.10.1, FFmpeg 7.1.2, OpenSSL 3.1.8 and NDK r27c. FFmpeg with OpenSSL 3 uses the permitted LGPLv3 option from LGPL-2.1-or-later. Materials include the complete Qt source archive, FFmpeg and OpenSSL sources with build parameters, the base LLVM revision with Android patches, and published Java runtime dependency sources. Notices are also in the APK's assets/licenses. The Maven runtime dependency tree and version coordinates are recorded.
 
-Пакеты Debian и Arch содержат собственное приложение и материалы SCrip; Qt и кодеки остаются системными зависимостями из менеджера пакетов.
+Debian and Arch packages contain the application and SCrip materials; Qt and codecs remain system dependencies supplied by the package manager.
