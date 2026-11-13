@@ -1,14 +1,9 @@
 import QtQuick
-import "design" as Design
-import "components" as UI
 import QtQuick.Controls
 
 Popup {
     id: root
-    property Item backdropItem: null
-    property int glassQuality: 1
     property bool dark: false
-    Design.Theme { id: theme; dark: root.dark }
 
     property color ink: "#242426"
     property color muted: "#858589"
@@ -18,9 +13,8 @@ Popup {
     anchors.centerIn: parent
     width: Math.min(480, parent.width - 24)
     height: Math.min(600, parent.height - 32)
-    background: UI.GlassSurface { dark: root.dark; quality: root.glassQuality; backdropItem: root.backdropItem; color: theme.elevated }
     modal: true
-    palette.window: theme.panel
+    palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
     palette.windowText: root.ink
     palette.text: root.ink
     contentItem: ScrollView {

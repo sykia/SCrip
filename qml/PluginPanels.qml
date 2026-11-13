@@ -1,13 +1,10 @@
 import QtQuick
-import "design" as Design
-import "components" as UI
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Column {
     id: root
     property bool dark: false
-    Design.Theme { id: theme; dark: root.dark }
 
     property var manager: null
     property string slotName: "home"
@@ -22,8 +19,8 @@ Column {
             required property var modelData
             width: root.width
             height: content.implicitHeight + 24
-            color: theme.elevated
-            radius: theme.controlRadius
+            color: (root.dark ? "#242424" : "#f4f4f4")
+            radius: 14
             Column {
                 id: content
                 x: 12; y: 12; width: parent.width - 24; spacing: 8

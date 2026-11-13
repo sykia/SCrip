@@ -751,19 +751,10 @@ class PluginTests : public QObject {
         QFile mainFile(fixture + "/Main.qml");
         QVERIFY(mainFile.open(QIODevice::WriteOnly));
         mainFile.write(source.readAll()); mainFile.close();
-        for (auto name : {"WaveCard.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
+        for (auto name : {"PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
             const auto sourcePath = QString(SCRIP_SOURCE_DIR) + (QString(name) == "RoundedImage.qml" || QString(name) == "AndroidGlyph.qml" ? "/qml/android/" : "/qml/") + name;
             QFile::remove(fixture + "/" + name);
             QVERIFY(QFile::copy(sourcePath, fixture + "/" + name));
-        }
-        for (const auto &directory : {QString("design"), QString("components")}) {
-            QVERIFY(QDir().mkpath(fixture + "/" + directory));
-            QDir sources(QString(SCRIP_SOURCE_DIR) + "/qml/" + directory);
-            for (const auto &file : sources.entryList({"*.qml"}, QDir::Files)) {
-                const auto destination = fixture + "/" + directory + "/" + file;
-                QFile::remove(destination);
-                QVERIFY(QFile::copy(sources.filePath(file), destination));
-            }
         }
         component.loadUrl(QUrl::fromLocalFile(fixture + "/Main.qml"));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
@@ -812,28 +803,8 @@ class PluginTests : public QObject {
         openPlayer.evaluate();
         QTRY_VERIFY(playerVisible.evaluate().toBool());
         QTest::qWait(500);
-        QVERIFY(window->grabWindow().save("android-player-dark.png"));
-        for (const auto &size : {QSize(320,480), QSize(860,412)}) {
-            window->resize(size); QTest::qWait(80);
-            QQmlExpression fits(QQmlEngine::contextForObject(object.data()), object.data(),
-                "player.contentItem.implicitHeight <= player.availableHeight + 1");
-            QVERIFY2(fits.evaluate().toBool(), qPrintable(QString("Player content exceeds %1x%2").arg(size.width()).arg(size.height())));
-            QVERIFY(!fits.hasError());
-            QVERIFY(window->grabWindow().save(QString("android-player-%1x%2.png").arg(size.width()).arg(size.height())));
-        }
-        window->resize(412,860); QTest::qWait(80);
-
-        QQmlExpression light(QQmlEngine::contextForObject(object.data()), object.data(), "prefs.darkMode = false");
-        light.evaluate(); QVERIFY(!light.hasError());
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("android-player-light.png"));
         QTest::keyClick(window, Qt::Key_Escape);
         QTRY_VERIFY_WITH_TIMEOUT(!playerVisible.evaluate().toBool(), 1500);
-        QQmlExpression home(QQmlEngine::contextForObject(object.data()), object.data(), "page = 0");
-        home.evaluate();
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("android-home-light.png"));
-        QQmlExpression settings(QQmlEngine::contextForObject(object.data()), object.data(), "page = 5");
-        settings.evaluate();
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("android-settings-light.png"));
     }
     void lifecycle() {
         QTemporaryDir data;

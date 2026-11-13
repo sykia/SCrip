@@ -1563,33 +1563,22 @@ private slots:
             QVERIFY((GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION) != WS_CAPTION);
         }
 #endif
-        auto clickControl = [&](const char *name) {
-            QQuickItem *item = nullptr;
-            QList<QQuickItem *> pending{window->contentItem()};
-            while (!pending.isEmpty()) {
-                auto *candidate = pending.takeLast();
-                if (candidate->objectName() == QString::fromLatin1(name)) { item = candidate; break; }
-                pending.append(candidate->childItems());
-            }
-            QVERIFY(item);
-            QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                item->mapToScene(QPointF(item->width()/2, item->height()/2)).toPoint());
-        };
-        clickControl("windowMaximize");
+        // Щелчки по центрам зелёной, жёлтой и красной кнопок в реальном QML.
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(65, 28));
         QTRY_COMPARE(window->visibility(), QWindow::Maximized);
 #ifdef Q_OS_WIN
         if (native) QTRY_VERIFY(IsZoomed(hwnd));
 #endif
-        clickControl("windowMaximize");
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(65, 28));
         QTRY_COMPARE(window->visibility(), QWindow::Windowed);
-        clickControl("windowMinimize");
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(45, 28));
         QTRY_COMPARE(window->visibility(), QWindow::Minimized);
 #ifdef Q_OS_WIN
         if (native) QTRY_VERIFY(IsIconic(hwnd));
 #endif
         window->showNormal();
         QVERIFY(QTest::qWaitForWindowExposed(window));
-        clickControl("windowClose");
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(25, 28));
         QTRY_VERIFY(!window->isVisible());
     }
     void queueHandleReordersTracks() {
@@ -1641,17 +1630,9 @@ private slots:
         QTRY_COMPARE(sc.state()["home"].toList().size(), 4);
         QTRY_VERIFY(!sc.state()["homeBusy"].toBool());
         QCOMPARE(window->property("section").toInt(), 5);
-        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
-        preferences->setProperty("motion", false);
-        preferences->setProperty("darkMode", true);
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-home-dark.png"));
-        preferences->setProperty("darkMode", false);
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-home-light.png"));
-        QCOMPARE(window->property("section").toInt(), 5);
-        preferences->setProperty("darkMode", true);
-        preferences->setProperty("motion", true);
         window->setProperty("section", 0);
         window->setWidth(1320); window->setHeight(820);
+        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
         preferences->setProperty("gridView", false);
         net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Тестовый трек с длинным названием для проверки вёрстки\",\"duration\":185000,\"user\":{\"username\":\"Исполнитель\"}},{\"urn\":\"soundcloud:tracks:2\",\"title\":\"Второй трек\",\"duration\":220000,\"access\":\"preview\"}]}"}};
         sc.browse("tracks", "Тест интерфейса"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2);
@@ -1694,7 +1675,7 @@ private slots:
             QTRY_VERIFY(!sc.state()["busy"].toBool());
             QTRY_VERIFY(trackView->property("activeDelegateCount").toInt() <= 40);
             if (size == 0) QCOMPARE(trackView->property("activeDelegateCount").toInt(), 0);
-            if (size == 1) QCOMPARE(trackView->property("height").toReal(), 68.0);
+            if (size == 1) QCOMPARE(trackView->property("height").toReal(), 58.0);
             if (size == 5000) {
                 QCOMPARE(trackView->property("count").toInt(), 5000);
                 net.responses = {{200, tracksJson(1, false, 5000)}};
@@ -1741,7 +1722,7 @@ private slots:
                 QCOMPARE(title.toString(), QString("Карточка 0"));
                 const int wideColumns = gridView->property("columns").toInt();
                 window->setWidth(760); QCoreApplication::processEvents();
-                QTRY_VERIFY(gridView->property("columns").toInt() < wideColumns);
+                QVERIFY(gridView->property("columns").toInt() < wideColumns);
                 window->setWidth(1320); QCoreApplication::processEvents();
                 net.responses = {{200, gridTracksJson(1, false, 5000)}};
                 auto *pageScroll = window->findChild<QObject *>("libraryScroll"); QVERIFY(pageScroll);
@@ -1793,31 +1774,6 @@ private slots:
         QVERIFY(window->grabWindow().save("ui-profile.png"));
         window->setProperty("section", 4); window->setProperty("settingGroup", 3); QTest::qWait(100);
         QVERIFY(window->grabWindow().save("ui-connection.png"));
-        preferences->setProperty("motion", false);
-        preferences->setProperty("darkMode", true);
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-settings-dark.png"));
-        preferences->setProperty("darkMode", false);
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-settings-light.png"));
-        auto *expanded = window->findChild<QObject *>("expandedPlayer"); QVERIFY(expanded);
-        QVERIFY(QMetaObject::invokeMethod(expanded, "open"));
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-player-light.png"));
-        preferences->setProperty("darkMode", true);
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-player-dark.png"));
-        QVERIFY(QMetaObject::invokeMethod(expanded, "close"));
-        net.responses = {{200, "[]"}};
-        window->setProperty("section", 1);
-        QTRY_VERIFY(!sc.state()["busy"].toBool());
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-library.png"));
-        net.responses = {{200, "[]"}};
-        window->setProperty("section", 2);
-        QTRY_VERIFY(!sc.state()["busy"].toBool());
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-playlists.png"));
-        auto *queuePopup = window->findChild<QObject *>("queuePopup"); QVERIFY(queuePopup);
-        QVERIFY(QMetaObject::invokeMethod(queuePopup, "open"));
-        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-queue.png"));
-        QVERIFY(QMetaObject::invokeMethod(queuePopup, "close"));
-        preferences->setProperty("motion", true);
-
         window->setWidth(760); window->setHeight(560); QTest::qWait(350);
         QVERIFY(!window->property("dockedInspector").toBool());
         QVERIFY(window->grabWindow().save("ui-narrow.png"));
