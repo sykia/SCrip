@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick Network Multimedia)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick Network Multimedia ShaderTools)
 # Для динамического Qt плагины загружаются при запуске; Android deployment
 # сканирует QT_QML_ROOT_PATH. Не сканируем весь репозиторий с build/ и SDK.
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -24,6 +24,9 @@ else()
     set(main_qml qml/Main.qml)
 endif()
 qt_standard_project_setup(REQUIRES 6.5)
+if(Qt6_VERSION VERSION_GREATER_EQUAL 6.8)
+    qt_policy(SET QTP0004 NEW)
+endif()
 
 set(executable_options)
 if(ANDROID)
@@ -37,6 +40,12 @@ if(ANDROID)
 endif()
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
+set_source_files_properties(qml/design/Theme.qml PROPERTIES QT_RESOURCE_ALIAS design/Theme.qml)
+foreach(component MusicCard GlassSurface AppCheckBox AppSwitch AppComboBox Section)
+    set_source_files_properties(qml/components/${component}.qml PROPERTIES QT_RESOURCE_ALIAS components/${component}.qml)
+endforeach()
+set_source_files_properties(qml/DesktopWaveHero.qml PROPERTIES QT_RESOURCE_ALIAS DesktopWaveHero.qml)
+set_source_files_properties(qml/WaveCard.qml PROPERTIES QT_RESOURCE_ALIAS WaveCard.qml)
 set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)
 set_source_files_properties(qml/android/RoundedImage.qml PROPERTIES QT_RESOURCE_ALIAS RoundedImage.qml)
 set_source_files_properties(qml/android/AndroidGlyph.qml PROPERTIES QT_RESOURCE_ALIAS AndroidGlyph.qml)
@@ -50,8 +59,10 @@ qt_add_qml_module(scrip
     URI SCrip
     VERSION 1.0
     RESOURCES qml/assets/blob.png
-    QML_FILES ${main_qml} qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
+    QML_FILES qml/components/MusicCard.qml qml/DesktopWaveHero.qml qml/components/Section.qml qml/components/AppComboBox.qml qml/components/AppCheckBox.qml qml/components/AppSwitch.qml qml/design/Theme.qml qml/components/GlassSurface.qml ${main_qml} qml/WaveCard.qml qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
 )
+qt_add_shaders(scrip glass_shader PREFIX "/shaders" BASE "qml/shaders" FILES qml/shaders/glass.frag)
+qt_add_shaders(scrip wave_shader PREFIX "/shaders" BASE "qml/shaders" FILES qml/shaders/wave.frag)
 qt_add_resources(scrip callback_page PREFIX "/" FILES resources/callback.html)
 target_link_libraries(scrip PRIVATE Qt6::Quick Qt6::Network Qt6::Multimedia)
 function(scrip_secret_store target)
@@ -147,6 +158,10 @@ if(BUILD_TESTING AND NOT ANDROID)
         set_target_properties(artwork_ui_tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)
     endif()
     target_link_libraries(artwork_ui_tests PRIVATE Qt6::QuickTest Qt6::Quick)
+    foreach(ui_test_target scrip_tests plugin_tests artwork_ui_tests)
+        qt_add_shaders(${ui_test_target} ui_test_shaders PREFIX "/shaders" BASE "qml/shaders"
+            FILES qml/shaders/wave.frag qml/shaders/glass.frag)
+    endforeach()
     add_test(NAME artwork_ui COMMAND artwork_ui_tests -input ${CMAKE_CURRENT_SOURCE_DIR}/tests/qml)
     set_tests_properties(artwork_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
 endif()

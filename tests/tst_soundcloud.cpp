@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <cstring>
+#include <cmath>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
@@ -1119,6 +1120,83 @@ private slots:
         qunsetenv("CAPTURE_ARGS"); qunsetenv("CAPTURE_EXIT");
     }
 #endif
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    void waveAudioRespondsToBassAndIgnoresDisabledAnalysis() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        QAudioFormat format;
+        format.setSampleRate(48000); format.setChannelCount(2); format.setSampleFormat(QAudioFormat::Float);
+        auto tone = [&](double frequency, double amplitude) {
+            QByteArray bytes(4800 * 2 * int(sizeof(float)), Qt::Uninitialized);
+            auto *samples = reinterpret_cast<float *>(bytes.data());
+            for (int frame = 0; frame < 4800; ++frame) {
+                const float value = float(amplitude * std::sin(2.0 * 3.141592653589793 * frequency * frame / 48000.0));
+                samples[frame * 2] = samples[frame * 2 + 1] = value;
+            }
+            return QAudioBuffer(bytes, format);
+        };
+        const auto bass = tone(70, 0.6), treble = tone(4000, 0.6), silence = tone(70, 0);
+        sc.analyzeWaveAudio(bass);
+        QCOMPARE(sc.m_waveTargetLevel, 0.0);
+        sc.setWaveVisualActive(true);
+        QCOMPARE(sc.m_player.audioBufferOutput(), &sc.m_waveOutput);
+        QCOMPARE(sc.m_sparePlayer.audioBufferOutput(), &sc.m_waveSpareOutput);
+        sc.analyzeWaveAudio(silence);
+        QCOMPARE(sc.m_waveTargetLevel, 0.0);
+        sc.analyzeWaveAudio(treble);
+        const double trebleBass = sc.m_waveTargetBass;
+        QVERIFY(sc.m_waveTargetLevel > 0.5);
+        sc.m_waveTargetBass = 0; sc.m_waveLowPass = 0;
+        QTest::qWait(190);
+        sc.analyzeWaveAudio(bass);
+        QVERIFY(sc.m_waveTargetBeat > 0);
+        QVERIFY(sc.m_waveTargetBass > trebleBass * 3);
+        QVERIFY(sc.m_waveTargetBass <= 1.0);
+        QSignalSpy changes(&sc, &SoundCloud::waveAudioChanged);
+        QTRY_VERIFY(!changes.isEmpty());
+        QVERIFY(sc.waveLevel() > 0);
+        sc.setWaveVisualActive(false);
+        QCOMPARE(sc.waveLevel(), 0.0); QCOMPARE(sc.waveBass(), 0.0); QCOMPARE(sc.waveBeat(), 0.0);
+        QVERIFY(!sc.m_waveAudioTimer.isActive());
+        QVERIFY(!sc.m_player.audioBufferOutput());
+        QVERIFY(!sc.m_sparePlayer.audioBufferOutput());
+    }
+#endif
+    void waveDeduplicatesRelatedAndCancelsLateReplies() {
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_waveMode = "discovery";
+        sc.m_waveSeeds = {QVariantMap{{"urn", "soundcloud:tracks:1"}}};
+        sc.m_waveSeen.insert("soundcloud:tracks:1");
+        net.responses = {{200, R"({"collection":[{"urn":"soundcloud:tracks:1"},{"urn":"soundcloud:tracks:2"},{"urn":"soundcloud:tracks:2"}]})"}};
+        sc.refillWave();
+        QTRY_VERIFY(!sc.state()["waveBusy"].toBool());
+        QCOMPARE(sc.m_queue.size(), 1);
+        QCOMPARE(sc.m_queue.first().toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+        net.responses = {{200, R"({"collection":[{"urn":"soundcloud:tracks:3"}]})", 30}};
+        sc.refillWave(); sc.stopWave();
+        QTest::qWait(60);
+        QCOMPARE(sc.m_queue.size(), 1);
+        QVERIFY(sc.state()["waveMode"].toString().isEmpty());
+    }
+    void waveEmptyLibraryAndNetworkFailureAllowRetry() {
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.set("signedIn", true);
+        net.responses = {{200, R"({"collection":[]})"}};
+        sc.startWave("library");
+        QTRY_VERIFY(!sc.state()["waveBusy"].toBool());
+        QVERIFY(!sc.state()["waveError"].toString().isEmpty());
+        QCOMPARE(sc.m_queueIndex, -1);
+        net.responses = {{503, "{}"}};
+        sc.retryWave();
+        QTRY_VERIFY(!sc.state()["waveBusy"].toBool());
+        QVERIFY(!sc.state()["waveError"].toString().isEmpty());
+        QVERIFY(sc.m_waveMode == "library");
+        sc.stopPlayback();
+        QVERIFY(sc.m_waveMode.isEmpty());
+    }
     void enqueueInsertsAfterCurrentTrack() {
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
@@ -1485,22 +1563,33 @@ private slots:
             QVERIFY((GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION) != WS_CAPTION);
         }
 #endif
-        // Щелчки по центрам зелёной, жёлтой и красной кнопок в реальном QML.
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(65, 28));
+        auto clickControl = [&](const char *name) {
+            QQuickItem *item = nullptr;
+            QList<QQuickItem *> pending{window->contentItem()};
+            while (!pending.isEmpty()) {
+                auto *candidate = pending.takeLast();
+                if (candidate->objectName() == QString::fromLatin1(name)) { item = candidate; break; }
+                pending.append(candidate->childItems());
+            }
+            QVERIFY(item);
+            QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                item->mapToScene(QPointF(item->width()/2, item->height()/2)).toPoint());
+        };
+        clickControl("windowMaximize");
         QTRY_COMPARE(window->visibility(), QWindow::Maximized);
 #ifdef Q_OS_WIN
         if (native) QTRY_VERIFY(IsZoomed(hwnd));
 #endif
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(65, 28));
+        clickControl("windowMaximize");
         QTRY_COMPARE(window->visibility(), QWindow::Windowed);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(45, 28));
+        clickControl("windowMinimize");
         QTRY_COMPARE(window->visibility(), QWindow::Minimized);
 #ifdef Q_OS_WIN
         if (native) QTRY_VERIFY(IsIconic(hwnd));
 #endif
         window->showNormal();
         QVERIFY(QTest::qWaitForWindowExposed(window));
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(25, 28));
+        clickControl("windowClose");
         QTRY_VERIFY(!window->isVisible());
     }
     void queueHandleReordersTracks() {
@@ -1552,9 +1641,17 @@ private slots:
         QTRY_COMPARE(sc.state()["home"].toList().size(), 4);
         QTRY_VERIFY(!sc.state()["homeBusy"].toBool());
         QCOMPARE(window->property("section").toInt(), 5);
+        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
+        preferences->setProperty("motion", false);
+        preferences->setProperty("darkMode", true);
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-home-dark.png"));
+        preferences->setProperty("darkMode", false);
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-home-light.png"));
+        QCOMPARE(window->property("section").toInt(), 5);
+        preferences->setProperty("darkMode", true);
+        preferences->setProperty("motion", true);
         window->setProperty("section", 0);
         window->setWidth(1320); window->setHeight(820);
-        auto *preferences = window->findChild<QObject *>("uiPreferences"); QVERIFY(preferences);
         preferences->setProperty("gridView", false);
         net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"Тестовый трек с длинным названием для проверки вёрстки\",\"duration\":185000,\"user\":{\"username\":\"Исполнитель\"}},{\"urn\":\"soundcloud:tracks:2\",\"title\":\"Второй трек\",\"duration\":220000,\"access\":\"preview\"}]}"}};
         sc.browse("tracks", "Тест интерфейса"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2);
@@ -1597,7 +1694,7 @@ private slots:
             QTRY_VERIFY(!sc.state()["busy"].toBool());
             QTRY_VERIFY(trackView->property("activeDelegateCount").toInt() <= 40);
             if (size == 0) QCOMPARE(trackView->property("activeDelegateCount").toInt(), 0);
-            if (size == 1) QCOMPARE(trackView->property("height").toReal(), 58.0);
+            if (size == 1) QCOMPARE(trackView->property("height").toReal(), 68.0);
             if (size == 5000) {
                 QCOMPARE(trackView->property("count").toInt(), 5000);
                 net.responses = {{200, tracksJson(1, false, 5000)}};
@@ -1644,7 +1741,7 @@ private slots:
                 QCOMPARE(title.toString(), QString("Карточка 0"));
                 const int wideColumns = gridView->property("columns").toInt();
                 window->setWidth(760); QCoreApplication::processEvents();
-                QVERIFY(gridView->property("columns").toInt() < wideColumns);
+                QTRY_VERIFY(gridView->property("columns").toInt() < wideColumns);
                 window->setWidth(1320); QCoreApplication::processEvents();
                 net.responses = {{200, gridTracksJson(1, false, 5000)}};
                 auto *pageScroll = window->findChild<QObject *>("libraryScroll"); QVERIFY(pageScroll);
@@ -1696,6 +1793,31 @@ private slots:
         QVERIFY(window->grabWindow().save("ui-profile.png"));
         window->setProperty("section", 4); window->setProperty("settingGroup", 3); QTest::qWait(100);
         QVERIFY(window->grabWindow().save("ui-connection.png"));
+        preferences->setProperty("motion", false);
+        preferences->setProperty("darkMode", true);
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-settings-dark.png"));
+        preferences->setProperty("darkMode", false);
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-settings-light.png"));
+        auto *expanded = window->findChild<QObject *>("expandedPlayer"); QVERIFY(expanded);
+        QVERIFY(QMetaObject::invokeMethod(expanded, "open"));
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-player-light.png"));
+        preferences->setProperty("darkMode", true);
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-player-dark.png"));
+        QVERIFY(QMetaObject::invokeMethod(expanded, "close"));
+        net.responses = {{200, "[]"}};
+        window->setProperty("section", 1);
+        QTRY_VERIFY(!sc.state()["busy"].toBool());
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-library.png"));
+        net.responses = {{200, "[]"}};
+        window->setProperty("section", 2);
+        QTRY_VERIFY(!sc.state()["busy"].toBool());
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-playlists.png"));
+        auto *queuePopup = window->findChild<QObject *>("queuePopup"); QVERIFY(queuePopup);
+        QVERIFY(QMetaObject::invokeMethod(queuePopup, "open"));
+        QTest::qWait(80); QVERIFY(window->grabWindow().save("ui-queue.png"));
+        QVERIFY(QMetaObject::invokeMethod(queuePopup, "close"));
+        preferences->setProperty("motion", true);
+
         window->setWidth(760); window->setHeight(560); QTest::qWait(350);
         QVERIFY(!window->property("dockedInspector").toBool());
         QVERIFY(window->grabWindow().save("ui-narrow.png"));

@@ -4,15 +4,24 @@ import android.view.View;
 import androidx.core.view.WindowCompat;
 import org.qtproject.qt.android.bindings.QtActivity;
 
-/** Тёмные значки строки состояния поверх светлого интерфейса SCrip. */
+/** Keep system bar icons readable in both SCrip themes. */
 public final class SCripActivity extends QtActivity {
+    private volatile boolean darkTheme = true;
+
+    public void setDarkTheme(boolean dark) {
+        darkTheme = dark;
+        runOnUiThread(this::updateStatusBarIcons);
+    }
+
     private void updateStatusBarIcons() {
         final View decor = getWindow().getDecorView();
         // После обработки Qt: иначе флаги окна могут перекрыть XML-тему.
         decor.post(() -> {
             if (!isFinishing() && !isDestroyed()) {
                 WindowCompat.getInsetsController(getWindow(), decor)
-                        .setAppearanceLightStatusBars(true);
+                        .setAppearanceLightStatusBars(!darkTheme);
+                WindowCompat.getInsetsController(getWindow(), decor)
+                        .setAppearanceLightNavigationBars(!darkTheme);
             }
         });
     }

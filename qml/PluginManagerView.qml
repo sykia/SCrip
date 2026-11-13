@@ -1,11 +1,16 @@
 import QtQuick
+import "design" as Design
+import "components" as UI
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs as Dialogs
 
 Column {
     id: root
+    property Item backdropItem: null
+    property int glassQuality: 1
     property bool dark: false
+    Design.Theme { id: theme; dark: root.dark }
 
     property var manager: null
     property string message: ""
@@ -49,7 +54,8 @@ Column {
         width: Math.min(560, parent.width - 24)
         height: Math.min(660, parent.height - 32)
         modal: true
-        palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
+        background: UI.GlassSurface { dark: root.dark; quality: root.glassQuality; backdropItem: root.backdropItem; color: theme.elevated }
+        palette.window: theme.panel
         palette.windowText: root.ink
         palette.text: root.ink
         title: "Проверка плагина"
@@ -72,7 +78,7 @@ Column {
                     model: root.preview.changes || []
                     Label { required property var modelData; width: parent.width; text: modelData; textFormat: Text.PlainText; wrapMode: Text.Wrap }
                 }
-                CheckBox {
+                UI.AppCheckBox {
                     id: consent
                     width: parent.width
                     enabled: !!root.preview.plugin
@@ -101,7 +107,8 @@ Column {
         anchors.centerIn: parent
         width: Math.min(480, parent.width - 24)
         modal: true
-        palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
+        background: UI.GlassSurface { dark: root.dark; quality: root.glassQuality; backdropItem: root.backdropItem; color: theme.elevated }
+        palette.window: theme.panel
         palette.windowText: root.ink
         palette.text: root.ink
         title: "Удаление плагина"
@@ -109,7 +116,7 @@ Column {
         contentItem: Column {
             spacing: 12
             Label { width: parent.width; text: "Удалить «" + root.removalId + "»? Его зависимые плагины будут отключены.\n" + (root.manager ? root.manager.dependents(root.removalId).join(", ") : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap }
-            CheckBox { id: keep; text: "Сохранить настройки и данные" }
+            UI.AppCheckBox { id: keep; text: "Сохранить настройки и данные" }
         }
         onAccepted: root.showResult(root.manager.remove(root.removalId, keep.checked))
     }
@@ -128,7 +135,7 @@ Column {
             property bool settingsOpen: false
             objectName: "plugin-card-" + modelData.plugin.id
             width: root.width; height: body.implicitHeight + 20; radius: 12
-            color: (root.dark ? "#242424" : "#f4f4f4"); border.color: (root.dark ? "#404040" : "#e3e3e3")
+            color: theme.elevated; border.color: theme.line
             Column {
                 id: body
                 x: 10; y: 10; width: parent.width - 20; spacing: 7
@@ -148,7 +155,7 @@ Column {
                 PluginAction { text: "Разрешения · " + (card.modelData.permissionRows || []).length; onClicked: card.permissionsOpen = !card.permissionsOpen }
                 Repeater {
                     model: card.modelData.permissionRows || []
-                    CheckBox {
+                    UI.AppCheckBox {
                         id: permission
                         required property var modelData
                         width: body.width
@@ -168,9 +175,9 @@ Column {
                         width: body.width; spacing: 4
                         visible: card.settingsOpen
                         Label { width: parent.width; text: setting.modelData.label; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
-                        Switch { palette.windowText: root.ink; visible: setting.modelData.type === "boolean"; checked: setting.modelData.value === true; text: "Включено"; onToggled: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, checked)) }
+                        UI.AppSwitch { palette.windowText: root.ink; visible: setting.modelData.type === "boolean"; checked: setting.modelData.value === true; text: "Включено"; onToggled: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, checked)) }
                         SpinBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "integer"; from: setting.modelData.min || 0; to: setting.modelData.max || 0; value: setting.modelData.type === "integer" ? setting.modelData.value : 0; editable: true; onValueModified: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, value)) }
-                        ComboBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "enum"; width: Math.min(280, parent.width); model: setting.modelData.options || []; currentIndex: (setting.modelData.options || []).indexOf(setting.modelData.value); onActivated: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, currentText)) }
+                        UI.AppComboBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "enum"; width: Math.min(280, parent.width); model: setting.modelData.options || []; currentIndex: (setting.modelData.options || []).indexOf(setting.modelData.value); onActivated: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, currentText)) }
                     }
                 }
                 Label { width: parent.width; text: "Собственные данные: " + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }

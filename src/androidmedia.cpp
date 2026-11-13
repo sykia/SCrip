@@ -118,3 +118,9 @@ void AndroidMedia::publish() {
     m_lastState = json;
     QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "update", "(Ljava/lang/String;)V", QJniObject::fromString(json).object());
 }
+
+void AndroidMedia::setDarkTheme(bool dark) {
+    const auto activity = QNativeInterface::QAndroidApplication::context();
+    if (activity.isValid())
+        activity.callMethod<void>("setDarkTheme", static_cast<jboolean>(dark));
+}

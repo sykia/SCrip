@@ -9,6 +9,10 @@
 #include <QNetworkAccessManager>
 #include <QMediaPlayer>
 #include <QAudioOutput>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+#include <QAudioBufferOutput>
+#include <QAudioBuffer>
+#endif
 #include <QVariantAnimation>
 #include <QTcpServer>
 #include <QTimer>
@@ -41,6 +45,9 @@ private:
 // Секреты доступны только хосту через системное защищённое хранилище.
 class SoundCloud : public QObject {
     Q_OBJECT
+    Q_PROPERTY(double waveLevel READ waveLevel NOTIFY waveAudioChanged)
+    Q_PROPERTY(double waveBass READ waveBass NOTIFY waveAudioChanged)
+    Q_PROPERTY(double waveBeat READ waveBeat NOTIFY waveAudioChanged)
     Q_PROPERTY(TrackModel* trackModel READ trackModel CONSTANT)
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
@@ -67,6 +74,13 @@ public:
     Q_INVOKABLE void more();
     Q_INVOKABLE void loadHome(bool force = false);
     Q_INVOKABLE void playMix(const QVariantList &tracks, int index = 0);
+    double waveLevel() const { return m_waveLevel; }
+    double waveBass() const { return m_waveBass; }
+    double waveBeat() const { return m_waveBeat; }
+    Q_INVOKABLE void setWaveVisualActive(bool enabled);
+    Q_INVOKABLE void startWave(const QString &mode);
+    Q_INVOKABLE void stopWave();
+    Q_INVOKABLE void retryWave();
     Q_INVOKABLE void playStation(const QVariantMap &seed);
     Q_INVOKABLE void listDestinations(const QString &next = {});
     Q_INVOKABLE void saveToPlaylist(const QString &track, const QString &playlist, const QString &newTitle);
@@ -99,6 +113,7 @@ public:
     Q_INVOKABLE void setShuffle(bool enabled);
     Q_INVOKABLE void setCrossfade(bool enabled);
 signals:
+    void waveAudioChanged();
     void changed();
     void catalogChanged();
     void progressChanged();
@@ -137,6 +152,23 @@ private:
     void nextStream(int generation, const char *reason);
     void startupStage(const char *stage);
     void prepareNext();
+    void refillWave();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    void analyzeWaveAudio(const QAudioBuffer &buffer);
+    QAudioBufferOutput m_waveOutput, m_waveSpareOutput;
+#endif
+    QTimer m_waveAudioTimer;
+    QElapsedTimer m_waveBeatClock;
+    bool m_waveVisualActive = false;
+    double m_waveLevel = 0, m_waveBass = 0, m_waveBeat = 0;
+    double m_waveTargetLevel = 0, m_waveTargetBass = 0, m_waveTargetBeat = 0;
+    double m_waveLowPass = 0, m_waveBaseline = 0;
+
+    int m_waveGeneration = 0, m_waveSeedIndex = 0, m_waveEmptyPages = 0;
+    QString m_waveMode, m_waveNext;
+    QVariantList m_waveSeeds;
+    QSet<QString> m_waveSeen;
+    bool m_waveWaiting = false;
     void holdPreloadedAudio(QMediaPlayer *media);
     void prepareStream(const QUrl &url, int generation, int redirects = 0);
     void beginCrossfade();

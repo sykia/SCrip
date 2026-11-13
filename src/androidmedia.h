@@ -11,6 +11,7 @@ class AndroidMedia : public QObject {
 public:
     AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwork, QObject *parent = nullptr);
     ~AndroidMedia() override;
+    Q_INVOKABLE void setDarkTheme(bool dark);
 private:
     void publish();
     SoundCloud *m_soundcloud;

@@ -69,3 +69,29 @@ SCrip is independent software and is not an official SoundCloud product.
 Copyright (c) 2026 sykia. The source code is licensed under **GNU GPL v3.0 only**. You may use, study, modify and redistribute it under the terms of [LICENSE](LICENSE).
 
 Third-party components retain their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md). The [name and original logo](TRADEMARKS.md) may be copied and modified under the GPL without additional restrictions. [Release licensing materials](licensing/README.md) document the distribution process.
+
+### Personal wave (beta)
+
+The home screen includes a continuous wave above the mixes on desktop and Android.
+“My music” shuffles paginated SoundCloud likes, cycling after the library ends.
+“Discoveries” uses liked tracks as seeds for SoundCloud related-track requests,
+rotates seeds, excludes session duplicates and expands the seed pool with discoveries.
+This is a heuristic using SoundCloud recommendations, not an audio analysis model.
+The queue refills near its end; switching to a track, mix or station cancels the wave.
+Failures preserve the queue and expose a retry action. Empty recommendation batches
+are bounded to avoid a request loop. Playback history is bounded during refills.
+The visual is a single-pass GPU fragment shader compiled with Qt Shader Tools
+(GLSL/SPIR-V/HLSL packages for Linux, Android and Windows). Six smoothly merging
+circular fields use shades of the current accent. The shader renders at a maximum
+width of 720 pixels and updates at ~30 fps, without CPU canvas drawing or blur passes.
+The title sits above the visual and the mode selector below it. Clicking the visual
+starts, pauses or resumes the wave; keyboard Space/Return and accessibility press
+actions are supported. Animation continues when the window loses focus or moves to
+another monitor. It stops outside the viewport, in a hidden/minimized window, or
+when motion is disabled. The software renderer uses a static fallback.
+On Qt 6.8+ with the FFmpeg backend, QAudioBufferOutput supplies decoded PCM: a
+lightweight RMS envelope and a 160 Hz low-pass envelope drive expansion and light.
+Bass onsets use an adaptive baseline with a 180 ms refractory interval; this is an
+onset heuristic, not BPM tracking. Analysis is downsampled to <=12 kHz, emits
+separate visual signals at ~30 Hz and detaches when the wave visual is inactive.
+Other backends and older Qt retain ambient motion without fabricated beat data. Wave sessions are not restored after restarting the app.

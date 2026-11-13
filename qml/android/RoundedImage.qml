@@ -8,8 +8,8 @@ Item {
         property color placeholderInk: "#858589"
         property int fadeDuration: 150
         property bool avatar: false
-        Rectangle { anchors.fill: parent; radius: rounded.avatar ? width / 2 : rounded.radius; color: "#ededed" }
-        AndroidGlyph { anchors.centerIn: parent; visible: rounded.avatar && picture.status !== Image.Ready; name: "profile"; ink: rounded.placeholderInk }
+        Rectangle { anchors.fill: parent; radius: rounded.avatar ? width / 2 : rounded.radius; color: Qt.alpha(rounded.placeholderInk, 0.12) }
+        AndroidGlyph { anchors.centerIn: parent; visible: picture.status !== Image.Ready; name: rounded.avatar ? "profile" : "music"; ink: rounded.placeholderInk }
         Image {
             id: picture
             anchors.fill: parent
