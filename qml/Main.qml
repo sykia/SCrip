@@ -287,12 +287,11 @@ Window {
 
         Rectangle {
             id: sidebar
-            x: 1; y: 1; width: 196; height: parent.height - 2
-            visible: sc.signedIn; color: app.panel; radius: shell.radius
-            Rectangle { anchors.right: parent.right; width: 15; height: parent.height; color: parent.color }
-            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: (app.dark ? "#383838" : "#e6e2e5") }
+            x: 12; y: 12; width: 196; height: parent.height - 24
+            visible: sc.signedIn; color: app.panel; radius: 28
+            border.color: app.dark ? "#252525" : "#eeecef"
             Column {
-                x: 16; y: 76; width: parent.width - 32; spacing: 4
+                x: 16; y: 64; width: parent.width - 32; spacing: 4
                 NavItem { text: "Главная"; symbol: "home"; selected: app.section === 5; onClicked: app.section = 5 }
                 NavItem { text: "Поиск"; symbol: "search"; selected: app.section === 0; onClicked: { app.section = 0; searchField.forceActiveFocus() } }
                 NavItem { text: "Лента"; symbol: "list"; selected: app.section === 1 && app.libraryPage === "feed"; onClicked: app.selectLibrary("feed") }
@@ -321,7 +320,7 @@ Window {
             x: 0; y: 0; width: parent.width; height: 56
             MouseArea { anchors.fill: parent; onPressed: app.startSystemMove(); onDoubleClicked: app.maximize() }
             Row {
-                x: 19; y: 22; spacing: 8
+                x: sidebar.x + 20; y: sidebar.y + 22; spacing: 8
                 Repeater {
                     model: ["#ff5f57", "#febc2e", "#28c840"]
                     AbstractButton {
@@ -336,7 +335,7 @@ Window {
                 }
             }
             Txt {
-                x: sidebar.width + 1 + app.gutter; anchors.verticalCenter: parent.verticalCenter; visible: sc.signedIn
+                x: sidebar.x + sidebar.width + app.gutter; anchors.verticalCenter: parent.verticalCenter; visible: sc.signedIn
                 width: Math.max(80, parent.width - x - app.inspectorWidth - 330)
                 text: "SCrip"
                 color: app.muted
@@ -360,21 +359,20 @@ Window {
         Rectangle {
             id: detailColumn
             visible: sc.signedIn && app.dockedInspector
-            x: parent.width - app.inspectorWidth - 1; y: 1
-            width: app.inspectorWidth; height: parent.height - y - player.height - 1
-            color: app.dark || app.themed ? app.panel : "#fafafa"; radius: shell.radius
-            Rectangle { width: 14; height: parent.height; color: parent.color }
-            Rectangle { width: 1; height: parent.height; color: (app.dark ? "#323232" : "#eaeaec") }
+            x: parent.width - app.inspectorWidth - 12; y: 12
+            width: app.inspectorWidth; height: parent.height - y - player.height - 24
+            color: app.dark || app.themed ? app.panel : "#fafafa"; radius: 28
+            border.color: app.dark ? "#252525" : "#eeecef"
             Inspector { anchors.fill: parent; anchors.margins: app.gutter; anchors.topMargin: 20; onDismiss: app.inspectorOpen = false }
         }
         Item {
             id: musicArea
             visible: sc.signedIn
-            x: sidebar.width + 1; y: 57; width: parent.width - x - app.inspectorWidth - 1; height: parent.height - y - 1
+            x: sidebar.x + sidebar.width; y: 57; width: parent.width - x - app.inspectorWidth - 12; height: parent.height - y - 1
             Flickable {
                 id: contentScroll
                 objectName: "libraryScroll"
-                anchors.fill: parent; anchors.leftMargin: app.gutter; anchors.rightMargin: app.gutter; anchors.bottomMargin: 100
+                anchors.fill: parent; anchors.leftMargin: app.gutter; anchors.rightMargin: app.gutter; anchors.bottomMargin: 112
                 clip: true; contentWidth: width; contentHeight: pageBody.height + 24
                 boundsBehavior: Flickable.StopAtBounds
                 flickDeceleration: 1500; maximumFlickVelocity: 3600
@@ -472,12 +470,10 @@ Window {
                 id: player
                 readonly property bool hasTrack: !!app.api.current.urn || !!app.api.current.id
                 readonly property bool narrow: width < 790
-                x: 0; anchors.bottom: parent.bottom
-                width: shell.width - musicArea.x - 1; height: 84
-                color: app.dark || app.themed ? app.panel : "#fcfcfd"; radius: shell.radius
-                Rectangle { width: parent.width; height: parent.radius; color: parent.color }
-                Rectangle { width: parent.radius; height: parent.height; color: parent.color }
-                Rectangle { width: parent.width; height: 1; color: (app.dark ? "#383838" : "#dfdfe3") }
+                x: 12; anchors.bottom: parent.bottom; anchors.bottomMargin: 11
+                width: shell.width - musicArea.x - 24; height: 84
+                color: app.dark || app.themed ? app.panel : "#fcfcfd"; radius: 28
+                border.color: app.dark ? "#252525" : "#eeecef"
 
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: player.narrow ? 14 : 24
