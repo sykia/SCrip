@@ -1,6 +1,6 @@
 # Plugin API v2: usage and implementation contract
 
-SCrip accepts declarative API 2 JSON plugins. Executable QML/JS, libraries and processes are unsupported. The executable format is rejected with `unsupported-runtime`: a secure isolated environment has not been implemented. The [architecture](plugin-api-v2.md) explains the trust boundary.
+SCrip accepts API 2 declarative JSON plugins and [trusted executable QML plugins](plugin-runtime.md). This reference describes declarative capabilities; `kind: "qml"`, `code.execute` and `runtime` contributions are specified in the runtime SDK document. Unknown executable runtime kinds are rejected with `unsupported-runtime`.
 
 ## Installation and management
 
@@ -28,7 +28,7 @@ Timers are one-shot and do not survive disabling, logout or restart. They use th
 
 ## Manifest
 
-See the JSON examples. Required fields: `api=2`, `kind=declarative`, `id`, `name`, `version`, `requiresHost`, `permissions`, `settings`, `contributions`, `rules`. `description` and `dependencies` are optional. Unknown fields, duplicate keys, invalid types, commands/references and exceeded limits are rejected before installation. UTF-8, up to 128 KiB, depth ≤16. Text is PlainText; paths, arbitrary URLs, eval, HTML and resources are unavailable. ID: `[a-z][a-z0-9.-]{0,47}`. Name: ≤48 printable characters; description: ≤1000.
+See the JSON examples. Required fields: `api=2`, `kind=declarative` (or `qml` for the trusted runtime), `id`, `name`, `version`, `requiresHost`, `permissions`, `settings`, `contributions`, `rules`. `description` and `dependencies` are optional. Unknown fields, duplicate keys, invalid types, commands/references and exceeded limits are rejected before installation. UTF-8, up to 128 KiB, depth ≤16. Declarative text is PlainText; paths, arbitrary URLs, eval, HTML and resources are unavailable to declarative contributions. QML source is executable code under the separate full-access contract. ID: `[a-z][a-z0-9.-]{0,47}`. Name: ≤48 printable characters; description: ≤1000.
 
 Versions are exactly `major.minor.patch`, with numbers 0–65535 and no leading zeros or suffixes. `requiresHost={min,maxExclusive}` requires both bounds. API compatibility is checked separately; a matching SCrip version does not add support for a new API. `dependencies` allows up to eight `{id,min,maxExclusive}` entries, v2 only; cycles are forbidden. A missing dependency or incompatible host blocks the whole package.
 

@@ -23,6 +23,10 @@ class Plugins : public QObject {
     QVariantList installed() const;
     QVariantMap theme() const;
     QVariantList panels() const;
+    QVariantList runtimes() const;
+    Q_INVOKABLE void reloadRuntime(const QString &id);
+    void runtimeError(const QString &id, const QString &message);
+
     QString error() const { return m_error; }
     Q_INVOKABLE QVariantMap prepareInstall(const QUrl &file);
     Q_INVOKABLE QString commitInstall(const QString &operationId, const QStringList &acceptedPermissions);
@@ -41,6 +45,7 @@ class Plugins : public QObject {
     void updatePlayer(const QVariantMap &state);
   signals:
     void changed();
+    void runtimeReloadRequested(const QString &id);
     void progressSnapshotRequested();
     void installPrepared(const QVariantMap &preview);
     void navigationRequested(const QString &destination);

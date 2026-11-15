@@ -17,7 +17,7 @@ Column {
     property color muted: "#707075"
     spacing: 12
     function permissionLabel(id) {
-        return ({"ui.panels":"Панели и кнопки", "ui.theme":"Изменение оформления", "player.observe":"Названия и исполнители треков, состояние плеера (персональные данные)", "player.control":"Управление воспроизведением", "navigation":"Переходы между страницами", "storage":"Собственные данные", "timers":"Одноразовые таймеры"})[id] || id
+        return ({"code.execute":"Исполнение QML/JavaScript: полный доступ к приложению, данным и сети; без изоляции", "ui.panels":"Панели и кнопки", "ui.theme":"Изменение оформления", "player.observe":"Названия и исполнители треков, состояние плеера (персональные данные)", "player.control":"Управление воспроизведением", "navigation":"Переходы между страницами", "storage":"Собственные данные", "timers":"Одноразовые таймеры"})[id] || id
     }
     function showResult(error) { message = error || "Изменения сохранены" }
     Dialogs.FileDialog {
@@ -142,6 +142,7 @@ Column {
                     PluginAction { width: Math.min(implicitWidth, parent.width); visible: card.modelData.status !== "removed"; text: card.modelData.enabled ? "Отключить" : "Включить"; onClicked: root.showResult(root.manager.enable(card.modelData.plugin.id, !card.modelData.enabled)) }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Обновить из файла"; onClicked: picker.open() }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Удалить"; onClicked: { root.removalId = card.modelData.plugin.id; keep.checked = false; removal.open() } }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Перезагрузить код"; visible: card.modelData.plugin.kind === "qml" && card.modelData.enabled; onClicked: root.manager.reloadRuntime(card.modelData.plugin.id) }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить журнал"; visible: !!card.modelData.lastError; onClicked: root.manager.clearError(card.modelData.plugin.id) }
                     PluginAction { width: Math.min(implicitWidth, parent.width); text: "Копировать ошибку"; visible: !!card.modelData.lastError; onClicked: sc.copyText(String(card.modelData.lastError)) }
                 }

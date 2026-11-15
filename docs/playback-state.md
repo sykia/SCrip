@@ -16,6 +16,23 @@ source. `progressSliderClickAndDrag` exercises click and drag handlers extracted
 from both production QML interfaces. `tests/run-hls-seek.sh` checks decoded audio
 and advancing playback after forward, backward, paused and repeated HLS seeks.
 
+## Seeking into an uncached HLS segment
+
+The local stream proxy buffers HLS media segments and initialization objects
+before sending a successful response to the decoder. Previously it forwarded
+partial bytes immediately: an interrupted CDN response exposed a truncated
+segment to FFmpeg, with no opportunity for the proxy to recover the request.
+Foreground downloads now retry up to twice before returning an HTTP error.
+Disconnected player requests are cancelled without retrying. Byte-range
+responses preserve `Content-Range`; only complete, non-range responses enter
+the cache. The existing 8 MiB object limit also bounds segment buffering.
+
+`truncatedSegmentIsRetried` interrupts an upstream response and verifies that
+the player receives one complete segment and that subsequent reads use the
+cache. `hlsSeekThroughCache`, run with the generated HLS fixture, also seeks
+into an uncached segment over a delayed local server and checks decoded PCM
+and clock progress before testing fully cached playback.
+
 ## Favorite synchronization
 
 After the authenticated profile loads, the controller reads every page of

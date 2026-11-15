@@ -9,6 +9,7 @@ import QtCore
 
 Window {
     id: app
+    objectName: "applicationWindow"
     width: 1320; height: 820
     minimumWidth: 760; minimumHeight: 560
     visible: true

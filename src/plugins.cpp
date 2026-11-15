@@ -568,6 +568,7 @@ QVariantList Plugins::installed() const {
         row["settingRows"] = settingRows;
         QVariantList permissionRows;
         const QHash<QString, QString> descriptions{
+            {"code.execute", "Исполнение QML/JavaScript: полный доступ к приложению, данным и сети; без изоляции"},
             {"ui.panels", "Панели и кнопки"},
             {"ui.theme", "Изменение оформления"},
             {"player.observe", "Названия и исполнители треков, состояние плеера (персональные данные)"},
@@ -882,6 +883,33 @@ void Plugins::recordError(const QString &id, const QString &message, bool fatal)
     }
     emit changed();
 }
+QVariantList Plugins::runtimes() const {
+    QVariantList result;
+    for (const auto &value : entries) {
+        const auto row = value.toMap();
+        const auto id = pluginId(row);
+        if (!reason(id).isEmpty() || !permitted(id, "code.execute")) continue;
+        for (const auto &value : manifest(row)["contributions"].toArray()) {
+            const auto c = value.toObject();
+            if (c["type"] != "runtime" || (c.contains("enabledSetting") &&
+                !row["settings"].toMap().value(c["enabledSetting"].toString()).toBool())) continue;
+            auto spec = c.toVariantMap();
+            spec["pluginId"] = id;
+            result.append(spec);
+        }
+    }
+    return result;
+}
+void Plugins::reloadRuntime(const QString &id) {
+    if (indexOf(id) < 0) return;
+    m_errors.remove(id);
+    m_logs.remove(id);
+    emit runtimeReloadRequested(id);
+    emit changed();
+}
+void Plugins::runtimeError(const QString &id, const QString &message) {
+    recordError(id, message, true);
+}
 QVariantList Plugins::panels() const {
     QVariantList result;
     for (auto value : entries) {
@@ -901,6 +929,7 @@ QVariantList Plugins::panels() const {
                     result.append(t);
                     continue;
                 }
+                if (c["type"] == "runtime") continue;
                 auto panel = c.toVariantMap();
                 panel["page"] = c["slot"] == "home.panels"      ? "home"
                                 : c["slot"] == "profile.panels" ? "profile"

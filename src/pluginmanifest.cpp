@@ -266,9 +266,8 @@ Result parse(const QByteArray &bytes) {
 QString validate(const QJsonObject &o) {
     if (o["api"] != 2)
         return "Неподдерживаемая версия API.";
-    if (o["kind"] != "declarative")
-        return "unsupported-runtime: исполняемые расширения не поддерживаются; изолированная среда "
-               "отсутствует.";
+    if (o["kind"] != "declarative" && o["kind"] != "qml")
+        return "unsupported-runtime: неизвестная среда исполнения; поддерживаются declarative и qml.";
     const QStringList required{"api",          "kind",        "id",       "name",          "version",
                                "requiresHost", "permissions", "settings", "contributions", "rules"};
     auto allowed = required;
@@ -281,13 +280,15 @@ QString validate(const QJsonObject &o) {
         if (!o[key].isArray())
             return "Ожидается массив.";
     const QStringList permissions{"ui.panels",  "ui.theme", "player.observe", "player.control",
-                                  "navigation", "storage",  "timers"};
+                                  "navigation", "storage",  "timers", "code.execute"};
     QSet<QString> grants;
     for (auto p : o["permissions"].toArray()) {
         if (!p.isString() || !permissions.contains(p.toString()) || grants.contains(p.toString()))
             return "Неизвестное или повторное разрешение.";
         grants.insert(p.toString());
     }
+    if ((o["kind"] == "qml") != grants.contains("code.execute"))
+        return "QML-плагину нужно разрешение code.execute (полный доступ).";
     if (o.contains("dependencies") &&
         (!o["dependencies"].isArray() || o["dependencies"].toArray().size() > 8))
         return "Некорректные зависимости.";
@@ -409,7 +410,12 @@ QString validate(const QJsonObject &o) {
         if (c.contains("enabledSetting") && (!settings.contains(c["enabledSetting"].toString()) ||
                                              settings[c["enabledSetting"].toString()]["type"] != "boolean"))
             return "Неизвестный переключатель вклада.";
-        if (type == "theme") {
+        if (type == "runtime") {
+            if (o["kind"] != "qml" || !fields(c, {"id", "type", "source", "enabledSetting"}, {"id", "type", "source"}) ||
+                !c["source"].isString() || c["source"].toString().trimmed().isEmpty() ||
+                c["source"].toString().toUtf8().size() > 128 * 1024)
+                return "Некорректный исполняемый QML-компонент.";
+        } else if (type == "theme") {
             if (!grants.contains("ui.theme") || ++themes > 6 ||
                 !fields(c, {"id", "type", "values", "enabledSetting"}, {"id", "type", "values"}) ||
                 !c["values"].isObject() || !theme(c["values"].toObject()).isEmpty())

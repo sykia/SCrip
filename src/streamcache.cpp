@@ -127,7 +127,7 @@ void StreamCache::accept() {
         });
     }
 }
-void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteArray range, bool head) {
+void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteArray range, bool head, int attempt) {
     if (auto *entry = m_cache.object(key)) {
         QFile file(entry->file);
         if (file.open(QIODevice::ReadOnly)) {
@@ -164,14 +164,21 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     auto *reply = head ? m_network.head(request) : m_network.get(request);
     if (background) { m_background = reply; reply->setProperty("cacheKey", key); }
     else if (socket) connect(socket, &QTcpSocket::disconnected, reply, &QNetworkReply::abort);
-    struct Download { QByteArray body; bool headers = false; bool manifest = false; bool tooLarge = false; };
+    // HLS demuxers may treat a truncated segment as EOF and never recover after
+    // a seek. Keep small HLS objects atomic so a failed download can be retried
+    // before any successful HTTP response reaches the player.
+    const auto suffix = QFileInfo(reply->url().path()).suffix().toLower();
+    const bool segment = !head && (suffix == "m4s" || suffix == "ts" || suffix == "mp4" || suffix == "aac" || suffix == "mp3");
+    struct Download { QByteArray body; bool headers = false; bool manifest = false; bool atomic = false; bool tooLarge = false; };
     auto state = std::make_shared<Download>();
     auto drain = [=] {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status < 200 || status >= 300) return;
         const QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         state->manifest = type.contains("mpegurl") || reply->url().path().endsWith(".m3u8");
-        if (!state->manifest && socket && !state->headers) {
+        state->atomic = segment || (!head && (type.contains("audio/mp4") || type.contains("video/mp4") ||
+            type.contains("video/mp2t") || type.contains("audio/aac") || type.contains("audio/mpeg")));
+        if (!state->manifest && !state->atomic && socket && !state->headers) {
             state->headers = true;
             QByteArray headers = "HTTP/1.0 " + QByteArray::number(status) + " OK\r\nConnection: close\r\nContent-Type: " + type + "\r\n";
             for (const auto &name : {QByteArray("Content-Length"), QByteArray("Content-Range"), QByteArray("Accept-Ranges")})
@@ -179,17 +186,17 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
             socket->write(headers + "\r\n");
         }
         const QByteArray chunk = reply->readAll();
-        if (!state->manifest && socket && !head) socket->write(chunk);
+        if (!state->manifest && !state->atomic && socket && !head) socket->write(chunk);
         if (!state->tooLarge) {
             state->body += chunk;
-            if (state->body.size() > maximumObject) { state->body.clear(); state->tooLarge = true; if (background || state->manifest) reply->abort(); }
+            if (state->body.size() > maximumObject) { state->body.clear(); state->tooLarge = true; if (background || state->manifest || state->atomic) reply->abort(); }
         }
     };
     connect(reply, &QNetworkReply::readyRead, this, drain);
     connect(reply, &QNetworkReply::finished, this, [=, this] {
         drain();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const bool ok = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300;
+        const bool ok = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300 && (!(state->atomic || state->manifest) || !state->tooLarge);
         QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         if (ok && state->manifest && !state->tooLarge) { state->body = playlist(state->body, {reply->url(), m_resources.value(key).root}); type = "application/vnd.apple.mpegurl"; }
         if (ok && !head && range.isEmpty() && status == 200 && !state->tooLarge) {
@@ -199,8 +206,19 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
                 file.close(); m_cache.insert(key, new Entry{path, type}, qMax(1, int(state->body.size())));
             } else { file.close(); QFile::remove(path); }
         }
+        const bool retry = !ok && !background && socket &&
+            socket->state() == QAbstractSocket::ConnectedState && !state->headers && attempt < 2 &&
+            reply->error() != QNetworkReply::OperationCanceledError &&
+            (status == 0 || status == 200 || status == 206 || status >= 500);
+        if (retry) {
+            --m_foreground;
+            reply->deleteLater();
+            fetch(key, socket, range, head, attempt + 1);
+            return;
+        }
         if (socket) {
-            if (!state->headers) respond(socket, ok ? status : 502, ok ? state->body : QByteArray{}, type, {}, head);
+            if (!state->headers) respond(socket, ok ? status : 502, ok ? state->body : QByteArray{}, type,
+                ok && reply->hasRawHeader("Content-Range") ? "Content-Range: " + reply->rawHeader("Content-Range") + "\r\n" : QByteArray{}, head);
             else socket->disconnectFromHost();
         }
         if (m_background == reply) m_background.clear();

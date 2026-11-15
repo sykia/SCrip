@@ -30,7 +30,7 @@ private:
     QUrl map(const QUrl &remote, const QString &root);
     QByteArray playlist(const QByteArray &body, const Resource &resource);
     void accept();
-    void fetch(const QString &key, QPointer<QTcpSocket> socket = {}, QByteArray range = {}, bool head = false);
+    void fetch(const QString &key, QPointer<QTcpSocket> socket = {}, QByteArray range = {}, bool head = false, int attempt = 0);
     void next();
     QTcpServer m_server;
     QNetworkAccessManager m_network;

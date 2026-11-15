@@ -1,12 +1,12 @@
 # Plugin system architecture
 
-SCrip uses a single declarative runtime and the API 2 manifest format. The implementation and full contract are described in the [reference](plugin-api-v2-reference.md). This document defines architectural boundaries, rather than a separate runtime.
+SCrip uses the API 2 manifest format with a declarative runtime and a [trusted executable QML runtime](plugin-runtime.md). The implementation and full contract are described in the [reference](plugin-api-v2-reference.md). This document defines architectural boundaries, rather than a separate runtime.
 
 ## Trust boundary
 
-A plugin is UTF-8 JSON without executable code, resources or paths. C++ strictly validates the manifest and executes a finite set of commands. QML displays only built-in panels and settings. QML/JavaScript, HTML, libraries, processes, arbitrary URLs, file APIs and dynamic evaluation are prohibited.
+A declarative plugin is UTF-8 JSON without executable code, resources or paths. C++ strictly validates the manifest and executes a finite set of commands. QML displays only built-in panels and settings. QML/JavaScript, HTML, libraries, processes, arbitrary URLs, file APIs and dynamic evaluation are prohibited.
 
-Contributions and commands are limited by user permissions. Player data is exposed only through explicitly subscribed events. Queues, timers, causal depth, actions and storage have quotas; dependencies are checked before activation. A save failure leaves the active state unchanged. Existing tests cover validation, permissions, commands, events, timers, data and updates.
+Declarative contributions and commands are limited by user permissions. The separate `code.execute` permission gives QML plugins full in-process access and does not provide isolation. Player data is exposed only through explicitly subscribed events. Queues, timers, causal depth, actions and storage have quotas; dependencies are checked before activation. A save failure leaves the active state unchanged. Existing tests cover validation, permissions, commands, events, timers, data and updates.
 
 ## Manifests and registry
 
@@ -16,4 +16,4 @@ The API 2 manifest format is the public package contract. The internal registry 
 
 If `plugins.json` is absent, the manager reads the older `plugins-v1.json` and `plugins-v2.json` files. Entries are validated before any changes; the current registry retains its order, and unique entries from the older registry are appended. Duplicates with different settings or data block migration. Byte-for-byte `.bak` backups are created before the unified registry is committed atomically. The original files are retained.
 
-Older appearance groups become API 2 manifests with a separate boolean setting for each group, standard theme and panel contributions, and the previously allowed actions. They do not load or run in a separate runtime. New installations accept only the declarative API 2 format.
+Older appearance groups become API 2 manifests with a separate boolean setting for each group, standard theme and panel contributions, and the previously allowed actions. They do not load or run in a separate runtime. New installations accept API 2 declarative and trusted QML packages.

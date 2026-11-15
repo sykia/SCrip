@@ -1,0 +1,13 @@
+{
+  "api": 2,
+  "kind": "qml",
+  "id": "glass-lab",
+  "name": "Glass Lab",
+  "description": "Исполняемый плагин: авторское меню, градиент с размытием и обратимое изменение плеера. Полный доступ к приложению.",
+  "version": "1.0.0",
+  "requiresHost": { "min": "1.6.0", "maxExclusive": "2.0.0" },
+  "permissions": ["code.execute"],
+  "settings": [{"id": "dim-dock", "type": "boolean", "label": "Приглушить плеер", "default": false}],
+  "contributions": [{"id": "main", "type": "runtime", "source": ""}],
+  "rules": []
+}

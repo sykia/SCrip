@@ -1,3 +1,4 @@
+#include "pluginruntime.h"
 #include "plugins.h"
 #include "discordpresence.h"
 #include "lyrics.h"
@@ -133,6 +134,7 @@ int main(int argc, char *argv[])
         quickWindow->setPersistentSceneGraph(false);
         quickWindow->setPersistentGraphics(false);
     }
+    PluginRuntime pluginRuntime(&engine, qobject_cast<QQuickWindow *>(engine.rootObjects().first()), &soundcloud, &plugins);
 #ifndef Q_OS_ANDROID
     auto *window = qobject_cast<QWindow *>(engine.rootObjects().first());
     QIcon icon(":/qt/qml/SCrip/assets/blob.png");

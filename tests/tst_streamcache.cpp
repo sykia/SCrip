@@ -44,12 +44,12 @@ private slots:
             connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
             connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
                 socket->readAll(); ++requests;
-                socket->write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\nContent-Type: audio/mp4\r\nConnection: close\r\n\r\n01234"); socket->flush();
+                socket->write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n01234"); socket->flush();
                 QTimer::singleShot(200, socket, [socket] { socket->write("56789"); socket->disconnectFromHost(); });
             });
         });
         StreamCache cache;
-        const auto local = cache.source(QUrl("https://cdn.example/part.m4s"));
+        const auto local = cache.source(QUrl("https://cdn.example/part.bin"));
         cache.m_resources[local.path().mid(1)].remote = QUrl(QString("http://127.0.0.1:%1/part").arg(upstream.serverPort()));
         QNetworkAccessManager client;
         auto *reply = client.get(QNetworkRequest(local));
@@ -58,6 +58,29 @@ private slots:
         QVERIFY(done.wait()); QCOMPARE(reply->readAll(), QByteArray("0123456789")); reply->deleteLater();
         reply = client.get(QNetworkRequest(local)); QSignalSpy cachedDone(reply, &QNetworkReply::finished);
         QVERIFY(cachedDone.wait()); QCOMPARE(reply->readAll(), QByteArray("0123456789")); QCOMPARE(requests, 1); reply->deleteLater();
+    }
+    void truncatedSegmentIsRetried() {
+        QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
+        int requests = 0;
+        connect(&upstream, &QTcpServer::newConnection, this, [&] {
+            auto *socket = upstream.nextPendingConnection();
+            connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                socket->readAll(); ++requests;
+                socket->write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\nContent-Type: audio/mp4\r\nConnection: close\r\n\r\n01234"); socket->flush();
+                QTimer::singleShot(200, socket, [socket, &requests] { if (requests > 1) socket->write("56789"); socket->disconnectFromHost(); });
+            });
+        });
+        StreamCache cache;
+        const auto local = cache.source(QUrl("https://cdn.example/part.m4s"));
+        cache.m_resources[local.path().mid(1)].remote = QUrl(QString("http://127.0.0.1:%1/part").arg(upstream.serverPort()));
+        QNetworkAccessManager client;
+        auto *reply = client.get(QNetworkRequest(local));
+        QSignalSpy done(reply, &QNetworkReply::finished);
+        // A truncated response must not reach the HLS demuxer.
+        QVERIFY(done.wait()); QCOMPARE(reply->error(), QNetworkReply::NoError); QCOMPARE(reply->readAll(), QByteArray("0123456789")); reply->deleteLater();
+        reply = client.get(QNetworkRequest(local)); QSignalSpy cachedDone(reply, &QNetworkReply::finished);
+        QVERIFY(cachedDone.wait()); QCOMPARE(reply->readAll(), QByteArray("0123456789")); QCOMPARE(requests, 2); reply->deleteLater();
     }
     void hlsSeekThroughCache() {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
@@ -76,8 +99,10 @@ private slots:
                 if (!file.open(QIODevice::ReadOnly)) { socket->disconnectFromHost(); return; }
                 const QByteArray body = file.readAll();
                 const QByteArray type = name.endsWith("m3u8") ? "application/vnd.apple.mpegurl" : "audio/mp4";
-                socket->write("HTTP/1.1 200 OK\r\nContent-Type: " + type + "\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
-                socket->disconnectFromHost();
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: " + type + "\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body.left(body.size() / 2));
+                QTimer::singleShot(1500, socket, [socket, body] {
+                    socket->write(body.mid(body.size() / 2)); socket->disconnectFromHost();
+                });
             });
         });
         StreamCache cache;
@@ -88,12 +113,18 @@ private slots:
         const auto local = cache.source(remote);
         player.setSource(local); player.play();
         QTRY_VERIFY_WITH_TIMEOUT(player.position() > 500 && buffers > 10, 10000);
+        // Seek while the destination segments have not been prefetched.
+        QVERIFY(!cache.m_cache.contains(cache.m_children.value(remote.toString(QUrl::FullyEncoded)).last()));
+        buffers = 0; player.setPosition(75000);
+        QTRY_VERIFY_WITH_TIMEOUT(player.position() > 75500 && buffers > 10, 10000);
+        QCOMPARE(player.error(), QMediaPlayer::NoError);
+        player.pause();
         cache.warm(local);
-        QTRY_VERIFY_WITH_TIMEOUT(cache.m_pending.isEmpty() && !cache.m_background && cache.m_cache.size() >= 10, 15000);
+        QTRY_VERIFY_WITH_TIMEOUT(cache.m_pending.isEmpty() && !cache.m_background && cache.m_cache.size() >= 10, 35000);
         // После прогрева источник отключён: перемотка должна читать только кэш.
         upstream.close();
         for (qint64 target : {60000, 10000, 75000}) {
-            buffers = 0; player.setPosition(target);
+            buffers = 0; player.setPosition(target); player.play();
             QTRY_VERIFY_WITH_TIMEOUT(player.position() > target + 500 && buffers > 10, 10000);
             QCOMPARE(player.error(), QMediaPlayer::NoError);
         }

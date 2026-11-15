@@ -8,6 +8,7 @@ import QtQuick.Dialogs as Dialogs
 
 ApplicationWindow {
     id: app
+    objectName: "applicationWindow"
     visible: true
     width: 412
     height: 860
@@ -676,6 +677,7 @@ ApplicationWindow {
 
     Item {
         id: navigationFooter
+        objectName: "navigationColumn"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -688,6 +690,7 @@ ApplicationWindow {
         spacing: 10
         AbstractButton {
             id: miniPlayer
+            objectName: "playbackDock"
             visible: !!app.api.current?.title
             x: 12; width: parent.width - 24; height: 72
             Accessible.name: "Открыть плеер: " + (app.api.current?.title || "")
@@ -846,6 +849,7 @@ ApplicationWindow {
 
     Sheet {
         id: player
+        objectName: "playerSheet"
         parent: Overlay.overlay
         width: parent.width; height: parent.height
         modal: true; focus: true; closePolicy: Popup.CloseOnEscape; padding: 26

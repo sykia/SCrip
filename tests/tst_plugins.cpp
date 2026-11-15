@@ -1,4 +1,5 @@
 #include "pluginmanifest.h"
+#include "pluginruntime.h"
 #include "plugins.h"
 #include <QDir>
 #include <QJsonArray>
@@ -95,6 +96,124 @@ class PluginTests : public QObject {
         QCoreApplication::setApplicationVersion("1.4.1");
         QCoreApplication::setApplicationName("SCrip-v2-tests-" +
                                              QUuid::createUuid().toString(QUuid::WithoutBraces));
+    }
+    void trustedRuntimeLifecycle() {
+        Plugins host;
+        auto p = basic("code-test");
+        p["kind"] = "qml";
+        p["permissions"] = QJsonArray{"code.execute"};
+        p["settings"] = QJsonArray{QJsonObject{{"id", "dim"}, {"type", "boolean"}, {"label", "Dim"}, {"default", true}}};
+        const QString source = R"(import QtQuick
+Item {
+    required property var sdk
+    objectName: "runtimeProbe"
+    property string owner: sdk.id
+    property bool dim: sdk.settings.dim
+    Binding { target: sdk.find("testDock"); property: "opacity"; value: 0.3; when: sdk.active; restoreMode: Binding.RestoreBindingOrValue }
+})";
+        p["contributions"] = QJsonArray{QJsonObject{{"id", "main"}, {"type", "runtime"}, {"source", source}}};
+        QVERIFY2(PluginManifest::validate(p).isEmpty(), qPrintable(PluginManifest::validate(p)));
+        auto denied = p;
+        denied["permissions"] = QJsonArray{};
+        QVERIFY(!PluginManifest::validate(denied).isEmpty());
+        denied = p;
+        denied["kind"] = "declarative";
+        QVERIFY(!PluginManifest::validate(denied).isEmpty());
+        QCOMPARE(add(host, p), QString());
+        QVERIFY(host.runtimes().isEmpty());
+        QQuickWindow window;
+        QQuickItem dock(window.contentItem());
+        dock.setObjectName("testDock");
+        dock.setOpacity(0.8);
+        QQmlEngine engine;
+        PluginRuntime runtime(&engine, &window, nullptr, &host);
+        QCOMPARE(host.enable("code-test", true), QString());
+        auto findProbe = [&]() -> QQuickItem * {
+            for (auto *child : window.contentItem()->childItems())
+                if (child->objectName() == "runtimeProbe") return child;
+            return nullptr;
+        };
+        QTRY_VERIFY(findProbe());
+        QPointer<QQuickItem> original = findProbe();
+        QCOMPARE(original->property("owner").toString(), QString("code-test"));
+        QCOMPARE(original->property("dim").toBool(), true);
+        QCOMPARE(dock.opacity(), 0.3);
+        QCOMPARE(host.setSetting("code-test", "dim", false), QString());
+        QTRY_COMPARE(original->property("dim").toBool(), false);
+        host.reloadRuntime("code-test");
+        QTRY_VERIFY(original.isNull());
+        QTRY_VERIFY(findProbe());
+        QCOMPARE(host.setPermission("code-test", "code.execute", false), QString());
+        QTRY_VERIFY(!findProbe());
+        QCOMPARE(dock.opacity(), 0.8);
+        QVERIFY(host.runtimes().isEmpty());
+        QCOMPARE(host.setPermission("code-test", "code.execute", true), QString());
+        QTRY_VERIFY(findProbe());
+        QCOMPARE(host.remove("code-test"), QString());
+        QTRY_VERIFY(!findProbe());
+    }
+    void trustedRuntimeRecoveryMode() {
+        Plugins host;
+        auto p = basic("safe-mode-test");
+        p["kind"] = "qml";
+        p["permissions"] = QJsonArray{"code.execute"};
+        p["contributions"] = QJsonArray{QJsonObject{{"id", "main"}, {"type", "runtime"},
+            {"source", "import QtQuick\nItem { required property var sdk; objectName: \"shouldNotLoad\" }"}}};
+        QCOMPARE(add(host, p), QString());
+        QCOMPARE(host.enable("safe-mode-test", true), QString());
+        const bool wasSet = qEnvironmentVariableIsSet("SCRIP_NO_PLUGIN_CODE");
+        const auto previous = qgetenv("SCRIP_NO_PLUGIN_CODE");
+        qputenv("SCRIP_NO_PLUGIN_CODE", "1");
+        QQuickWindow window;
+        QQmlEngine engine;
+        {
+            PluginRuntime runtime(&engine, &window, nullptr, &host);
+            QTest::qWait(30);
+            QVERIFY(window.contentItem()->childItems().isEmpty());
+        }
+        if (wasSet) qputenv("SCRIP_NO_PLUGIN_CODE", previous);
+        else qunsetenv("SCRIP_NO_PLUGIN_CODE");
+        QCOMPARE(host.installed().first().toMap()["enabled"].toBool(), true);
+    }
+    void trustedRuntimeErrorAndExample() {
+        Plugins host;
+        QFile manifestFile(QString(SCRIP_SOURCE_DIR) + "/examples/plugins/glass-lab.manifest.json");
+        QFile sourceFile(QString(SCRIP_SOURCE_DIR) + "/examples/plugins/glass-lab.qml");
+        QVERIFY(manifestFile.open(QIODevice::ReadOnly));
+        QVERIFY(sourceFile.open(QIODevice::ReadOnly));
+        auto p = QJsonDocument::fromJson(manifestFile.readAll()).object();
+        p["requiresHost"] = basic()["requiresHost"];
+        auto c = p["contributions"].toArray()[0].toObject();
+        c["source"] = QString::fromUtf8(sourceFile.readAll());
+        p["contributions"] = QJsonArray{c};
+        QCOMPARE(add(host, p), QString());
+        QQuickWindow window;
+        window.resize(412, 860);
+        QQmlEngine engine;
+        PluginRuntime runtime(&engine, &window, nullptr, &host);
+        QCOMPARE(host.enable("glass-lab", true), QString());
+        auto findMenu = [&]() -> QObject * {
+            for (auto *child : window.contentItem()->childItems())
+                if (child->objectName() == "glassLabExtension") return child->findChild<QObject *>("glassLabMenu");
+            return nullptr;
+        };
+        QTRY_VERIFY2(findMenu(), qPrintable(host.installed().first().toMap()["lastError"].toString()));
+        QCOMPARE(host.panels().size(), 0);
+        QCOMPARE(host.enable("glass-lab", false), QString());
+        QTRY_VERIFY(!findMenu());
+        p["version"] = "1.0.1";
+        c["source"] = "import QtQuick\nItem { required property var sdk; broken syntax }";
+        p["contributions"] = QJsonArray{c};
+        QCOMPARE(add(host, p), QString());
+        QCOMPARE(host.enable("glass-lab", true), QString());
+        QTRY_COMPARE(host.installed().first().toMap()["status"].toString(), QString("error"));
+        QVERIFY(host.runtimes().isEmpty());
+        p["version"] = "1.0.2";
+        c["source"] = "import QtQuick\nItem { required property var sdk; objectName: \"fixedPlugin\" }";
+        p["contributions"] = QJsonArray{c};
+        QCOMPARE(add(host, p), QString());
+        host.reloadRuntime("glass-lab");
+        QTRY_COMPARE(host.installed().first().toMap()["status"].toString(), QString("active"));
     }
     void parserRejectsHostileInput() {
         auto p = basic();
