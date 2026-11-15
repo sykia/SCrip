@@ -37,6 +37,7 @@ if(ANDROID)
 endif()
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
+set_source_files_properties(qml/SmoothWheel.qml PROPERTIES QT_RESOURCE_ALIAS SmoothWheel.qml)
 set_source_files_properties(qml/WavePanel.qml PROPERTIES QT_RESOURCE_ALIAS WavePanel.qml)
 set_source_files_properties(qml/PlaylistPopup.qml PROPERTIES QT_RESOURCE_ALIAS PlaylistPopup.qml)
 set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)
@@ -54,7 +55,7 @@ qt_add_qml_module(scrip
     URI SCrip
     VERSION 1.0
     RESOURCES qml/assets/blob.png
-    QML_FILES qml/PlaylistPopup.qml qml/InteractionFeedback.qml qml/SurfaceTransition.qml ${main_qml} qml/WavePanel.qml qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
+    QML_FILES qml/SmoothWheel.qml qml/PlaylistPopup.qml qml/InteractionFeedback.qml qml/SurfaceTransition.qml ${main_qml} qml/WavePanel.qml qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
 )
 qt_add_shaders(scrip wave_shaders
     PREFIX "/shaders"

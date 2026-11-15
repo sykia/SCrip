@@ -544,10 +544,24 @@ ApplicationWindow {
             visible: sc.signedIn && app.page > 0 && app.page < 5
             Layout.fillWidth: true; Layout.fillHeight: true
             clip: true; model: sc.trackModel
+            reuseItems: true
+            cacheBuffer: Math.max(320, height / 2)
+            pixelAligned: false
+            flickDeceleration: 1500
+            maximumFlickVelocity: 3600
+            function maybeLoad() {
+                if (visible && prefs.autoLoad && app.api.hasMore && !app.api.busy && !app.api.error
+                        && contentY + height >= originY + contentHeight + bottomMargin - 180) sc.more()
+            }
+            readonly property bool paginationReady: visible && prefs.autoLoad && app.api.hasMore && !app.api.busy && !app.api.error
+            onPaginationReadyChanged: loadTimer.restart()
+            onContentHeightChanged: loadTimer.restart()
+            onHeightChanged: loadTimer.restart()
+            Timer { id: loadTimer; interval: 100; onTriggered: tracks.maybeLoad() }
             onCountChanged: if (app.page === 4 && app.profileTabResetPending) positionViewAtBeginning()
             onContentYChanged: {
                 if (!app.restoringScroll && app.activeScrollKey === app.scrollKey) app.scrollPositions[app.activeScrollKey] = contentY
-                if (prefs.autoLoad && app.api.hasMore && !app.api.busy && contentY + height >= contentHeight - 180) sc.more()
+                if (!loadTimer.running) loadTimer.start()
             }
             header: Column {
                 width: tracks.width
@@ -907,7 +921,7 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true
-                Caption { text: app.time(sc.position); color: app.muted; font.pixelSize: 12 }
+                Caption { text: app.time(progress.pressed ? progress.value : sc.position); color: app.muted; font.pixelSize: 12 }
                 Item { Layout.fillWidth: true }
                 Caption { text: app.time(sc.duration); color: app.muted; font.pixelSize: 12 }
             }

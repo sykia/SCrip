@@ -480,7 +480,6 @@ Window {
                 clip: true; contentWidth: width; contentHeight: pageBody.height + 136
                 boundsBehavior: Flickable.StopAtBounds
                 flickDeceleration: 1500; maximumFlickVelocity: 3600
-                property real wheelTarget: 0
                 property bool virtualCollectionHovered: false
                 function maybeLoad() {
                     if (prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
@@ -500,21 +499,10 @@ Window {
                 Timer { id: autoLoadTimer; interval: 160; onTriggered: contentScroll.maybeLoad() }
                 readonly property bool paginationReady: app.api.hasMore && !app.api.busy && !app.api.error && prefs.autoLoad
                 onPaginationReadyChanged: autoLoadTimer.restart()
-                onMovementStarted: wheelMotion.stop()
-                SmoothedAnimation { id: wheelMotion; target: contentScroll; property: "contentY"; velocity: -1; duration: Math.min(220, app.motion); reversingMode: SmoothedAnimation.Immediate }
-                WheelHandler {
+                SmoothWheel {
+                    flickable: contentScroll
+                    duration: prefs.motion ? Math.min(220, app.motion) : 0
                     enabled: !contentScroll.virtualCollectionHovered
-                    acceptedDevices: PointerDevice.Mouse
-                    onWheel: event => {
-                        if (event.pixelDelta.y !== 0 || event.angleDelta.y === 0) { event.accepted = false; return }
-                        const end = Math.max(0, contentScroll.contentHeight - contentScroll.height)
-                        const sameDirection = (contentScroll.wheelTarget - contentScroll.contentY) * event.angleDelta.y < 0
-                        const base = wheelMotion.running && sameDirection ? contentScroll.wheelTarget : contentScroll.contentY
-                        contentScroll.wheelTarget = Math.max(0, Math.min(end, base - event.angleDelta.y / 120 * 176))
-                        if (prefs.motion) { wheelMotion.to = contentScroll.wheelTarget; wheelMotion.start() }
-                        else contentScroll.contentY = contentScroll.wheelTarget
-                        event.accepted = true
-                    }
                 }
                 ScrollBar.vertical: ScrollBar { id: pageBar }
 
@@ -654,7 +642,7 @@ Window {
                         }
                         RowLayout {
                             visible: player.hasTrack; Layout.fillWidth: true; spacing: 8
-                            Txt { text: app.time(sc.position); color: app.muted; font.pixelSize: 10 }
+                            Txt { text: app.time(trackProgress.pressed ? trackProgress.value : sc.position); color: app.muted; font.pixelSize: 10 }
                             LineSlider {
                                 id: trackProgress
                                 Layout.fillWidth: true; implicitHeight: 17; from: 0; to: Math.max(1, sc.duration || 1)
@@ -1370,6 +1358,7 @@ Window {
             }
             onContentHeightChanged: contentScroll.maybeLoadVirtual(contentY, height, contentHeight)
             HoverHandler { onHoveredChanged: contentScroll.virtualCollectionHovered = hovered }
+            SmoothWheel { flickable: virtualCoverGrid; duration: prefs.motion ? Math.min(220, app.motion) : 0 }
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
             delegate: Item {
                 id: tile
@@ -1460,6 +1449,7 @@ Window {
             }
             onContentHeightChanged: maybeLoad()
             HoverHandler { onHoveredChanged: contentScroll.virtualCollectionHovered = hovered }
+            SmoothWheel { flickable: virtualTrackList; duration: prefs.motion ? Math.min(220, app.motion) : 0 }
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
             delegate: Rectangle {
                 id: row
