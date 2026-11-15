@@ -70,7 +70,7 @@ See [SoundCloud integration and secure storage](docs/soundcloud-security.md), th
 
 SCrip is independent software and is not an official SoundCloud product.
 
-Copyright (c) 2026 sykia. The source code is licensed under **GNU GPL v3.0 only**. You may use, study, modify and redistribute it under the terms of [LICENSE](LICENSE).
+Copyright (c) 2026 sykia. The source code is licensed under **GNU GPL v3.0 only (GPL-3.0-only)**. You may use, study, modify and redistribute it under the terms of [LICENSE](LICENSE).
 
 Third-party components retain their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md). The [name and original logo](TRADEMARKS.md) may be copied and modified under the GPL without additional restrictions. [Release licensing materials](licensing/README.md) document the distribution process.
 
