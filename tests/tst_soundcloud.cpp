@@ -1,4 +1,5 @@
 #include "soundcloud.h"
+#include "lyrics.h"
 #include <QtTest>
 #include <QNetworkReply>
 #include <QTemporaryDir>
@@ -9,11 +10,16 @@
 #include <cmath>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlExpression>
+#include <QQmlComponent>
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QQuickItemGrabResult>
 #include <QDesktopServices>
 #include <QSettings>
 #include <QElapsedTimer>
+#include <QMediaDevices>
+#include <QDataStream>
 #include <QTcpSocket>
 #include <QWheelEvent>
 #ifdef Q_OS_WIN
@@ -72,12 +78,19 @@ public:
     QList<QNetworkRequest> requests;
     QList<QByteArray> bodies;
     QList<QByteArray> methods;
+    QSet<QString> responseHosts;
+    QHash<QString, QList<Response>> hostResponses;
+    bool routeByHost = false;
 protected:
     QNetworkReply *createRequest(Operation op, const QNetworkRequest &request, QIODevice *outgoing) override {
         Q_UNUSED(op)
         requests.append(request); bodies.append(outgoing ? outgoing->readAll() : QByteArray{});
         methods.append(request.attribute(QNetworkRequest::CustomVerbAttribute).toByteArray());
-        Response r = responses.isEmpty() ? Response{500, "{}"} : responses.takeFirst();
+        const auto host = request.url().host();
+        Response r;
+        if (routeByHost) r = hostResponses[host].isEmpty() ? Response{404, "{}"} : hostResponses[host].takeFirst();
+        else if (!responseHosts.isEmpty() && !responseHosts.contains(host)) r = {404, "{}"};
+        else r = responses.isEmpty() ? Response{500, "{}"} : responses.takeFirst();
         return new Reply(request, r, this);
     }
 };
@@ -154,6 +167,66 @@ private slots:
         QTest::qWait(20);
     }
 #endif
+    void playlistPreviewPreservesCatalogAndRejectsStaleResponses() {
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false);
+        sc.m_access = "test-access";
+        sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        const QVariantList catalog{QVariantMap{{"urn", "soundcloud:playlists:1"}}};
+        sc.set("tracks", catalog);
+        sc.set("heading", "Catalog");
+        const QVariantMap first{{"urn", "soundcloud:playlists:1"}};
+        const QVariantMap second{{"urn", "soundcloud:playlists:2"}};
+        net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\"}]}", 80},
+                         {200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:2\"}],\"next_href\":\"https://api.soundcloud.com/playlists/2/tracks?cursor=next\"}"}};
+        sc.loadPlaylist(first);
+        sc.loadPlaylist(second);
+        QTRY_VERIFY(!sc.state()["playlistBusy"].toBool());
+        QCOMPARE(sc.state()["playlistTracks"].toList().first().toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+        QTest::qWait(100);
+        QCOMPARE(sc.state()["playlistTracks"].toList().size(), 1);
+        QCOMPARE(sc.state()["tracks"].toList(), catalog);
+        QCOMPARE(sc.state()["heading"].toString(), QString("Catalog"));
+        QVERIFY(sc.state()["playlistHasMore"].toBool());
+        net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:2\"},{\"urn\":\"soundcloud:tracks:3\"}]}"}};
+        sc.loadPlaylist(second, true);
+        QTRY_VERIFY(!sc.state()["playlistBusy"].toBool());
+        QCOMPARE(sc.state()["playlistTracks"].toList().size(), 2);
+        QVERIFY(!sc.state()["playlistHasMore"].toBool());
+    }
+    void stationAndMixPreviewsDoNotStartPlayback() {
+        Network net;
+        SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false);
+        sc.m_access = "test-access";
+        sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        const QVariantMap seed{{"urn", "soundcloud:tracks:1"}, {"title", "Seed"}};
+        const QVariantMap related{{"urn", "soundcloud:tracks:2"}, {"title", "Related"}};
+        const QVariantMap station{{"urn", seed["urn"]}, {"preview_type", "station"}, {"seed", seed}};
+        const QVariantList catalog{QVariantMap{{"urn", "soundcloud:playlists:1"}}};
+        sc.set("tracks", catalog);
+        net.responses = {{200, QJsonDocument(QJsonObject{{"collection", QJsonArray{QJsonObject::fromVariantMap(seed), QJsonObject::fromVariantMap(related)}}}).toJson()}};
+        sc.loadPlaylist(station);
+        QTRY_VERIFY(!sc.state()["playlistBusy"].toBool());
+        QCOMPARE(sc.state()["playlistTracks"].toList().size(), 2);
+        QCOMPARE(sc.state()["playlistTracks"].toList().first().toMap()["urn"], seed["urn"]);
+        QVERIFY(net.requests.last().url().path().endsWith("/related"));
+        QVERIFY(sc.state()["current"].toMap().isEmpty());
+        QVERIFY(sc.state()["queue"].toList().isEmpty());
+        QCOMPARE(sc.state()["tracks"].toList(), catalog);
+        net.responses = {{200, QJsonDocument(QJsonArray{QJsonObject::fromVariantMap(seed)}).toJson(), 80}};
+        sc.loadPlaylist(station);
+        const auto requestCount = net.requests.size();
+        sc.loadPlaylist({{"preview_type", "mix"}, {"tracks", QVariantList{related}}});
+        QCOMPARE(net.requests.size(), requestCount);
+        QTest::qWait(100);
+        QCOMPARE(sc.state()["playlistTracks"].toList().size(), 1);
+        QCOMPARE(sc.state()["playlistTracks"].toList().first().toMap()["urn"], related["urn"]);
+        QVERIFY(!sc.state()["playlistBusy"].toBool());
+        QVERIFY(!sc.state()["playlistHasMore"].toBool());
+        QVERIFY(sc.state()["current"].toMap().isEmpty());
+    }
     void volumeAndCrossfadePreferencesRestore() {
         QSettings preferences;
         preferences.remove("player/volume"); preferences.remove("player/crossfade");
@@ -520,6 +593,104 @@ private slots:
             QCOMPARE(sc.position(), 12750);
         }
         settings.remove("playback/session"); settings.remove("playback/position");
+    }
+    void seekDuringLoadingOverridesRestoredPosition() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        QTemporaryDir files; QVERIFY(files.isValid());
+        QFile wav(files.filePath("seek.wav")); QVERIFY(wav.open(QIODevice::WriteOnly));
+        QDataStream data(&wav); data.setByteOrder(QDataStream::LittleEndian);
+        constexpr int bytes = 44100 * 2 * 10;
+        data.writeRawData("RIFF", 4); data << quint32(bytes + 36);
+        data.writeRawData("WAVEfmt ", 8); data << quint32(16) << quint16(1) << quint16(1)
+            << quint32(44100) << quint32(88200) << quint16(2) << quint16(16);
+        data.writeRawData("data", 4); data << quint32(bytes);
+        wav.write(QByteArray(bytes, '\0')); wav.close();
+        sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:seek"}, {"duration", 10000}});
+        sc.set("duration", 10000);
+        sc.m_restoringPlayback = true; sc.m_restorePosition = 1000;
+        QSignalSpy seeks(&sc, &SoundCloud::playbackSeeked);
+        // A click while the stream URL is still resolving must survive setSource.
+        sc.seek(7000);
+        QCOMPARE(sc.position(), 7000);
+        QCOMPARE(sc.m_pendingSeek, 7000);
+        sc.m_player.setSource(QUrl::fromLocalFile(wav.fileName()));
+        QTRY_COMPARE(sc.m_pendingSeek, -1);
+        QTRY_COMPARE(sc.m_player.position(), 7000);
+        QCOMPARE(sc.position(), 7000);
+        QVERIFY(!sc.m_restoringPlayback);
+        QCOMPARE(seeks.size(), 1);
+        sc.seek(2000); QTRY_COMPARE(sc.m_player.position(), 2000);
+        QCOMPARE(sc.m_player.playbackState(), QMediaPlayer::StoppedState);
+        sc.stopPlayback(); QCOMPARE(sc.m_pendingSeek, -1);
+    }
+    void likesSyncUpdatesEveryContextAndFutureTracks() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        sc.set("signedIn", true);
+        const QVariantMap track{{"urn", "soundcloud:tracks:2"}, {"user_favorite", false}};
+        sc.set("current", track); sc.set("tracks", QVariantList{track});
+        sc.set("queue", QVariantList{track});
+        sc.set("home", QVariantList{QVariantMap{{"tracks", QVariantList{track}}}});
+        sc.m_listings.insert("cached", {QVariantList{track}, {}});
+        net.responses = {
+            {200, "{\"collection\":[{\"track\":{\"urn\":\"soundcloud:tracks:1\"}}],\"next_href\":\"https://api.soundcloud.com/me/likes/tracks?cursor=2\"}"},
+            {200, "{\"collection\":[{\"track\":{\"urn\":\"soundcloud:tracks:2\"}}]}"}};
+        sc.syncLikes();
+        QTRY_VERIFY(sc.m_likesComplete);
+        QVERIFY(sc.state()["current"].toMap()["user_favorite"].toBool());
+        QVERIFY(sc.state()["tracks"].toList()[0].toMap()["user_favorite"].toBool());
+        QVERIFY(sc.m_queue[0].toMap()["user_favorite"].toBool());
+        QVERIFY(sc.state()["home"].toList()[0].toMap()["tracks"].toList()[0].toMap()["user_favorite"].toBool());
+        QVERIFY(sc.m_listings["cached"].tracks[0].toMap()["user_favorite"].toBool());
+        sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:1"}});
+        QVERIFY(sc.state()["current"].toMap()["user_favorite"].toBool());
+        // A stale queue entry must still send DELETE, then stay unliked after a late sync page.
+        net.responses = {{204, ""}};
+        sc.like(track);
+        QTRY_VERIFY(sc.m_likeOverrides.contains("soundcloud:tracks:2"));
+        QCOMPARE(net.methods.last(), QByteArray("DELETE"));
+        sc.m_likedTracks.insert("soundcloud:tracks:2"); sc.refreshLikeStates();
+        QVERIFY(!sc.m_queue[0].toMap()["user_favorite"].toBool());
+        sc.set("current", track); QVERIFY(!sc.state()["current"].toMap()["user_favorite"].toBool());
+        sc.set("signedIn", false);
+        QVERIFY(sc.m_likedTracks.isEmpty()); QVERIFY(sc.m_likeOverrides.isEmpty());
+    }
+    void progressSliderClickAndDrag() {
+        for (const auto &path : {"/qml/Main.qml", "/qml/android/Main.qml"}) {
+            QFile file(QString(SCRIP_SOURCE_DIR) + path); QVERIFY(file.open(QIODevice::ReadOnly));
+            const QString source = QString::fromUtf8(file.readAll());
+            const bool android = QString(path).contains("android");
+            const QString id = android ? "progress" : "trackProgress";
+            const int start = source.lastIndexOf(android ? "FineSlider {" : "LineSlider {", source.indexOf("id: " + id));
+            int end = start, depth = 0;
+            for (; end < source.size(); ++end) {
+                if (source[end] == '{') ++depth;
+                if (source[end] == '}' && --depth == 0) { ++end; break; }
+            }
+            QString slider = source.mid(start, end - start);
+            slider.replace(android ? "FineSlider {" : "LineSlider {", "Slider {");
+            slider.replace("Layout.fillWidth: true;", "");
+            slider.replace("Layout.fillWidth: true", "");
+            QQmlEngine engine;
+            QQmlComponent component(&engine);
+            component.setData(("import QtQuick; import QtQuick.Controls; Item { width: 400; height: 60; "
+                "QtObject { id: sc; property real position: 10000; property real duration: 100000; "
+                "property real target: -1; function seek(value) { target = value; position = value } } "
+                "property alias target: sc.target; " + slider + " }").toUtf8(), QUrl());
+            QScopedPointer<QObject> root(component.create());
+            QVERIFY2(root, qPrintable(component.errorString()));
+            auto *item = qobject_cast<QQuickItem *>(root.data()); QVERIFY(item);
+            QQuickWindow window; window.resize(400, 60); item->setParentItem(window.contentItem());
+            auto *control = item->childItems().first(); control->setWidth(400); control->setHeight(60);
+            window.show(); QTest::qWait(80);
+            QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, QPoint(300, 30));
+            QVERIFY2(root->property("target").toDouble() > 70000, qPrintable(path));
+            QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(300, 30));
+            QTest::mouseMove(&window, QPoint(100, 30));
+            QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(100, 30));
+            QVERIFY(root->property("target").toDouble() < 30000);
+            item->setParentItem(nullptr);
+        }
     }
     void repostLikesAreMatchedAcrossPages() {
         Network net;
@@ -1120,6 +1291,250 @@ private slots:
         qunsetenv("CAPTURE_ARGS"); qunsetenv("CAPTURE_EXIT");
     }
 #endif
+    void lyricsParsingAndTransport() {
+        const auto lines = Lyrics::parseLrc("[ar:Artist]\n[offset:-100]\n[00:02.50][00:04.125]Repeat\n[00:01.1]First\n[00:05.000]\nmalformed");
+        QCOMPARE(lines.size(), 4);
+        QCOMPARE(lines[0].toMap()["time"].toLongLong(), 1000);
+        QCOMPARE(lines[1].toMap()["time"].toLongLong(), 2400);
+        QCOMPARE(lines[2].toMap()["time"].toLongLong(), 4025);
+        Network net; net.responseHosts = {"lrclib.net"};
+        net.responses = {{200, "{\"id\":42,\"trackName\":\"Song\",\"artistName\":\"Artist\",\"syncedLyrics\":\"[00:01.00]First\\n[00:03.00]Second\"}"}};
+        Lyrics lyrics(nullptr, &net);
+        lyrics.lookup("Artist - Song (Official Audio)", "Repost", 180000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QCOMPARE(lyrics.state()["lines"].toList().size(), 2);
+        QCOMPARE(QUrlQuery(net.requests.last().url()).queryItemValue("track_name"), QString("Song"));
+        QCOMPARE(QUrlQuery(net.requests.last().url()).queryItemValue("artist_name"), QString("Artist"));
+        lyrics.lookup("Artist - Song (Official Audio)", "Repost", 180000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QCOMPARE(net.requests.size(), 1);
+        net.responses = {{200, "{\"plainLyrics\":\"One\\nTwo\",\"id\":2}"}};
+        lyrics.lookup("Plain", "Artist", 1000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QVERIFY(!lyrics.state()["synced"].toBool());
+        QCOMPARE(lyrics.state()["lines"].toList().size(), 2);
+        net.responses = {{200, "{\"instrumental\":true,\"id\":3}"}};
+        lyrics.lookup("Instrumental", "Artist", 1000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QVERIFY(lyrics.state()["instrumental"].toBool());
+        net.responses = {{200, "not JSON"}};
+        lyrics.search("Broken"); QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QCOMPARE(lyrics.state()["message"].toString(), QString("Текст не найден"));
+        QVERIFY(lyrics.state()["sourceUnavailable"].toBool());
+        for (const auto &request : net.requests) QVERIFY(!request.hasRawHeader("Authorization"));
+    }
+    void lyricsFallbackAndCustomText() {
+        Network net; net.responseHosts = {"lrclib.net"};
+        const QByteArray record = "{\"id\":9,\"trackName\":\"Rare song\",\"artistName\":\"Artist\",\"duration\":10,\"syncedLyrics\":\"[00:01.00]One\\n[00:03.00]Two\"}";
+        net.responses = {{404, "{}"}, {200, "[" + record + "]"}};
+        Lyrics lyrics(nullptr, &net);
+        lyrics.lookup("Artist - Rare song", "Repost account", 10000, "test:rare-lyrics");
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QVERIFY(lyrics.state()["synced"].toBool());
+        QVERIFY(lyrics.state()["results"].toList().isEmpty());
+        QVERIFY(lyrics.setCustomText("[00:02.00]Custom\n[00:04.00]Second"));
+        QVERIFY(lyrics.state()["custom"].toBool());
+        const auto requests = net.requests.size();
+        Lyrics reopened(nullptr, &net);
+        reopened.lookup("Artist - Rare song", "Repost account", 10000, "test:rare-lyrics");
+        QCOMPARE(net.requests.size(), requests);
+        QVERIFY(reopened.state()["custom"].toBool());
+        QVERIFY(!reopened.setCustomText("  "));
+        QVERIFY(reopened.setCustomText("Plain text"));
+        QVERIFY(!reopened.state()["synced"].toBool());
+        reopened.removeCustomText();
+        QTRY_VERIFY(!reopened.state()["busy"].toBool());
+        QVERIFY(!reopened.state()["custom"].toBool());
+        net.responses = {{200, record, 100}};
+        lyrics.lookup("Other", "Artist", 10000);
+        QVERIFY(lyrics.setCustomText("[00:00.00]Keep this"));
+        QTest::qWait(150);
+        QCOMPARE(lyrics.state()["lines"].toList()[0].toMap()["text"].toString(), QString("Keep this"));
+    }
+    void lyricsMultipleProvidersAndAutomaticMatching() {
+        const QByteArray timed = "[00:01.00]First line\n[00:03.00]Second line";
+        const QByteArray netSearch = "{\"code\":200,\"result\":{\"songs\":[{\"id\":12,\"name\":\"Rare song\",\"duration\":150468,\"artists\":[{\"name\":\"Archive account\"}]}]}}";
+        const QByteArray qqSearch = "{\"code\":0,\"data\":{\"song\":{\"list\":[{\"songmid\":\"mid12\",\"songname\":\"Rare song\",\"interval\":150,\"singer\":[{\"name\":\"Artist\"}]}]}}}";
+        const QByteArray ovhSearch = "{\"data\":[{\"id\":12,\"title\":\"Rare song\",\"duration\":150,\"artist\":{\"name\":\"Artist\"}}]}";
+        const QByteArray geniusSearch = "{\"response\":{\"sections\":[{\"type\":\"song\",\"hits\":[{\"result\":{\"id\":12,\"title\":\"Rare song\",\"url\":\"https://genius.com/Artist-rare-song-lyrics\",\"primary_artist\":{\"name\":\"Artist\"}}}]}]}}";
+        const QByteArray kugouSearch = "{\"candidates\":[{\"id\":\"12\",\"accesskey\":\"public-download-token\",\"song\":\"Rare song\",\"singer\":\"Artist\",\"duration\":150000}]}";
+        const QList<QPair<QString, QList<Response>>> fixtures{
+            {"music.163.com", {{200, netSearch}, {200, QJsonDocument(QJsonObject{{"lrc", QJsonObject{{"lyric", QString::fromUtf8(timed)}}}}).toJson()}}},
+            {"c.y.qq.com", {{200, qqSearch}, {200, "{\"code\":0,\"lyric\":\"[00:01.00]First &amp; line&#10;[00:03.00]Second line\"}"}}},
+            {"api.lyrics.ovh", {{200, ovhSearch}, {200, "{\"lyrics\":\"First line\\nSecond line\"}"}}},
+            {"genius.com", {{200, geniusSearch}, {200, "<div data-lyrics-container=\"true\"><div data-exclude-from-selection=\"true\"><div>17 Contributors</div><div><span>Translations</span> English</div><h2>Rare song Lyrics</h2></div><div>First &amp; line</div>Second line<br><span data-exclude-from-selection=\"true\">Read more</span>Third line</div>"}}},
+            {"lyrics.kugou.com", {{200, kugouSearch}, {200, QJsonDocument(QJsonObject{{"content", QString::fromLatin1(timed.toBase64())}}).toJson()}}}
+        };
+        const QStringList sources{"NetEase", "QQ Music", "Lyrics.ovh", "Genius", "KuGou"};
+        for (int i = 0; i < fixtures.size(); ++i) {
+            Network net; net.routeByHost = true;
+            net.hostResponses["lrclib.net"] = {{404, "{}"}, {200, "[]"}};
+            net.hostResponses[fixtures[i].first] = fixtures[i].second;
+            Lyrics lyrics(nullptr, &net);
+            lyrics.lookup("Rare song", "Artist", 150000);
+            QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+            QCOMPARE(lyrics.state()["source"].toString(), sources[i]);
+            QVERIFY2(lyrics.state()["lines"].toList().size() >= 2, qPrintable(sources[i]));
+            QCOMPARE(lyrics.state()["synced"].toBool(), i == 0 || i == 1 || i == 4);
+            QVERIFY(lyrics.state()["results"].toList().isEmpty());
+            if (i == 1) QCOMPARE(lyrics.state()["lines"].toList()[0].toMap()["text"].toString(), QString("First & line"));
+            if (i == 3) {
+                const auto text = lyrics.state()["rawText"].toString();
+                QVERIFY(!text.contains("Contributors")); QVERIFY(!text.contains("Translations"));
+                QVERIFY(!text.contains("Rare song Lyrics")); QVERIFY(!text.contains("Read more"));
+                QVERIFY(text.contains("First & line")); QVERIFY(text.contains("Third line"));
+            }
+            for (const auto &request : net.requests) QVERIFY(!request.hasRawHeader("Authorization"));
+        }
+        // Some NetEase entries have plain text in the lrc field; skip an empty duplicate first.
+        Network plain; plain.routeByHost = true;
+        plain.hostResponses["music.163.com"] = {
+            {200, "{\"result\":{\"songs\":[{\"id\":12,\"name\":\"Rare song\",\"duration\":150000,\"artists\":[{\"name\":\"Artist\"}]},{\"id\":13,\"name\":\"Rare song\",\"duration\":150000,\"artists\":[{\"name\":\"Artist\"}]}]}}"},
+            {200, "{\"uncollected\":true}"},
+            {200, QJsonDocument(QJsonObject{{"lrc", QJsonObject{{"lyric", "First line\nSecond line"}}}}).toJson()}
+        };
+        Lyrics plainLyrics(nullptr, &plain);
+        plainLyrics.lookup("Rare song", "Artist", 150000);
+        QTRY_VERIFY(!plainLyrics.state()["busy"].toBool());
+        QCOMPARE(plainLyrics.state()["lines"].toList().size(), 2);
+        QVERIFY(!plainLyrics.state()["synced"].toBool());
+        QCOMPARE(plainLyrics.state()["source"].toString(), QString("NetEase"));
+        // Recommendations with unrelated titles, translations and different versions are ignored.
+        Network unrelated; unrelated.routeByHost = true;
+        unrelated.hostResponses["api.lyrics.ovh"] = {{200, "{\"data\":[{\"id\":1,\"title\":\"GARCON\",\"duration\":150,\"artist\":{\"name\":\"Artist\"}}]}"}};
+        unrelated.hostResponses["music.163.com"] = {{200, "{\"result\": {\"songs\": [{\"id\": 1, \"name\": \"Rare song (Remix)\", \"duration\": 150000, \"artists\": [{\"name\": \"Artist\"}]}, {\"id\": 2, \"name\": \"Rare song\", \"duration\": 250000, \"artists\": [{\"name\": \"Artist\"}]}]}}"}};
+        Lyrics missing(nullptr, &unrelated);
+        missing.lookup("Rare song", "Artist", 150000);
+        QTRY_VERIFY(!missing.state()["busy"].toBool());
+        QVERIFY(missing.state()["lines"].toList().isEmpty());
+        QCOMPARE(missing.state()["message"].toString(), QString("Текст не найден"));
+        QCOMPARE(unrelated.requests.size(), 7); // One exact request and six independent searches, no lyric downloads.
+        // Per-source rate limits must not block the other providers or leak stale replies.
+        Network limited; limited.routeByHost = true;
+        limited.hostResponses["lrclib.net"] = {{429, "{}"}};
+        limited.hostResponses["music.163.com"] = {{200, netSearch, 100}, {200, netSearch}, {200, QJsonDocument(QJsonObject{{"lrc", QJsonObject{{"lyric", QString::fromUtf8(timed)}}}}).toJson()}};
+        Lyrics retry(nullptr, &limited);
+        retry.lookup("Rare song", "Artist", 150000);
+        QTRY_VERIFY(limited.requests.size() > 1);
+        retry.lookup("Rare song", "Artist", 150000);
+        QTRY_VERIFY(!retry.state()["busy"].toBool());
+        QCOMPARE(retry.state()["source"].toString(), QString("NetEase"));
+        QTest::qWait(150);
+        QCOMPARE(retry.state()["lines"].toList().size(), 2);
+    }
+    void equalizerFiltersAndSpectrum() {
+        auto tone = [](double frequency, bool opposite = false) {
+            std::vector<float> samples(48000 * 2);
+            for (int i = 0; i < 48000; ++i) {
+                const float sample = 0.1f * std::sin(2 * 3.141592653589793 * frequency * i / 48000);
+                samples[i * 2] = sample; samples[i * 2 + 1] = opposite ? -sample : sample;
+            }
+            return samples;
+        };
+        auto rms = [](const std::vector<float> &samples, int channel) {
+            double energy = 0;
+            for (int i = 24000; i < 48000; ++i) energy += std::pow(samples[i * 2 + channel], 2);
+            return std::sqrt(energy / 24000);
+        };
+        AudioDsp dsp;
+        std::array<double, 5> gains{};
+        dsp.configure(48000, 2, gains);
+        auto unity = tone(1000); const auto original = unity;
+        dsp.process(unity.data(), 48000);
+        QVERIFY(std::abs(rms(unity, 0) - rms(original, 0)) < 1e-6);
+        gains[0] = -12;
+        dsp.configure(48000, 2, gains); dsp.reset();
+        auto low = tone(60); dsp.process(low.data(), 48000);
+        QVERIFY(rms(low, 0) < 0.021); // -12 dB at the bass center, compared with 0.071 RMS.
+        gains[0] = 12;
+        dsp.configure(48000, 2, gains); dsp.reset();
+        low = tone(60); dsp.process(low.data(), 48000);
+        auto high = tone(4000); dsp.reset(); dsp.process(high.data(), 48000);
+        QVERIFY(rms(low, 0) > rms(high, 0) * 3.5);
+        auto isolated = tone(60);
+        for (int i = 0; i < 48000; ++i) isolated[i * 2 + 1] = 0;
+        dsp.reset(); dsp.process(isolated.data(), 48000);
+        QCOMPARE(rms(isolated, 1), 0.0);
+        const auto bass = tone(60), treble = tone(4000), antiPhase = tone(4000, true);
+        const auto bassBins = AudioDsp::spectrum(bass.data(), 2048, 2, 48000);
+        const auto trebleBins = AudioDsp::spectrum(treble.data(), 2048, 2, 48000);
+        QCOMPARE(bassBins.size(), AudioDsp::spectrumBands);
+        auto peak = [](const QVariantList &bins) {
+            int result = 0;
+            for (int i = 1; i < bins.size(); ++i)
+                if (bins[i].toDouble() > bins[result].toDouble()) result = i;
+            return result;
+        };
+        QVERIFY(peak(bassBins) < 20); QVERIFY(peak(trebleBins) > 60);
+        QCOMPARE(AudioDsp::spectrum(antiPhase.data(), 2048, 2, 48000), trebleBins);
+        std::vector<float> silence(4096, 0);
+        for (const auto &value : AudioDsp::spectrum(silence.data(), 2048, 2, 48000)) QCOMPARE(value.toDouble(), 0.0);
+    }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    void equalizerLocalAudioPlayback() {
+        if (QMediaDevices::defaultAudioOutput().isNull()) QSKIP("No audio output device available");
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        const bool saved = sc.equalizerEnabled(); const auto savedGains = sc.equalizerGains();
+        QTemporaryDir audioFiles; QVERIFY(audioFiles.isValid());
+        QFile wav(audioFiles.filePath("equalizer.wav")); QVERIFY(wav.open(QIODevice::WriteOnly));
+        QDataStream stream(&wav); stream.setByteOrder(QDataStream::LittleEndian);
+        constexpr int frames = 48000 * 4, dataSize = frames * 2 * 2;
+        stream.writeRawData("RIFF", 4); stream << quint32(dataSize + 36);
+        stream.writeRawData("WAVEfmt ", 8); stream << quint32(16) << quint16(1) << quint16(2)
+            << quint32(48000) << quint32(48000 * 4) << quint16(4) << quint16(16);
+        stream.writeRawData("data", 4); stream << quint32(dataSize);
+        for (int frame = 0; frame < frames; ++frame) {
+            const qint16 sample = qint16(2000 * std::sin(2 * 3.141592653589793 * 1000 * frame / 48000));
+            stream << sample << sample;
+        }
+        wav.close();
+        sc.m_audio.setVolume(0); // Exercise the real output without an audible test tone.
+        sc.setEqualizerGain(2, -9);
+        sc.setEqualizerEnabled(true);
+        sc.setTrackVisualActive(true);
+        sc.m_player.setSource(QUrl::fromLocalFile(wav.fileName()));
+        sc.m_player.play();
+        QTRY_VERIFY_WITH_TIMEOUT(!sc.m_playerEffects.processed().isEmpty(), 5000);
+        QVERIFY2(sc.equalizerEnabled(), qPrintable(sc.equalizerError()));
+        QTRY_VERIFY(([&] { const auto bins = sc.spectrum(); return std::any_of(bins.cbegin(), bins.cend(), [](const QVariant &v) { return v.toDouble() > 0.1; }); })());
+        QTest::qWait(1000);
+        QVERIFY2(sc.equalizerEnabled(), qPrintable(sc.equalizerError()));
+        // Both decoders must be routed while a crossfade is in progress.
+        sc.m_crossfadeStarted = true;
+        sc.m_sparePlayer.setSource(QUrl::fromLocalFile(wav.fileName()));
+        sc.m_sparePlayer.play();
+        QTRY_VERIFY(!sc.m_spareEffects.processed().isEmpty());
+        sc.m_sparePlayer.stop(); sc.m_crossfadeStarted = false;
+        sc.m_player.pause();
+        QVERIFY(sc.m_playerEffects.processed().isEmpty());
+        sc.seek(2000); sc.m_player.play();
+        QTRY_VERIFY(!sc.m_playerEffects.processed().isEmpty());
+        sc.m_player.stop();
+        QVERIFY(sc.m_playerEffects.processed().isEmpty());
+        sc.setTrackVisualActive(false); sc.setEqualizerEnabled(false);
+        for (int i = 0; i < 5; ++i) sc.setEqualizerGain(i, savedGains[i].toDouble());
+        sc.setEqualizerEnabled(saved);
+    }
+    void equalizerRoutingAndSettings() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        const bool saved = sc.equalizerEnabled(); const auto gains = sc.equalizerGains();
+        sc.setEqualizerEnabled(true);
+        QVERIFY(sc.equalizerEnabled());
+        QVERIFY(sc.m_audio.isMuted()); QVERIFY(sc.m_preloadAudio.isMuted());
+        QCOMPARE(sc.m_player.audioBufferOutput(), &sc.m_waveOutput);
+        sc.setEqualizerGain(0, 50); QCOMPARE(sc.equalizerGains()[0].toDouble(), 12.0);
+        sc.setTrackVisualActive(true);
+        sc.setEqualizerEnabled(false);
+        QVERIFY(!sc.m_audio.isMuted()); QVERIFY(sc.m_waveAudioTimer.isActive());
+        QVERIFY(sc.m_player.audioBufferOutput());
+        sc.setTrackVisualActive(false);
+        QVERIFY(!sc.m_waveAudioTimer.isActive()); QVERIFY(!sc.m_player.audioBufferOutput());
+        sc.resetEqualizer();
+        for (const auto &gain : sc.equalizerGains()) QCOMPARE(gain.toDouble(), 0.0);
+        for (int i = 0; i < 5; ++i) sc.setEqualizerGain(i, gains[i].toDouble());
+        sc.setEqualizerEnabled(saved);
+    }
+#endif
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     void waveAudioRespondsToBassAndIgnoresDisabledAnalysis() {
         Network net; SoundCloud sc(nullptr, &net, secrets);
@@ -1161,6 +1576,265 @@ private slots:
         QVERIFY(!sc.m_sparePlayer.audioBufferOutput());
     }
 #endif
+    void wavePanelRendersAcrossSizes() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        QQmlEngine engine;
+        QStringList warnings;
+        connect(&engine, &QQmlEngine::warnings, this, [&warnings](const QList<QQmlError> &errors) {
+            for (const auto &error : errors) warnings.append(error.toString());
+        });
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/WavePanel.qml"));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QQuickWindow window;
+        QScopedPointer<QObject> object(component.createWithInitialProperties({{"backend", QVariant::fromValue(&sc)}, {"motion", false}}));
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto *panel = qobject_cast<QQuickItem *>(object.data()); QVERIFY(panel);
+        panel->setParentItem(window.contentItem());
+        window.show();
+        for (int mode = 0; mode < 2; ++mode) {
+            if (mode) {
+                auto *selector = object->findChild<QObject *>("waveModeSelector"); QVERIFY(selector);
+                QVERIFY(selector->setProperty("currentIndex", 1));
+                QVERIFY(object->property("discovery").toBool());
+            }
+            for (bool dark : {false, true}) {
+                object->setProperty("dark", dark);
+                for (int width : {320, 720, 1920}) {
+                    panel->setWidth(width); panel->setHeight(panel->implicitHeight());
+                    window.resize(width, qCeil(panel->height()));
+                    QTest::qWait(100);
+                    auto grab = panel->grabToImage(QSize(width, qCeil(panel->height())));
+                    QVERIFY(grab);
+                    QSignalSpy ready(grab.data(), &QQuickItemGrabResult::ready);
+                    QVERIFY(ready.wait(3000));
+                    QVERIFY(grab->image().save(QString("ui-wave-%1-%2-%3-%4.png")
+                        .arg(qEnvironmentVariable("QT_QUICK_BACKEND", "rhi")).arg(mode).arg(width).arg(dark ? "dark" : "light")));
+                }
+            }
+        }
+        sc.set("waveMode", "discovery"); sc.set("playbackActive", true);
+        object->setProperty("motion", true);
+        sc.m_waveLevel = 0.6; sc.m_waveBass = 0.75; sc.m_waveBeat = 1.0;
+        emit sc.waveAudioChanged();
+        auto *shader = object->findChild<QObject *>("waveShader");
+        const bool gpu = shader != nullptr;
+        if (gpu) {
+            QCOMPARE(shader->property("bass").toDouble(), 0.75);
+            QCOMPARE(shader->property("beat").toDouble(), 1.0);
+            QVERIFY(shader->property("width").toReal() <= panel->height() * 1.7);
+        }
+        object->setProperty("foreground", false);
+        QTRY_VERIFY(!object->findChild<QObject *>("waveShader"));
+        QVERIFY(!sc.m_waveVisualActive);
+        QVERIFY(!sc.m_waveAudioTimer.isActive());
+        object->setProperty("foreground", true);
+        QVERIFY(sc.m_waveVisualActive);
+        if (gpu) QTRY_VERIFY(object->findChild<QObject *>("waveShader"));
+        object->setProperty("foreground", false);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        panel->setParentItem(nullptr);
+        object.reset();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+    }
+    void wavePanelClickStartsRetriesAndPauses() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false); // Prevent the fixture's deferred guest connection.
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.set("signedIn", true);
+        QQmlEngine engine;
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/WavePanel.qml"));
+        QScopedPointer<QObject> object(component.createWithInitialProperties({{"backend", QVariant::fromValue(&sc)}, {"motion", false}}));
+        QVERIFY2(object, qPrintable(component.errorString()));
+        QQuickWindow window;
+        auto *panel = qobject_cast<QQuickItem *>(object.data()); QVERIFY(panel);
+        panel->setParentItem(window.contentItem()); panel->setWidth(320); panel->setHeight(330);
+        window.resize(320, 330); window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        QTest::qWait(100);
+        auto *control = object->findChild<QQuickItem *>("wavePlayButton"); QVERIFY(control);
+        const auto center = control->mapToScene(QPointF(control->width() / 2, control->height() / 2)).toPoint();
+        QVERIFY(control->isEnabled());
+        QSignalSpy clicked(control, SIGNAL(clicked()));
+        net.responses = {{200, R"({"collection":[]})"}};
+        QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, center);
+        QTRY_COMPARE(clicked.size(), 1);
+        QTRY_COMPARE(sc.m_waveMode, QString("library"));
+        QTRY_VERIFY(!sc.state()["waveError"].toString().isEmpty());
+        const int requests = net.requests.size();
+        net.responses = {{200, R"({"collection":[]})"}};
+        QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, center);
+        QTRY_COMPARE(net.requests.size(), requests + 1);
+        QTRY_VERIFY(!sc.state()["waveBusy"].toBool());
+        sc.set("waveError", ""); sc.set("playbackActive", true);
+        QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, center);
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QCOMPARE(sc.m_waveMode, QString("library"));
+        panel->setParentItem(nullptr);
+        object.reset();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+    void waveSessionRestoresCursorAndIndependentPositions() {
+        QSettings settings; settings.remove("playback");
+        const QVariantMap profile{{"urn", "soundcloud:users:wave-test"}};
+        const QVariantMap first{{"urn", "soundcloud:tracks:101"}, {"access", "blocked"}};
+        const QVariantMap second{{"urn", "soundcloud:tracks:102"}, {"access", "blocked"}};
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.m_restoreChecked = true; sc.set("signedIn", true); sc.set("profile", profile);
+            sc.m_waveMode = "library"; sc.set("waveMode", "library");
+            sc.m_waveNext = "/me/likes/tracks?cursor=next";
+            sc.m_waveSeen.insert("soundcloud:tracks:101");
+            sc.m_queue = {first}; sc.m_queueIndex = 0;
+            sc.set("current", first); sc.set("position", 17000); sc.savePlayback();
+            sc.set("position", 23000); sc.savePlaybackPosition();
+            sc.stopPlayback();
+            sc.m_waveMode = "discovery"; sc.set("waveMode", "discovery");
+            sc.m_waveSeeds = {second}; sc.m_waveSeedIndex = 3;
+            sc.m_waveRelatedNext = "/tracks/102/related?cursor=saved";
+            sc.m_queue = {second}; sc.m_queueIndex = 0;
+            sc.set("current", second); sc.set("position", 41000); sc.savePlayback();
+        }
+        {
+            Network net; SoundCloud sc(nullptr, &net, secrets);
+            sc.set("signedIn", true); sc.set("profile", profile); sc.restorePlayback(profile);
+            QCOMPARE(sc.m_waveMode, QString("discovery"));
+            QCOMPARE(sc.m_waveSeedIndex, 3);
+            QCOMPARE(sc.m_waveRelatedNext, QString("/tracks/102/related?cursor=saved"));
+            QCOMPARE(sc.position(), 41000);
+            QVERIFY(!sc.state()["playbackActive"].toBool());
+            sc.startWave("library");
+            QCOMPARE(sc.position(), 23000);
+            QCOMPARE(sc.m_waveNext, QString("/me/likes/tracks?cursor=next"));
+            QVERIFY(sc.m_waveSeen.contains("soundcloud:tracks:101"));
+            sc.startWave("discovery");
+            QCOMPARE(sc.position(), 41000);
+            QCOMPARE(sc.m_waveSeeds, QVariantList{second});
+            QVERIFY(net.requests.isEmpty());
+            QVERIFY(sc.clearSession());
+            QVERIFY(!settings.contains("playback/waves/library"));
+            QVERIFY(!settings.contains("playback/waves/discovery"));
+        }
+        settings.remove("playback");
+    }
+    void waveFiltersUnplayableTracksAndRefillsAtEnd() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_waveMode = "library";
+        net.responses = {{200, R"({"collection":[{"urn":"soundcloud:tracks:1","access":"blocked"},{"urn":"soundcloud:tracks:2","streamable":false},{"urn":"soundcloud:tracks:3"}]})"}};
+        sc.refillWave();
+        QTRY_VERIFY(!sc.state()["waveBusy"].toBool());
+        QCOMPARE(sc.m_queue.size(), 1);
+        QCOMPARE(sc.m_queue[0].toMap()["urn"].toString(), QString("soundcloud:tracks:3"));
+        sc.m_queueIndex = 0;
+        net.responses = {{200, R"({"collection":[]})"}};
+        sc.next();
+        QVERIFY(sc.m_waveWaiting);
+        QTRY_VERIFY(!sc.state()["waveBusy"].toBool());
+        QCOMPARE(sc.m_queueIndex, 0);
+        QVERIFY(!sc.state()["waveError"].toString().isEmpty());
+    }
+    void discoveryFollowsPaginationAndNeverForgetsDuplicateHistory() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_waveMode = "discovery";
+        sc.m_waveSeeds = {QVariantMap{{"urn", "soundcloud:tracks:1"}}};
+        for (int i = 1; i <= 3501; ++i) sc.m_waveSeen.insert(QString("soundcloud:tracks:%1").arg(i));
+        for (int i = 4000; i < 4010; ++i) {
+            sc.m_queue.append(QVariantMap{{"urn", QString("soundcloud:tracks:%1").arg(i)}});
+            sc.m_waveSeen.insert(QString("soundcloud:tracks:%1").arg(i));
+        }
+        sc.m_queueIndex = 0;
+        net.responses = {
+            {200, R"({"collection":[{"urn":"soundcloud:tracks:42"}],"next_href":"/tracks/1/related?cursor=next"})"},
+            {200, R"({"collection":[{"urn":"soundcloud:tracks:42"},{"urn":"soundcloud:tracks:9000"},{"urn":"soundcloud:tracks:9000"}]})"}
+        };
+        sc.refillWave();
+        QTRY_COMPARE(sc.m_queue.size(), 11);
+        QCOMPARE(net.requests.size(), 2);
+        QVERIFY(net.requests[1].url().query().contains("cursor=next"));
+        QCOMPARE(sc.m_queue.last().toMap()["urn"].toString(), QString("soundcloud:tracks:9000"));
+        QVERIFY(sc.m_waveSeen.contains("soundcloud:tracks:42"));
+        QVERIFY(sc.m_waveSeen.size() > 3500);
+        QVERIFY(sc.m_waveRelatedNext.isEmpty());
+    }
+    void discoveryAutomaticallyRetriesAnExhaustedGraphAndContinuesQueue() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_waveMode = "discovery";
+        const QVariantMap seed{{"urn", "soundcloud:tracks:1"}};
+        const QVariantMap current{{"urn", "soundcloud:tracks:2"}};
+        sc.m_waveSeeds = {seed}; sc.m_waveSeen = {"soundcloud:tracks:1", "soundcloud:tracks:2"};
+        sc.m_waveNext = "https://api.soundcloud.com/me/likes/tracks?cursor=more";
+        sc.m_queue = {current}; sc.m_queueIndex = 0; sc.set("current", current);
+        for (int i = 0; i < 6; ++i)
+            net.responses.append({200, R"({"collection":[{"urn":"soundcloud:tracks:2"}]})"});
+        sc.next();
+        QTRY_VERIFY(sc.m_waveRetryTimer.isActive());
+        QCOMPARE(net.requests.size(), 6);
+        QCOMPARE(sc.m_queue.size(), 1);
+        QVERIFY(sc.state()["waveError"].toString().isEmpty());
+        QVERIFY(sc.m_waveLoadSeeds);
+        QCOMPARE(sc.m_waveRetryTimer.interval(), 3000);
+        net.responses = {
+            {200, R"({"collection":[{"urn":"soundcloud:tracks:20"}]})"},
+            {200, R"({"collection":[{"urn":"soundcloud:tracks:2"},{"urn":"soundcloud:tracks:3"},{"urn":"soundcloud:tracks:4"},{"urn":"soundcloud:tracks:5"},{"urn":"soundcloud:tracks:6"},{"urn":"soundcloud:tracks:7"},{"urn":"soundcloud:tracks:8"}]})"},
+            {403, "{}"} // No real stream request leaves the test transport.
+        };
+        sc.m_waveRetryTimer.start(1);
+        QTRY_COMPARE(sc.m_queueIndex, 1);
+        QCOMPARE(sc.m_queue.size(), 7);
+        QVERIFY(net.requests[6].url().query().contains("cursor=more"));
+        QVERIFY(!sc.m_waveWaiting);
+        QVERIFY(!sc.m_waveRetryTimer.isActive());
+        QSet<QString> ids;
+        for (const auto &track : sc.m_queue) ids.insert(SoundCloud::urn(track.toMap()));
+        QCOMPARE(ids.size(), sc.m_queue.size());
+    }
+    void discoveryNetworkRetryBacksOffAndStopsOnPauseOrStop() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_waveMode = "discovery";
+        sc.m_waveSeeds = {QVariantMap{{"urn", "soundcloud:tracks:1"}}};
+        sc.set("playbackActive", true);
+        net.responses = {{503, "{}"}};
+        sc.refillWave();
+        QTRY_VERIFY(sc.m_waveRetryTimer.isActive());
+        QVERIFY(sc.state()["waveError"].toString().isEmpty());
+        net.responses = {{503, "{}"}};
+        sc.m_waveRetryTimer.start(1);
+        QTRY_COMPARE(sc.m_waveRetryTimer.interval(), 6000);
+        sc.pausePlayback();
+        QVERIFY(!sc.m_waveRetryTimer.isActive());
+        QVERIFY(!sc.state()["waveBusy"].toBool());
+        QVERIFY(!sc.m_waveWaiting);
+        const int requests = net.requests.size();
+        QTest::qWait(30);
+        QCOMPARE(net.requests.size(), requests);
+        sc.set("playbackActive", true); sc.scheduleWaveRefill();
+        QVERIFY(sc.m_waveRetryTimer.isActive());
+        sc.stopWave();
+        QVERIFY(!sc.m_waveRetryTimer.isActive());
+    }
+    void discoveryLateRefillDoesNotResumeAfterPause() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", false);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.m_waveMode = "discovery";
+        sc.m_waveSeeds = {QVariantMap{{"urn", "soundcloud:tracks:1"}}};
+        const QVariantMap current{{"urn", "soundcloud:tracks:2"}};
+        sc.m_queue = {current}; sc.m_queueIndex = 0; sc.set("current", current);
+        net.responses = {{200, R"({"collection":[{"urn":"soundcloud:tracks:3"},{"urn":"soundcloud:tracks:4"},{"urn":"soundcloud:tracks:5"},{"urn":"soundcloud:tracks:6"},{"urn":"soundcloud:tracks:7"},{"urn":"soundcloud:tracks:8"}]})", 30}};
+        sc.next(); sc.pausePlayback();
+        QTRY_COMPARE(sc.m_queue.size(), 7);
+        QCOMPARE(sc.m_queueIndex, 0);
+        QCOMPARE(sc.state()["current"].toMap(), current);
+        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QCOMPARE(net.requests.size(), 1);
+    }
     void waveDeduplicatesRelatedAndCancelsLateReplies() {
         Network net;
         SoundCloud sc(nullptr, &net, secrets);
@@ -1563,22 +2237,32 @@ private slots:
             QVERIFY((GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CAPTION) != WS_CAPTION);
         }
 #endif
-        // Щелчки по центрам зелёной, жёлтой и красной кнопок в реальном QML.
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(65, 28));
+        std::function<QQuickItem *(QQuickItem *, const QString &)> findControl = [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
+            if (parent->objectName() == name) return parent;
+            for (auto *child : parent->childItems()) if (auto *found = findControl(child, name)) return found;
+            return nullptr;
+        };
+        auto controlCenter = [window, &findControl](const char *name) {
+            auto *item = findControl(window->contentItem(), QString::fromLatin1(name));
+            return item ? item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint() : QPoint(-1, -1);
+        };
+        QVERIFY(controlCenter("windowMaximize") != QPoint(-1, -1));
+        // Resolve live geometry: the titlebar moves with the sidebar margins.
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, controlCenter("windowMaximize"));
         QTRY_COMPARE(window->visibility(), QWindow::Maximized);
 #ifdef Q_OS_WIN
         if (native) QTRY_VERIFY(IsZoomed(hwnd));
 #endif
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(65, 28));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, controlCenter("windowMaximize"));
         QTRY_COMPARE(window->visibility(), QWindow::Windowed);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(45, 28));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, controlCenter("windowMinimize"));
         QTRY_COMPARE(window->visibility(), QWindow::Minimized);
 #ifdef Q_OS_WIN
         if (native) QTRY_VERIFY(IsIconic(hwnd));
 #endif
         window->showNormal();
         QVERIFY(QTest::qWaitForWindowExposed(window));
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(25, 28));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, controlCenter("windowClose"));
         QTRY_VERIFY(!window->isVisible());
     }
     void queueHandleReordersTracks() {
@@ -1621,6 +2305,11 @@ private slots:
         QTRY_VERIFY(sc.state()["connected"].toBool());
         QTRY_VERIFY(!sc.state()["busy"].toBool());
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        Network lyricsNet; lyricsNet.responseHosts = {"lrclib.net"};
+        const QByteArray lyricFixture = R"({"id":42,"trackName":"A track page","artistName":"Test artist","syncedLyrics":"[00:00.00]Every sound has a story\n[00:10.00]Every word finds its way\n[00:20.00]Stay a little longer\n[00:30.00]Let the music play"})";
+        lyricsNet.responses = {{200, lyricFixture}, {200, lyricFixture}, {200, lyricFixture}};
+        Lyrics lyrics(nullptr, &lyricsNet);
+        engine.rootContext()->setContextProperty("lyricsBackend", &lyrics);
         QStringList warnings;
         connect(&engine, &QQmlEngine::warnings, this, [&warnings](const QList<QQmlError> &errors) { for (const auto &error : errors) warnings.append(error.toString()); });
         net.responses = {{200, R"([{"urn":"soundcloud:tracks:10","title":"Релиз"}])"}, {200, "[]"}, {200, R"([{"urn":"soundcloud:tracks:11","title":"Основа"}])"}, {200, R"([{"urn":"soundcloud:tracks:12","title":"Похожий"}])"}};
@@ -1638,6 +2327,48 @@ private slots:
         sc.browse("tracks", "Тест интерфейса"); QTRY_COMPARE(sc.state()["tracks"].toList().size(), 2);
         QCOMPARE(window->property("api").toMap()["tracks"].toList(), sc.state()["tracks"].toList());
         QTest::qWait(450); QVERIFY(window->grabWindow().save("ui-catalog.png"));
+        net.responses = {{200, "{\"collection\":[{\"urn\":\"soundcloud:tracks:1\",\"title\":\"First track\",\"duration\":185000,\"user\":{\"username\":\"Artist\"}},{\"urn\":\"soundcloud:tracks:2\",\"title\":\"Second track\",\"duration\":220000}]}"}};
+        QQmlExpression openPlaylist(QQmlEngine::contextForObject(window), window,
+            "playlistView.begin({urn: 'soundcloud:playlists:42', title: 'Evening collection', track_count: 2, user: {username: 'SCrip'}})");
+        openPlaylist.evaluate();
+        QVERIFY2(!openPlaylist.hasError(), qPrintable(openPlaylist.error().toString()));
+        QTRY_VERIFY(!sc.state()["playlistBusy"].toBool());
+        QQmlExpression previewObject(QQmlEngine::contextForObject(window), window, "playlistView");
+        auto *preview = previewObject.evaluate().value<QObject *>();
+        QVERIFY(preview);
+        QTest::qWait(45);
+        const auto openingOpacity = preview->property("opacity").toReal();
+        QVERIFY(openingOpacity > 0 && openingOpacity < 1);
+        QVERIFY(QMetaObject::invokeMethod(preview, "close"));
+        QVERIFY(qAbs(preview->property("opacity").toReal() - openingOpacity) < 0.1);
+        QTest::qWait(30);
+        const auto closingOpacity = preview->property("opacity").toReal();
+        QVERIFY(QMetaObject::invokeMethod(preview, "open"));
+        QVERIFY(qAbs(preview->property("opacity").toReal() - closingOpacity) < 0.1);
+        QTRY_VERIFY(preview->property("opened").toBool());
+        QTRY_COMPARE(preview->property("opacity").toReal(), 1.0);
+        QTRY_COMPARE(preview->property("reveal").toReal(), 1.0);
+        QVERIFY(window->grabWindow().save("ui-playlist.png"));
+        std::function<QQuickItem *(QQuickItem *)> findTrackActions = [&](QQuickItem *item) -> QQuickItem * {
+            if (item->objectName() == "previewTrackActions0") return item;
+            for (auto *child : item->childItems()) if (auto *found = findTrackActions(child)) return found;
+            return nullptr;
+        };
+        QTRY_VERIFY(findTrackActions(window->contentItem()));
+        auto *actionsButton = findTrackActions(window->contentItem());
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+            actionsButton->mapToScene(QPointF(actionsButton->width() / 2, actionsButton->height() / 2)).toPoint());
+        QQmlExpression actionMenuObject(QQmlEngine::contextForObject(window), window, "trackActions");
+        auto *actionMenu = actionMenuObject.evaluate().value<QObject *>();
+        QVERIFY(actionMenu);
+        QTRY_VERIFY(actionMenu->property("opened").toBool());
+        QVERIFY(window->grabWindow().save("ui-track-actions.png"));
+        QVERIFY(QMetaObject::invokeMethod(actionMenu, "close"));
+        QTRY_VERIFY(!actionMenu->property("visible").toBool());
+        QQmlExpression closePlaylist(QQmlEngine::contextForObject(window), window, "playlistView.close()");
+        closePlaylist.evaluate();
+        QTRY_VERIFY(!preview->property("visible").toBool());
+
         QVERIFY(window->property("dockedInspector").toBool());
         QJsonArray scrollTracks;
         for (int i=0; i<32; ++i) scrollTracks.append(QJsonObject{{"urn", QString("soundcloud:tracks:%1").arg(i+10)}, {"title", "Проверка прокрутки"}});
@@ -1718,8 +2449,10 @@ private slots:
             if (size == 5000) {
                 QCOMPARE(gridView->property("count").toInt(), 5000);
                 QVariant title;
-                QVERIFY(QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 0)));
-                QCOMPARE(title.toString(), QString("Карточка 0"));
+                QTRY_VERIFY(([&] {
+                    return QMetaObject::invokeMethod(gridView, "trackTitleAt", Q_RETURN_ARG(QVariant, title), Q_ARG(QVariant, 0))
+                        && title.toString() == QString("Карточка 0");
+                })());
                 const int wideColumns = gridView->property("columns").toInt();
                 window->setWidth(760); QCoreApplication::processEvents();
                 QVERIFY(gridView->property("columns").toInt() < wideColumns);
@@ -1777,6 +2510,211 @@ private slots:
         window->setWidth(760); window->setHeight(560); QTest::qWait(350);
         QVERIFY(!window->property("dockedInspector").toBool());
         QVERIFY(window->grabWindow().save("ui-narrow.png"));
+        auto *dock = window->findChild<QQuickItem *>("playbackDock"); QVERIFY(dock);
+        auto *barrier = window->findChild<QQuickItem *>("playbackDockBarrier"); QVERIFY(barrier);
+        QQmlComponent clickProbe(&engine);
+        clickProbe.setData("import QtQuick; MouseArea { property int clicks: 0; z: 1; onClicked: clicks++ }", QUrl());
+        QScopedPointer<QObject> probeObject(clickProbe.create());
+        auto *probe = qobject_cast<QQuickItem *>(probeObject.data()); QVERIFY(probe);
+        probe->setParentItem(dock->parentItem());
+        probe->setX(dock->x()); probe->setY(dock->y());
+        probe->setWidth(dock->width()); probe->setHeight(dock->height());
+        const auto dockPoint = dock->mapToScene(QPointF(dock->width() / 2, 3)).toPoint();
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, dockPoint);
+        QCOMPARE(probe->property("clicks").toInt(), 0);
+        barrier->setEnabled(false);
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, dockPoint);
+        QCOMPARE(probe->property("clicks").toInt(), 1);
+        barrier->setEnabled(true);
+        probe->setParentItem(nullptr);
+
+        const auto currentBeforePage = sc.state()["current"].toMap();
+        const QVariant pageTrack = QVariantMap{{"urn", "soundcloud:tracks:details"}, {"title", "коза (p. youngslashprod)"},
+            {"duration", 185000}, {"description", "Track description with enough detail to wrap across lines."},
+            {"user", QVariantMap{{"username", "Test artist"}, {"urn", "soundcloud:users:details"}}}};
+        QVERIFY(QMetaObject::invokeMethod(window, "openTrack", Q_ARG(QVariant, pageTrack), Q_ARG(QVariant, false)));
+        auto *detailsPage = window->findChild<QObject *>("trackPage"); QVERIFY(detailsPage);
+        QTRY_VERIFY(detailsPage->property("opened").toBool());
+        QCOMPARE(detailsPage->property("track").toMap()["title"].toString(), QString("коза (p. youngslashprod)"));
+        QCOMPARE(sc.state()["current"].toMap(), currentBeforePage);
+        QTRY_COMPARE(lyrics.state()["lines"].toList().size(), 4);
+        QVERIFY(!window->findChild<QObject *>("equalizerToggle"));
+        auto *bars = window->findChild<QObject *>("spectrumBars"); QVERIFY(bars);
+        QVERIFY(QMetaObject::invokeMethod(bars, "clicked"));
+        QCOMPARE(preferences->property("spectrumStyle").toInt(), 1);
+        auto *solid = window->findChild<QObject *>("spectrumSolid"); QVERIFY(solid);
+        QVERIFY(QMetaObject::invokeMethod(solid, "clicked"));
+        QCOMPARE(preferences->property("spectrumStyle").toInt(), 0);
+        QTest::qWait(150);
+        QVERIFY(window->grabWindow().save("ui-track-narrow.png"));
+        window->setWidth(1320); window->setHeight(820);
+        QCoreApplication::processEvents();
+        auto *centerArea = window->findChild<QQuickItem *>("mainContentArea"); QVERIFY(centerArea);
+        auto *detailsContent = detailsPage->property("contentItem").value<QQuickItem *>(); QVERIFY(detailsContent);
+        const auto pageStart = detailsContent->mapToScene(QPointF(0, 0));
+        QVERIFY(pageStart.x() >= centerArea->x());
+        QVERIFY(pageStart.x() + detailsContent->width() <= centerArea->x() + centerArea->width());
+        QVERIFY(pageStart.y() + detailsContent->height() <= dock->mapToScene(QPointF(0, 0)).y());
+        QVERIFY(!detailsPage->property("modal").toBool());
+        auto *trackColumn = window->findChild<QQuickItem *>("trackMainColumn"); QVERIFY(trackColumn);
+        auto *lyricsColumn = window->findChild<QQuickItem *>("trackLyricsPane"); QVERIFY(lyricsColumn);
+        QVERIFY(lyricsColumn->x() > trackColumn->x() + trackColumn->width());
+        QVERIFY(std::abs(trackColumn->width() / (trackColumn->width() + lyricsColumn->width()) - 0.66) < 0.01);
+        for (bool dark : {false, true}) {
+            preferences->setProperty("darkMode", dark); QTest::qWait(150);
+            QVERIFY(window->grabWindow().save(dark ? "ui-track-dark.png" : "ui-track-light.png"));
+        }
+        auto *pageTitle = window->findChild<QQuickItem *>("trackDetailsTitle"); QVERIFY(pageTitle);
+        QVERIFY(pageTitle->property("contentWidth").toDouble() <= pageTitle->width() + 1);
+        QVERIFY(!detailsPage->property("showDescription").toBool());
+        window->setHeight(1080);
+        lyricsNet.responses.prepend({404, "{}"});
+        lyrics.lookup("Missing lyrics fixture", "Fixture artist", 1000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QVERIFY(lyrics.state()["lines"].toList().isEmpty());
+        QVERIFY(!window->findChild<QObject *>("lyricsSearch"));
+        for (bool dark : {false, true}) {
+            preferences->setProperty("darkMode", dark); QTest::qWait(150);
+            QVERIFY(window->grabWindow().save(dark ? "ui-track-empty-dark.png" : "ui-track-empty-light.png"));
+        }
+        lyrics.lookup(pageTrack.toMap()["title"].toString(), "Test artist", 185000);
+        QTRY_COMPARE(lyrics.state()["lines"].toList().size(), 4);
+        const auto oldPosition = sc.position();
+        const auto wasPlaying = sc.state()["playing"].toBool();
+        sc.set("current", pageTrack.toMap()); sc.set("playing", true); sc.set("position", 11000);
+        QTRY_COMPARE(detailsPage->property("lyricIndex").toInt(), 1);
+        // Exercise actual delegate clicks against a local seekable stream, including pause/resume.
+        QTemporaryDir lyricAudio; QVERIFY(lyricAudio.isValid());
+        QFile lyricWav(lyricAudio.filePath("lyrics.wav")); QVERIFY(lyricWav.open(QIODevice::WriteOnly));
+        QDataStream lyricData(&lyricWav); lyricData.setByteOrder(QDataStream::LittleEndian);
+        constexpr int lyricBytes = 44100 * 2 * 40;
+        lyricData.writeRawData("RIFF", 4); lyricData << quint32(lyricBytes + 36);
+        lyricData.writeRawData("WAVEfmt ", 8); lyricData << quint32(16) << quint16(1) << quint16(1)
+            << quint32(44100) << quint32(88200) << quint16(2) << quint16(16);
+        lyricData.writeRawData("data", 4); lyricData << quint32(lyricBytes);
+        lyricWav.write(QByteArray(lyricBytes, '\0')); lyricWav.close();
+        sc.player().setSource(QUrl::fromLocalFile(lyricWav.fileName()));
+        QTRY_VERIFY(sc.player().isSeekable());
+        sc.pausePlayback();
+        auto *lyricView = window->findChild<QQuickItem *>("lyricsList"); QVERIFY(lyricView);
+        QVERIFY(QMetaObject::invokeMethod(lyricView, "positionViewAtIndex", Q_ARG(int, 2), Q_ARG(int, 1)));
+        auto findLine = [&]() -> QQuickItem * {
+            const auto content = lyricView->property("contentItem").value<QQuickItem *>();
+            if (!content) return nullptr;
+            for (auto *child : content->childItems())
+                if (child->objectName() == "lyricLine2") return child;
+            return nullptr;
+        };
+        QTRY_VERIFY(findLine());
+        auto *line = findLine();
+        QVERIFY(line->isEnabled());
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                          line->mapToScene(QPointF(line->width() / 2, line->height() / 2)).toPoint());
+        QTRY_VERIFY(sc.state()["playbackActive"].toBool());
+        QTRY_VERIFY(sc.player().position() >= 20000 && sc.player().position() < 22000);
+        QTRY_COMPARE(detailsPage->property("lyricIndex").toInt(), 2);
+        sc.pausePlayback();
+        auto *activeText = line->property("contentItem").value<QQuickItem *>(); QVERIFY(activeText);
+        QTRY_COMPARE(activeText->property("color").value<QColor>().rgba(), window->property("accent").value<QColor>().rgba());
+        const auto savedThemes = preferences->property("savedThemes");
+        const auto savedThemeName = preferences->property("themeName");
+        preferences->setProperty("savedThemes", "[{\"name\":\"Lyrics test\",\"accent\":\"#3388cc\",\"tint\":0}]");
+        preferences->setProperty("themeName", "Lyrics test");
+        QTRY_COMPARE(activeText->property("color").value<QColor>().rgba(), window->property("accent").value<QColor>().rgba());
+        QCOMPARE(window->property("baseAccent").value<QColor>(), QColor("#3388cc"));
+        preferences->setProperty("savedThemes", savedThemes);
+        preferences->setProperty("themeName", savedThemeName);
+        sc.seek(500);
+        QTRY_COMPARE(detailsPage->property("lyricIndex").toInt(), 0);
+        sc.seek(11000);
+        QTRY_COMPARE(detailsPage->property("lyricIndex").toInt(), 1);
+
+        sc.m_waveAudioTimer.stop(); // Deterministic visualization fixture, no network audio.
+        for (int i = 0; i < AudioDsp::spectrumBands; ++i)
+            sc.m_spectrum[i] = 0.15 + 0.7 * std::abs(std::sin(i * 0.19)) * (1.0 - i / 140.0);
+        emit sc.spectrumChanged();
+        for (int style : {0, 1}) {
+            preferences->setProperty("spectrumStyle", style); QTest::qWait(80);
+            QVERIFY(window->grabWindow().save(style ? "ui-track-bars.png" : "ui-track-solid.png"));
+        }
+        auto *detailsScroll = window->findChild<QObject *>("trackDetailsScroll"); QVERIFY(detailsScroll);
+        detailsScroll->setProperty("contentY", 0); QTest::qWait(80);
+        QVERIFY(window->grabWindow().save("ui-track-lyrics.png"));
+        sc.set("position", 500);
+        QTRY_COMPARE(detailsPage->property("lyricIndex").toInt(), 0);
+        QVERIFY(QMetaObject::invokeMethod(detailsPage, "loadLyrics"));
+        auto *editLyrics = window->findChild<QObject *>("editLyrics"); QVERIFY(editLyrics);
+        QVERIFY(QMetaObject::invokeMethod(editLyrics, "clicked"));
+        auto *editor = window->findChild<QObject *>("customLyricsDialog"); QVERIFY(editor);
+        QTRY_VERIFY(editor->property("opened").toBool());
+        auto *editorText = window->findChild<QObject *>("customLyricText"); QVERIFY(editorText);
+        editorText->setProperty("text", "[00:00.00]Saved words\n[00:05.00]Another line");
+        QVERIFY(QMetaObject::invokeMethod(editor, "accept"));
+        QTRY_VERIFY(lyrics.state()["custom"].toBool());
+        QTRY_VERIFY(!editor->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(detailsPage, "loadLyrics"));
+        QVERIFY(lyrics.state()["custom"].toBool());
+        lyrics.removeCustomText();
+        QTRY_COMPARE(lyrics.state()["lines"].toList().size(), 4);
+        // Clicking on a different track starts it and retains the target while resolving streams.
+        sc.set("current", currentBeforePage);
+        net.responses = {{200, "{}", 100}};
+        QVERIFY(QMetaObject::invokeMethod(lyricView, "positionViewAtIndex", Q_ARG(int, 2), Q_ARG(int, 1)));
+        QTRY_VERIFY(findLine());
+        line = findLine();
+        QVERIFY(line->isEnabled());
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                          line->mapToScene(QPointF(line->width() / 2, line->height() / 2)).toPoint());
+        QCOMPARE(sc.state()["current"].toMap()["urn"], pageTrack.toMap()["urn"]);
+        QCOMPARE(sc.position(), 20000);
+        QCOMPARE(sc.m_pendingSeek, 20000);
+        QVERIFY(sc.state()["playbackActive"].toBool());
+        sc.stopPlayback();
+        sc.set("position", oldPosition); sc.set("playing", wasPlaying); sc.set("current", currentBeforePage);
+        QVERIFY(QMetaObject::invokeMethod(detailsPage, "close"));
+        QTRY_VERIFY(!detailsPage->property("opened").toBool());
+        QVERIFY(!currentBeforePage.value("urn").toString().isEmpty());
+        auto *dockTitle = window->findChild<QQuickItem *>("dockTrackTitle"); QVERIFY(dockTitle);
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                          dockTitle->mapToScene(QPointF(dockTitle->width() / 2, dockTitle->height() / 2)).toPoint());
+        QTRY_VERIFY(detailsPage->property("opened").toBool());
+        QVERIFY(detailsPage->property("isCurrent").toBool());
+        QCOMPARE(detailsPage->property("track").toMap()["urn"], currentBeforePage["urn"]);
+        QVERIFY(detailsPage->property("followCurrent").toBool());
+        auto nextTrack = pageTrack.toMap(); nextTrack["urn"] = "soundcloud:tracks:next"; nextTrack["title"] = "Next playing track";
+        sc.set("current", nextTrack);
+        QTRY_COMPARE(detailsPage->property("track").toMap()["urn"], nextTrack["urn"]);
+        QVERIFY(!window->findChild<QObject *>("lyricsQuery"));
+        QVERIFY(detailsPage->property("isCurrent").toBool());
+        QVERIFY(QMetaObject::invokeMethod(window, "openTrack", Q_ARG(QVariant, pageTrack), Q_ARG(QVariant, false)));
+        QVERIFY(!detailsPage->property("followCurrent").toBool());
+        sc.set("current", currentBeforePage);
+        QTRY_COMPARE(detailsPage->property("track").toMap()["urn"], pageTrack.toMap()["urn"]);
+        QVERIFY(QMetaObject::invokeMethod(detailsPage, "close"));
+        const QVariantMap stationSeed{{"urn", "soundcloud:tracks:station-seed"}, {"title", "Station seed"},
+            {"user", QVariantMap{{"urn", "soundcloud:users:artist"}, {"username", "Station artist"}}}};
+        sc.set("home", QVariantList{QVariantMap{{"title", "Recommendations"}, {"tracks", QVariantList{stationSeed}}}});
+        sc.m_homeLoaded = true;
+        window->setProperty("section", 5);
+        const auto findStationCard = [&]() -> QQuickItem * {
+            std::function<QQuickItem *(QQuickItem *)> visit = [&](QQuickItem *item) -> QQuickItem * {
+                if (item->objectName() == "artistStationCard0") return item;
+                for (auto *child : item->childItems()) if (auto *found = visit(child)) return found;
+                return nullptr;
+            };
+            return visit(window->contentItem());
+        };
+        QTRY_VERIFY(findStationCard());
+        const auto currentBeforeStation = sc.state()["current"];
+        const auto queueBeforeStation = sc.state()["queue"];
+        net.responses = {{200, QJsonDocument(QJsonArray{QJsonObject{{"urn", "soundcloud:tracks:related"}, {"title", "Related track"}}}).toJson()}};
+        QVERIFY(QMetaObject::invokeMethod(findStationCard(), "clicked"));
+        QTRY_VERIFY(!sc.state()["playlistBusy"].toBool());
+        QCOMPARE(sc.state()["playlistTracks"].toList().size(), 2);
+        QCOMPARE(sc.state()["current"], currentBeforeStation);
+        QCOMPARE(sc.state()["queue"], queueBeforeStation);
+        QTest::qWait(250);
+        QVERIFY(window->grabWindow().save("ui-artist-station.png"));
         for (const auto &warning : warnings) QVERIFY2(!warning.contains("ReferenceError") && !warning.contains("TypeError") && !warning.contains("Binding loop"), qPrintable(warning));
     }
     void logoutInvalidatesPendingResponses() {

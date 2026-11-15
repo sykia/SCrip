@@ -3,6 +3,10 @@ import QtQuick.Controls
 
 Popup {
     id: root
+    readonly property int motionDuration: root.parent.Window.window && root.parent.Window.window.motion !== undefined ? root.parent.Window.window.motion : 0
+    opacity: 0; scale: 0.985
+        enter: SurfaceTransition { duration: root.motionDuration }
+    exit: SurfaceTransition { duration: root.motionDuration; leaving: true }
     property bool dark: false
 
     property color ink: "#242426"

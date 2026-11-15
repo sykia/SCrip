@@ -4,6 +4,6 @@ Communicate with the user in Russian and maintain project documentation in Engli
 
 Add resources and dependencies only when needed. Keep generated files in `build/`, and personal data and secrets outside the repository.
 
-After making changes, build the application with `cmake --build --preset debug`, check the result and leave the current build open. For a clean build, run `cmake --preset debug` first.
+After making changes, build the application with `cmake --build --preset debug` and check the result. For a clean build, run `cmake --preset debug` first.
 
-After every completed task, launch the current SCrip build and leave its window open.
+Launch SCrip only when explicitly requested by the user.

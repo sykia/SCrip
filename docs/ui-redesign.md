@@ -1,55 +1,90 @@
 # SCrip appearance system
 
-The interface combines quiet, opaque content surfaces with optical glass on floating navigation, player controls and overlays. Dark and light appearances share the same geometry and interaction model. No new font or image dependency is required.
+The desktop interface uses opaque theme-colored capsules with rounded corners.
+Navigation, content panels, settings groups, player controls, queue and plugin
+cards retain their existing layout and rounded geometry.
 
-## Components and compatibility
+Light and dark appearances, user themes, accent colors, artwork radius, avatar
+roundness, motion preferences and plugin appearance precedence remain supported.
+Liquid-glass effects and their settings have been removed, including backdrop
+captures, optical shaders, background transparency and native compositor blur.
+No extra shader tooling or desktop compositor integration is required.
 
-- `qml/design/Theme.qml`: graphite and cool neutral palettes, readable accent text, error colors, radii, spacing, typography and reduced-motion timings.
-- `qml/components/GlassSurface.qml`: bounded backdrop capture, optical shader and opaque fallback.
-- `AppCheckBox`, `AppSwitch`, `AppComboBox` and `Section`: shared controls and settings sections. Focus, disabled states, keyboard interaction and native QML accessibility remain available.
-- Desktop: revised navigation and window controls, floating playback dock, settings sections, artwork placeholders, themed catalog/profile/library/playlist/queue surfaces and an expanded player.
-- Android: shared palettes and controls, glass navigation and mini-player, themed player, sheets, settings and plugin views. The player adapts its artwork placement in landscape. System bar icon appearance follows the selected theme through a small UI-only JNI method.
-- Shared plugin panels, management and review dialogs use the same surfaces. Native file/color dialogs retain platform behavior.
+The Android entry point remains in `qml/android/Main.qml`; the desktop entry
+point is `qml/Main.qml`. Shared plugin cards use ordinary opaque backgrounds.
 
-Settings categories and stored theme definitions are unchanged. User accents, theme tint, artwork radius, avatar roundness, panel radius, plugin appearance precedence, motion and scrolling preferences remain supported. The only added persisted setting is `glassQuality` (0 minimal, 1 balanced, 2 high). Switching appearance updates bindings without recreating the player or changing navigation.
+## Track pages and player input
 
-SoundCloud networking, OAuth, secret storage, playback, queue, crossfade, caching, updates and plugin API logic were not rewritten. Pre-existing working-tree changes in those areas were retained.
+The floating playback dock consumes unused pointer and wheel events so tracks
+scrolling behind it cannot receive accidental clicks. Artwork and titles open a
+central track page from the dock, library, search results, home shelves
+and queue. Opening a page does not start playback; explicit play controls remain
+available. The page uses theme colors, rounded surfaces, large artwork, artist
+navigation, available description text, like and queue actions. Escape or Back
+returns to the previous view.
 
-## Optical material
+## Central track view and audio controls
 
-`GlassSurface` receives an explicit backdrop item that excludes the glass and its foreground. It rejects ancestor/self captures. Desktop overlays sample the shell, the dock samples a content layer that includes the page and inspector but excludes the dock, and mobile overlays/navigation sample the body. The capture rectangle is mapped into source coordinates. Popup overlays are excluded from their own source. Nested player sheets sample the visible player content rather than the covered page.
+The track page is non-modal and anchored inside the main content area, above the
+playback dock. Navigation, the inspector and playback controls remain visible and
+interactive. Navigating to another section closes the page; the underlying page
+keeps its scroll state and is hidden while the track view is open.
 
-A `ShaderEffectSource` captures only the panel region at 40% (balanced) or 75% (high) resolution. `glass.frag` uses 17 weighted texture samples, a rounded signed-distance mask, approximately 1.5 physical pixels of edge refraction, a neutral surface tint and restrained edge highlights. Text and controls render after the optical pass. Transparent source pixels are composited against the material color before tinting; output uses premultiplied alpha.
+The five-band equalizer uses independent stereo biquads at 60 Hz, 250 Hz, 1 kHz,
+4 kHz and 12 kHz with a range of -12 to +12 dB. Gains and the enabled state are
+stored in user settings. Positive gains reserve automatic headroom, with a final
+sample limiter. Reset restores flat gains. The bypass uses the original output.
 
-Shaders are packaged with `qt_add_shaders`/qsb. The implementation uses Qt Quick's RHI pipeline; no compositor blur, custom render thread, CPU readback or additional graphics dependency is required. Captures follow source dirtiness. Invisible effects release their source and minimized windows stop live updates. Lists retain virtualization and never allocate a blur per delegate. Minimal mode and Qt Quick's software backend use an opaque material.
+On Qt 6.8+ with the FFmpeg backend, decoded buffers are processed into floating
+point PCM and played through a bounded QAudioSink queue. Each decoder has its own
+filter state and sink to retain crossfade volume ramps. Native outputs remain
+muted timing sources while processing is enabled. Source changes, pause, stop and
+seek clear buffered processing. Unsupported formats or output errors disable the
+equalizer and return playback to the native output. Older Qt builds retain native
+playback and show that the equalizer is unavailable.
 
-The original `WaveCard.qml` and `wave.frag` are retained. Their shape, audio inputs, timing, viewport/minimize suspension and interaction have not been replaced. Regression tests still cover wave controls and suspension.
+The spectrum uses a 2048-point Hann-windowed FFT and 20 logarithmic frequency
+bands. Channel powers are combined without canceling opposite stereo phases.
+It analyzes decoded audio (processed audio when equalization is enabled), with
+smoothed decay and no simulated signal. Analysis is active only while the current
+track page is visible; equalization continues independently in the background.
 
-Qt references: [ShaderEffectSource](https://doc.qt.io/qt-6/qml-qtquick-shadereffectsource.html), [ShaderEffect](https://doc.qt.io/qt-6/qml-qtquick-shadereffect.html).
+Validation includes flat response, bass cut and boost, stereo isolation,
+frequency discrimination and silence; real local PCM playback through the Linux
+audio device, pause, seek, simultaneous decoder routing; and page boundaries in
+wide and narrow layouts. Windows and Android runtime audio validation remains
+outstanding.
 
-## Validation and evidence
+Qt API references:
+[QAudioBufferOutput](https://doc.qt.io/qt-6/qaudiobufferoutput.html),
+[QMediaPlayer audio buffer output](https://doc.qt.io/qt-6/qmediaplayer.html#audioBufferOutput-prop),
+[QAudioSink](https://doc.qt.io/qt-6/qaudiosink.html).
 
-Generated artifacts and logs belong in `build/`:
+## Android mobile appearance
 
-- `build/debug/`: preset build, CTest log and software-rendered UI screenshots.
-- `build/visual-gpu/`: desktop screenshots and OpenGL test log from NVIDIA GeForce RTX 4070. Tests exercise home in both appearances, settings, search/catalog, profiles, expanded player, library, playlists, queue, narrow windows and virtualized collections up to 5,000 tracks.
-- `build/mobile-gpu/`: the actual mobile QML rendered on Linux with fixture data, including navigation, both player appearances, settings and swipe/back behavior. These are UI fixtures, not an authenticated Android session.
-- `build/android-redesign/`: Qt 6.10.1 Android x86_64 Debug APK and native Android 35 emulator screenshots of welcome/settings in both appearances. A separate AVD protects the existing installation and its data.
+The Android interface uses neutral charcoal surfaces in dark mode and neutral
+white surfaces in light mode. A floating capsule groups Home, Feed and Library,
+with a separate circular Search button and animated selection indicator. Home
+provides 154 dp artwork shelves. Track rows use 54 dp
+artwork and 80 dp height. The mini-player and expanded player use neutral surfaces.
 
-The preset uses Qt 6.12 on Linux. CTest covers the existing playback/network/cache/plugin suites, artwork and wave UI tests, plus new palette contrast, extreme accent colors, reduced motion and recursive capture prevention checks. Native window controls are located by their semantic names rather than old pixel coordinates.
+Empty list messages are part of the scrolling footer, after the profile card and
+its tabs, so they cannot overlap profile information. Track actions appear in a
+height-limited scrollable bottom sheet with an artwork header, explicit favorite
+state, leading icons and left-aligned action labels. System safe-area insets,
+theme preferences and existing account data remain supported.
 
-## Remaining validation limits
+Android track menus look up lyrics through the shared lyrics backend. A lyrics
+action appears when text is available and opens a full-height, scrollable reader.
+The reader supports saved custom lyrics and provider lyrics. Android controls use
+their own pressed backgrounds without the additional shared feedback overlay;
+track rows use a subtle inset highlight.
 
-Windows runtime and physical Android devices have not been tested. Authenticated end-to-end OAuth and real account playback were not exercised in the clean Android emulator; fixture tests cover the associated UI paths. Android MediaSession/background playback was retained but needs physical-device regression testing. A single 3-second Linux sample on the restored, paused home screen with the original wave animating used 3.67% of one CPU core and approximately 396 MiB RSS (`build/debug/idle-sample.json`). This is not a comparative benchmark. No claim of measured 60 FPS, energy use or universal GPU compatibility is made.
+The Android mini-player uses a compact 72 dp card with 48 dp artwork, a short
+progress track below the metadata and a contrasting 44 dp play/pause button.
+Favorite controls remain available, and tapping or swiping up opens the player.
 
-The emulator's deprecated `swiftshader_indirect` mode produced geometry artifacts, including on ordinary Qt rectangles; host GPU mode rendered correctly. This remains an emulator/backend limitation. Both Vulkan and Direct3D require target-platform runtime validation. Performance strategies above describe implemented resource limits, not a completed cross-device benchmark.
-
-This is an implemented UI update, not certification that every production scenario on every platform has passed.
-
-## Changed implementation files
-
-New files: `qml/design/Theme.qml`, `qml/components/{GlassSurface,AppCheckBox,AppSwitch,AppComboBox,Section}.qml`, `qml/shaders/glass.frag`, `tests/qml/tst_design.qml`, and this document.
-
-Updated: `CMakeLists.txt` (QML/resource aliases, qsb and test resources), both `Main.qml` entry points, `Artwork.qml`, `android/RoundedImage.qml`, shared plugin views/actions, `src/androidmedia.{h,cpp}`, `packaging/android/src/org/scrip/app/SCripActivity.java`, and the existing desktop/mobile UI tests in `tests/tst_soundcloud.cpp` and `tests/tst_plugins.cpp`.
-
-Pre-existing modified/untracked files, including the wave implementation, README and SoundCloud playback changes, remain in the working tree. No release, version bump or destructive Git operation was performed.
+The Android lyrics reader uses a vertically constrained Flickable with explicit
+text content height, native touch inertia and a soft boundary rebound. The title
+and source remain fixed while the text scrolls; opening the reader resets it to
+the beginning.

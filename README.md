@@ -37,6 +37,10 @@ Browse your favorites by artwork and open an artist's profile from their name. D
 
 ![SCrip library with favorite tracks](docs/screenshots/library.png)
 
+## Share what you are listening to
+
+Desktop settings include optional [Discord Rich Presence](docs/discord-presence.md): clickable track title, artist, cover, elapsed / total track progress, a SCrip badge, and buttons to open the track or download SCrip on GitHub. It requires the Discord desktop client; the shared project Application ID is already configured.
+
 ## Take your music with you
 
 Android includes a dedicated touch interface, a full-screen player, background playback and system media controls.

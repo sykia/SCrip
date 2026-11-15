@@ -10,6 +10,7 @@ Canvas {
             const c = getContext("2d"); c.reset(); c.scale(width / 24, height / 24)
             c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1.65; c.lineCap = "round"; c.lineJoin = "round"; c.beginPath()
             switch (name) {
+            case "menu": for (let y = 6; y <= 18; y += 6) { c.moveTo(4,y); c.lineTo(20,y) } break
             case "more": c.arc(5,12,1,0,Math.PI*2); c.moveTo(13,12); c.arc(12,12,1,0,Math.PI*2); c.moveTo(20,12); c.arc(19,12,1,0,Math.PI*2); c.fill(); return
             case "search": c.arc(10,10,6,0,Math.PI*2); c.moveTo(15,15); c.lineTo(21,21); break
             case "home": c.moveTo(3,11); c.lineTo(12,3); c.lineTo(21,11); c.moveTo(5,10); c.lineTo(5,21); c.lineTo(10,21); c.lineTo(10,14); c.lineTo(14,14); c.lineTo(14,21); c.lineTo(19,21); c.lineTo(19,10); break

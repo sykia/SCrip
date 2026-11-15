@@ -130,7 +130,7 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         {"home", QVariantList{}}, {"homeBusy", false}, {"homeError", ""}, {"authBusy", false}, {"error", ""}, {"status", "Подключите SoundCloud"}, {"tracks", QVariantList{}},
         {"queue", QVariantList{}}, {"profile", QVariantMap{}}, {"current", QVariantMap{}}, {"restoreCleared", false},
         {"playing", false}, {"playbackActive", false}, {"position", 0}, {"duration", 0}, {"hasMore", false},
-        {"heading", "Откройте свою музыку"}, {"configPath", m_configPath}, {"repeat", false}, {"shuffle", false}, {"crossfade", false},
+        {"heading", "Откройте свою музыку"}, {"configPath", m_configPath}, {"repeat", false}, {"shuffle", false}, {"crossfade", false}, {"waveMode", ""}, {"waveBusy", false}, {"waveError", ""},
         {"updateChecking", false}, {"updateAvailable", false}, {"updateError", ""}, {"updateResult", ""}, {"updateManual", false}};
 #ifdef Q_OS_LINUX
     if (m_systemStore) {
@@ -192,6 +192,12 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     QSettings preferences;
     m_audio.setVolume(preferences.value("player/volume", 0.7).toDouble());
     set("volume", m_audio.volume());
+    for (int i = 0; i < 5; ++i)
+        m_equalizerGains[i] = qBound(-12.0, preferences.value(QString("player/equalizer/%1").arg(i), 0).toDouble(), 12.0);
+    m_playerEffects.setGains(m_equalizerGains); m_spareEffects.setGains(m_equalizerGains);
+    m_equalizerEnabled = equalizerAvailable() && preferences.value("player/equalizerEnabled", false).toBool();
+    m_spectrum = m_spectrumTarget = QVariantList(AudioDsp::spectrumBands, 0.0);
+    updateAudioRouting();
 #ifdef Q_OS_ANDROID
     // На мобильных устройствах переходы между треками отключены, включая старую настройку.
     set("crossfade", false);
@@ -220,6 +226,11 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         m_crossfadeStarted = false;
         prepareNext();
     });
+    m_waveRetryTimer.setSingleShot(true);
+    connect(&m_waveRetryTimer, &QTimer::timeout, this, [this] {
+        set("waveBusy", false);
+        refillWave();
+    });
     m_waveAudioTimer.setInterval(33);
     connect(&m_waveAudioTimer, &QTimer::timeout, this, [this] {
         auto envelope = [](double current, double target) {
@@ -231,20 +242,35 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         m_waveBeat = qMax(m_waveTargetBeat, m_waveBeat * 0.80);
         if (m_waveBeat < 0.001) m_waveBeat = 0;
         m_waveTargetLevel *= 0.85; m_waveTargetBass *= 0.85; m_waveTargetBeat = 0;
+        for (int i = 0; i < m_spectrum.size(); ++i) {
+            const double current = m_spectrum[i].toDouble(), target = m_spectrumTarget[i].toDouble();
+            // Gentle spectrum attack/release, independent from the beat animation.
+            const double value = current + (target - current) * (target > current ? 0.24 : 0.085);
+            m_spectrum[i] = value < 0.001 ? 0.0 : value;
+            m_spectrumTarget[i] = target * 0.95;
+        }
+        emit spectrumChanged();
         emit waveAudioChanged();
     });
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     connect(&m_waveOutput, &QAudioBufferOutput::audioBufferReceived, this, [this](const QAudioBuffer &buffer) {
-        if (m_activePlayer == &m_player) analyzeWaveAudio(buffer);
+        processAudio(&m_player, buffer);
     });
     connect(&m_waveSpareOutput, &QAudioBufferOutput::audioBufferReceived, this, [this](const QAudioBuffer &buffer) {
-        if (m_activePlayer == &m_sparePlayer) analyzeWaveAudio(buffer);
+        processAudio(&m_sparePlayer, buffer);
     });
 #endif
     QList<QMediaPlayer *> players{&m_player, &m_sparePlayer};
     m_preloadAudio.setVolume(0);
     m_preloadPlayer->setAudioOutput(&m_preloadAudio);
     for (auto *media : players) {
+        connect(media, &QMediaPlayer::sourceChanged, this, [this, media] {
+            (media == &m_player ? m_playerEffects : m_spareEffects).clear();
+        });
+        connect(media, &QMediaPlayer::playbackStateChanged, this, [this, media](QMediaPlayer::PlaybackState state) {
+            if (state != QMediaPlayer::PlayingState)
+                (media == &m_player ? m_playerEffects : m_spareEffects).clear();
+        });
         connect(media, &QMediaPlayer::positionChanged, this, [this, media](qint64 p) {
             if (media != m_activePlayer) return;
             // Restore/seek emits positionChanged too; count progress only after the
@@ -252,13 +278,16 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
             if (p > m_startupInitialPosition && m_startupAudible) {
                 startupStage("first_progress"); m_startupAudible = false; m_startupPending = false;
             }
-            if (!m_restoringPlayback) {
+            if (!m_restoringPlayback && m_pendingSeek < 0) {
                 set("position", p);
                 if (!m_state.value("playbackActive").toBool()) savePlaybackPosition();
             }
             const qint64 duration = media->duration();
             if (m_state.value("crossfade").toBool() && !m_crossfadeStarted && duration > 6000 && duration - p <= 3000)
                 beginCrossfade();
+        });
+        connect(media, &QMediaPlayer::seekableChanged, this, [this, media](bool) {
+            if (media == m_activePlayer) applyPendingSeek();
         });
         connect(media, &QMediaPlayer::durationChanged, this, [this, media](qint64 d) { if (media == m_activePlayer) set("duration", d); });
         connect(media, &QMediaPlayer::playbackStateChanged, this, [this, media] {
@@ -307,7 +336,8 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
             // BufferingMedia уже содержит достаточно данных для продолжения; StalledMedia — нет.
             set("buffering", status == QMediaPlayer::LoadingMedia || status == QMediaPlayer::StalledMedia ||
                 (status == QMediaPlayer::BufferingMedia && media->playbackState() != QMediaPlayer::PlayingState));
-            if (m_restoringPlayback && (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia)) {
+            applyPendingSeek();
+            if (m_restoringPlayback && m_pendingSeek < 0 && (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia)) {
                 if (m_restorePosition > 0) player().setPosition(player().duration() > 0 ? qMin(m_restorePosition, player().duration()) : m_restorePosition);
                 m_restoringPlayback = false;
                 set("position", player().position());
@@ -355,7 +385,21 @@ void SoundCloud::finishStorageLoad(bool ok, const QJsonObject &connection, const
     if (autoConnect && m_state.value("configured").toBool() && (!m_useWorker || m_userSession)) connectCatalog();
 }
 #endif
-void SoundCloud::set(const QString &key, const QVariant &value) {
+void SoundCloud::set(const QString &key, const QVariant &input) {
+    QVariant value = input;
+    if (key == "signedIn" && !value.toBool()) {
+        m_likedTracks.clear(); m_likeOverrides.clear(); m_likePages.clear(); m_likesComplete = false;
+    }
+    if (key == "current") value = withLikeState(value.toMap());
+    else if (key == "tracks" || key == "queue" || key == "playlistTracks") value = withLikeStates(value.toList());
+    else if (key == "home") {
+        auto shelves = value.toList();
+        for (auto &entry : shelves) {
+            auto shelf = entry.toMap(); shelf["tracks"] = withLikeStates(shelf.value("tracks").toList()); entry = shelf;
+        }
+        value = shelves;
+    }
+    if (key == "queue") m_queue = value.toList();
     if (m_state.value(key) == value) return;
     m_state[key] = value;
     if (key == "playbackActive") {
@@ -556,8 +600,43 @@ void SoundCloud::connectCatalog() {
     ensureToken([this] { set("connected", true); set("signedIn", m_userSession); set("busy", false); set("status", m_userSession ? "Аккаунт подключён" : "Публичный каталог подключён"); if (m_userSession) { profile(); browse("likes"); } else { tryRestoreAndroidTrack(); browse("tracks", ""); } }, [this](QString message) { set("busy", false); fail(message); });
 }
 void SoundCloud::profile() { request("/me", [this](QJsonDocument d) {
-    const auto profile = d.object().toVariantMap(); set("profile", profile); restorePlayback(profile);
+    const auto profile = d.object().toVariantMap();
+    if (urn(profile) != urn(m_state.value("profile").toMap())) {
+        m_likedTracks.clear(); m_likeOverrides.clear(); m_likePages.clear(); m_likesComplete = false;
+    }
+    set("profile", profile); restorePlayback(profile);
+    if (signedIn()) { m_likedTracks.clear(); m_likesComplete = false; m_likePages.clear(); syncLikes(); }
 }); }
+QVariantMap SoundCloud::withLikeState(QVariantMap track) const {
+    const auto id = urn(track);
+    if (!id.startsWith("soundcloud:tracks:")) return track;
+    if (m_likeOverrides.contains(id)) track["user_favorite"] = m_likeOverrides.value(id);
+    else if (m_likesComplete || m_likedTracks.contains(id)) track["user_favorite"] = m_likedTracks.contains(id);
+    return track;
+}
+QVariantList SoundCloud::withLikeStates(QVariantList tracks) const {
+    for (auto &entry : tracks) entry = withLikeState(entry.toMap());
+    return tracks;
+}
+void SoundCloud::refreshLikeStates() {
+    for (auto it = m_listings.begin(); it != m_listings.end(); ++it) it->tracks = withLikeStates(it->tracks);
+    set("tracks", m_state.value("tracks")); set("queue", m_queue);
+    set("current", m_state.value("current")); set("home", m_state.value("home"));
+    set("playlistTracks", m_state.value("playlistTracks"));
+}
+void SoundCloud::syncLikes(const QString &path) {
+    if (!signedIn() || m_likePages.contains(path)) return;
+    m_likePages.insert(path);
+    request(path, [this](QJsonDocument doc) {
+        // A malformed success response must not turn unknown likes into dislikes.
+        if (!doc.isArray() && !doc.object().value("collection").isArray()) return;
+        for (const auto &entry : items(doc)) m_likedTracks.insert(urn(entry.toMap()));
+        const auto next = doc.object().value("next_href").toString();
+        m_likesComplete = next.isEmpty();
+        refreshLikeStates();
+        if (!next.isEmpty()) syncLikes(next);
+    }, "GET", {}, true, [this, path](QString) { m_likePages.remove(path); });
+}
 void SoundCloud::savePlayback() {
     const QString account = urn(m_state.value("profile").toMap());
     if (!m_restoreChecked || account.isEmpty() || !signedIn()) return;
@@ -566,7 +645,12 @@ void SoundCloud::savePlayback() {
         settings.remove("playback/session"); settings.remove("playback/position"); return;
     }
     const QVariantMap snapshot{{"account", account}, {"queue", m_queue}, {"index", m_queueIndex},
-                               {"position", m_state.value("position")}};
+                               {"position", m_state.value("position")}, {"waveMode", m_waveMode},
+                               {"waveNext", m_waveNext}, {"waveSeeds", m_waveSeeds},
+                               {"waveRelatedNext", m_waveRelatedNext}, {"waveLoadSeeds", m_waveLoadSeeds},
+                               {"waveSeedIndex", m_waveSeedIndex}, {"waveSeen", QStringList(m_waveSeen.values())}};
+    if (!m_waveMode.isEmpty())
+        settings.setValue("playback/waves/" + m_waveMode, QJsonDocument::fromVariant(snapshot).toJson(QJsonDocument::Compact));
     settings.setValue("playback/session", QJsonDocument::fromVariant(snapshot).toJson(QJsonDocument::Compact));
     savePlaybackPosition();
 }
@@ -575,7 +659,15 @@ void SoundCloud::savePlaybackPosition() {
     const auto track = urn(m_state.value("current").toMap());
     if (!m_restoreChecked || !signedIn() || account.isEmpty() || track.isEmpty()) return;
     const QVariantMap position{{"account", account}, {"track", track}, {"position", m_state.value("position")}};
-    QSettings().setValue("playback/position", QJsonDocument::fromVariant(position).toJson(QJsonDocument::Compact));
+    QSettings settings;
+    settings.setValue("playback/position", QJsonDocument::fromVariant(position).toJson(QJsonDocument::Compact));
+    if (!m_waveMode.isEmpty()) {
+        auto snapshot = QJsonDocument::fromJson(settings.value("playback/waves/" + m_waveMode).toByteArray()).object().toVariantMap();
+        if (snapshot.value("account").toString() == account) {
+            snapshot["position"] = m_state.value("position");
+            settings.setValue("playback/waves/" + m_waveMode, QJsonDocument::fromVariant(snapshot).toJson(QJsonDocument::Compact));
+        }
+    }
 }
 void SoundCloud::restorePlayback(const QVariantMap &profile) {
     if (m_restoreChecked) return;
@@ -590,6 +682,7 @@ void SoundCloud::restorePlayback(const QVariantMap &profile) {
     for (const auto &track : queue) if (!urn(track.toMap()).startsWith("soundcloud:tracks:")) return;
     m_androidRestorePending = false; m_androidRestoreTrack.clear(); m_snapshotPlayback = true;
     m_queue = queue; m_queueIndex = index;
+    restoreWaveState(snapshot);
     set("queue", m_queue); set("queueIndex", index);
     const auto track = queue[index].toMap();
     const auto savedPosition = QJsonDocument::fromJson(QSettings().value("playback/position").toByteArray()).object().toVariantMap();
@@ -659,6 +752,7 @@ void SoundCloud::callbackConnection() {
                 set("loadingDestinations", false); set("savingTrack", false); set("busy", false);
                 m_queue.clear(); m_queueIndex = -1; set("queue", m_queue); set("queueIndex", -1);
                 stopPlayback();
+                QSettings().remove("playback/waves");
                 set("connected", true); set("signedIn", true);
                 set("authBusy", false);
                 set("authStep", "");
@@ -678,7 +772,10 @@ bool SoundCloud::clearSession() {
     ++m_homeGeneration; set("home", QVariantList{}); set("homeBusy", false); set("homeError", "");
     set("savingTrack", false); set("loadingDestinations", false); set("destinations", QVariantList{}); set("destinationNext", "");
     stopPlayback();
-    ++m_epoch; ++m_listing;
+    QSettings().remove("playback/waves");
+    ++m_epoch; ++m_listing; ++m_playlistGeneration;
+    m_playlistNext.clear();
+    set("playlistTracks", QVariantList{}); set("playlistBusy", false); set("playlistHasMore", false); set("playlistError", "");
     m_access.clear(); m_refresh.clear(); m_expires = 0; m_userSession = false; m_refreshing = false; m_waiting.clear();
     m_queue.clear(); m_queueIndex = -1; m_nextHref.clear();
     set("queue", m_queue); set("queueIndex", -1); set("buffering", false); set("current", QVariantMap{}); set("tracks", QVariantList{}); set("profile", QVariantMap{});
@@ -787,7 +884,9 @@ void SoundCloud::collection(const QString &path, bool append) {
         for (const auto &old : list) seen.insert(urn(old.toMap()));
         for (auto item : items(doc)) {
             auto map = item.toMap();
-            if (m_lastPath.startsWith("/me/likes/tracks")) map["user_favorite"] = true;
+            if (m_lastPath.startsWith("/me/likes/tracks")) {
+                m_likedTracks.insert(urn(map)); map["user_favorite"] = true;
+            }
             const auto id = urn(map);
             if (seen.contains(id)) continue;
             seen.insert(id);
@@ -796,6 +895,7 @@ void SoundCloud::collection(const QString &path, bool append) {
         set("tracks", list); const auto next = doc.object().value("next_href").toString(); m_nextHref = next == m_nextHref ? QString{} : next; set("hasMore", !m_nextHref.isEmpty()); set("busy", false);
         if (m_listings.size() >= 8 && !m_listings.contains(m_lastPath)) m_listings.erase(m_listings.begin());
         m_listings.insert(m_lastPath, {list, m_nextHref});
+        if (m_lastPath.startsWith("/me/likes/tracks")) refreshLikeStates();
         if (m_lastPath.startsWith("/me/reposts/tracks")) {
             QSet<QString> pending;
             for (const auto &entry : list) if (!entry.toMap().value("user_favorite").toBool()) pending.insert(urn(entry.toMap()));
@@ -886,22 +986,85 @@ void SoundCloud::loadHome(bool force) {
         }
     });
 }
-void SoundCloud::setWaveVisualActive(bool enabled) {
-    if (m_waveVisualActive == enabled) return;
-    m_waveVisualActive = enabled;
+QVariantList SoundCloud::equalizerGains() const {
+    QVariantList result;
+    for (double db : m_equalizerGains) result.append(db);
+    return result;
+}
+void SoundCloud::setEqualizerEnabled(bool enabled) {
+    enabled = enabled && equalizerAvailable();
+    if (m_equalizerEnabled == enabled) return;
+    m_equalizerEnabled = enabled; m_equalizerError.clear();
+    m_playerEffects.clear(); m_spareEffects.clear();
+    QSettings().setValue("player/equalizerEnabled", enabled);
+    updateAudioRouting();
+    emit soundControlsChanged();
+}
+void SoundCloud::setEqualizerGain(int band, double db) {
+    if (band < 0 || band >= 5 || !std::isfinite(db)) return;
+    m_equalizerGains[band] = qBound(-12.0, db, 12.0);
+    m_playerEffects.setGains(m_equalizerGains); m_spareEffects.setGains(m_equalizerGains);
+    QSettings().setValue(QString("player/equalizer/%1").arg(band), m_equalizerGains[band]);
+    emit soundControlsChanged();
+}
+void SoundCloud::resetEqualizer() {
+    for (int i = 0; i < 5; ++i) setEqualizerGain(i, 0);
+}
+void SoundCloud::setTrackVisualActive(bool enabled) {
+    if (m_trackVisualActive == enabled) return;
+    m_trackVisualActive = enabled;
+    updateAudioRouting();
+}
+void SoundCloud::updateAudioRouting() {
+    const bool capture = m_waveVisualActive || m_trackVisualActive || m_equalizerEnabled;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-    m_player.setAudioBufferOutput(enabled ? &m_waveOutput : nullptr);
-    m_sparePlayer.setAudioBufferOutput(enabled ? &m_waveSpareOutput : nullptr);
+    m_player.setAudioBufferOutput(capture ? &m_waveOutput : nullptr);
+    m_sparePlayer.setAudioBufferOutput(capture ? &m_waveSpareOutput : nullptr);
 #endif
-    if (enabled) { m_waveBeatClock.start(); m_waveAudioTimer.start(); }
-    else {
+    // Keep original outputs as playback clocks, with their existing volume/crossfade ramps.
+    m_audio.setMuted(m_equalizerEnabled); m_preloadAudio.setMuted(m_equalizerEnabled);
+    if (m_waveVisualActive || m_trackVisualActive) {
+        if (!m_waveAudioTimer.isActive()) { m_waveBeatClock.start(); m_waveAudioTimer.start(); }
+    } else {
         m_waveAudioTimer.stop();
         m_waveLevel = m_waveBass = m_waveBeat = 0;
         m_waveTargetLevel = m_waveTargetBass = m_waveTargetBeat = 0;
         m_waveLowPass = m_waveBaseline = 0;
-        emit waveAudioChanged();
+        m_spectrum = m_spectrumTarget = QVariantList(AudioDsp::spectrumBands, 0.0);
+        emit spectrumChanged(); emit waveAudioChanged();
     }
 }
+void SoundCloud::setWaveVisualActive(bool enabled) {
+    if (m_waveVisualActive == enabled) return;
+    m_waveVisualActive = enabled;
+    updateAudioRouting();
+}
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+void SoundCloud::processAudio(QMediaPlayer *media, const QAudioBuffer &buffer) {
+    if (!buffer.isValid() || buffer.frameCount() <= 0 || media->playbackState() != QMediaPlayer::PlayingState) return;
+    if (media != m_activePlayer && !m_crossfadeStarted) return;
+    QByteArray samples;
+    if (m_equalizerEnabled) {
+        auto &effects = media == &m_player ? m_playerEffects : m_spareEffects;
+        const double volume = media->audioOutput() ? media->audioOutput()->volume() : 0;
+        if (!effects.write(buffer, volume)) {
+            const auto error = effects.error();
+            setEqualizerEnabled(false);
+            m_equalizerError = error;
+            emit soundControlsChanged();
+            return;
+        }
+        samples = effects.processed();
+    }
+    if (media != m_activePlayer) return;
+    if (m_waveVisualActive) analyzeWaveAudio(buffer);
+    if (m_trackVisualActive) {
+        if (samples.isEmpty()) samples = AudioEffects::floatSamples(buffer);
+        m_spectrumTarget = AudioDsp::spectrum(reinterpret_cast<const float *>(samples.constData()),
+                                             buffer.frameCount(), buffer.format().channelCount(), buffer.format().sampleRate());
+    }
+}
+#endif
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 void SoundCloud::analyzeWaveAudio(const QAudioBuffer &buffer) {
     if (!m_waveVisualActive || !buffer.isValid()) return;
@@ -935,52 +1098,105 @@ void SoundCloud::analyzeWaveAudio(const QAudioBuffer &buffer) {
 }
 #endif
 
+void SoundCloud::restoreWaveState(const QVariantMap &snapshot) {
+    const QString mode = snapshot.value("waveMode").toString();
+    if (mode != "library" && mode != "discovery") return;
+    m_waveMode = mode; m_waveNext = snapshot.value("waveNext").toString();
+    m_waveSeeds = snapshot.value("waveSeeds").toList();
+    m_waveRelatedNext = snapshot.value("waveRelatedNext").toString();
+    m_waveLoadSeeds = snapshot.value("waveLoadSeeds").toBool();
+    m_waveRetryAttempts = 0;
+    m_waveSeedIndex = qMax(0, snapshot.value("waveSeedIndex").toInt());
+    m_waveSeen.clear();
+    for (const auto &id : snapshot.value("waveSeen").toStringList()) m_waveSeen.insert(id);
+    set("waveMode", mode);
+}
 void SoundCloud::stopWave() {
+    if (!m_waveMode.isEmpty()) savePlayback();
     ++m_waveGeneration;
+    m_waveRetryTimer.stop();
     m_waveMode.clear(); m_waveWaiting = false;
     set("waveMode", ""); set("waveBusy", false); set("waveError", "");
 }
 void SoundCloud::startWave(const QString &mode) {
     if (!signedIn() || (mode != "library" && mode != "discovery")) return;
+    if (mode == m_waveMode) { togglePlayback(); return; }
     stopPlayback();
+    const auto saved = QJsonDocument::fromJson(QSettings().value("playback/waves/" + mode).toByteArray()).object().toVariantMap();
+    const auto queue = saved.value("queue").toList();
+    const int index = saved.value("index", -1).toInt();
+    const bool valid = saved.value("account").toString() == urn(m_state.value("profile").toMap())
+        && saved.value("waveMode").toString() == mode && index >= 0 && index < queue.size() && queue.size() <= 500
+        && std::all_of(queue.begin(), queue.end(), [](const QVariant &t) { return urn(t.toMap()).startsWith("soundcloud:tracks:"); });
+    if (valid) {
+        restoreWaveState(saved);
+        m_waveWaiting = false; m_waveEmptyPages = 0;
+        m_queue = queue; m_queueIndex = index;
+        set("queue", m_queue); set("queueIndex", index);
+        startTrack(queue[index].toMap(), true, qMax<qint64>(0, saved.value("position").toLongLong()));
+        return;
+    }
     m_waveMode = mode; m_waveNext.clear(); m_waveSeeds.clear(); m_waveSeen.clear();
+    m_waveRelatedNext.clear(); m_waveLoadSeeds = false; m_waveRetryAttempts = 0;
     m_waveSeedIndex = 0; m_waveEmptyPages = 0; m_waveWaiting = true;
     m_queue.clear(); m_queueIndex = -1;
     set("queue", m_queue); set("queueIndex", -1); set("waveMode", mode);
     setRepeat(false); setShuffle(false);
+    set("playbackActive", true);
     refillWave();
 }
 void SoundCloud::retryWave() {
     if (m_waveMode.isEmpty()) return;
     m_waveEmptyPages = 0;
-    if (m_queueIndex + 1 >= m_queue.size()) m_waveWaiting = true;
+    if (m_waveRetryTimer.isActive()) { m_waveRetryTimer.stop(); set("waveBusy", false); }
+    if (m_queueIndex + 1 >= m_queue.size()) { m_waveWaiting = true; set("playbackActive", true); }
     refillWave();
+}
+void SoundCloud::scheduleWaveRefill() {
+    if (m_waveMode != "discovery" || (!m_waveWaiting && !m_state.value("playbackActive").toBool())) return;
+    // Retry quietly without hammering an exhausted graph or an unavailable service.
+    const int delay = qMin(60000, 3000 * (1 << qMin(m_waveRetryAttempts, 5)));
+    m_waveRetryAttempts = qMin(m_waveRetryAttempts + 1, 5);
+    m_waveEmptyPages = 0;
+    set("waveError", ""); set("waveBusy", true);
+    m_waveRetryTimer.start(delay);
+    savePlayback();
 }
 void SoundCloud::refillWave() {
     if (m_waveMode.isEmpty() || m_state.value("waveBusy").toBool()) return;
     const int generation = m_waveGeneration;
-    const bool seeds = m_waveMode == "discovery" && m_waveSeeds.isEmpty();
+    const bool seeds = m_waveMode == "discovery" && (m_waveSeeds.isEmpty() || m_waveLoadSeeds);
     QString path;
     if (m_waveMode == "library" || seeds)
         path = m_waveNext.isEmpty() ? QString("/me/likes/tracks?limit=50&linked_partitioning=true") : m_waveNext;
+    else if (!m_waveRelatedNext.isEmpty()) path = m_waveRelatedNext;
     else {
-        const auto seed = m_waveSeeds[m_waveSeedIndex++ % m_waveSeeds.size()].toMap();
+        m_waveSeedIndex %= m_waveSeeds.size();
+        const auto seed = m_waveSeeds[m_waveSeedIndex++].toMap();
         path = apiPath("tracks", urn(seed)) + "/related?limit=40&linked_partitioning=true";
     }
     set("waveBusy", true); set("waveError", "");
-    request(path, [this, generation, seeds](QJsonDocument doc) {
+    request(path, [this, generation, seeds, path](QJsonDocument doc) {
         if (generation != m_waveGeneration) return;
         set("waveBusy", false);
         auto tracks = items(doc);
         if (seeds) {
+            m_waveLoadSeeds = false;
             for (const auto &entry : tracks) {
-                if (urn(entry.toMap()).startsWith("soundcloud:tracks:")) {
-                    m_waveSeeds.append(entry); m_waveSeen.insert(urn(entry.toMap()));
+                const auto id = urn(entry.toMap());
+                if (id.startsWith("soundcloud:tracks:") && !m_waveSeen.contains(id)) {
+                    m_waveSeeds.append(entry); m_waveSeen.insert(id);
+                    if (m_waveSeeds.size() > 100) m_waveSeeds.removeFirst();
                 }
             }
             m_waveNext = doc.object().value("next_href").toString();
+            if (m_waveNext == path) m_waveNext.clear();
             if (!m_waveSeeds.isEmpty()) { refillWave(); return; }
         } else {
+            if (m_waveMode == "discovery") {
+                m_waveRelatedNext = doc.object().value("next_href").toString();
+                if (m_waveRelatedNext == path) m_waveRelatedNext.clear();
+            }
             if (m_waveMode == "library") m_waveNext = doc.object().value("next_href").toString();
             const auto before = m_queue.size();
             // A finite library cycles only after all its pages have been consumed.
@@ -989,13 +1205,18 @@ void SoundCloud::refillWave() {
                 tracks.swapItemsAt(i, QRandomGenerator::global()->bounded(i + 1));
             for (const auto &entry : tracks) {
                 const auto id = urn(entry.toMap());
-                if (!id.startsWith("soundcloud:tracks:") || m_waveSeen.contains(id)) continue;
+                const auto track = entry.toMap();
+                if (!id.startsWith("soundcloud:tracks:") || m_waveSeen.contains(id)
+                    || track.value("access").toString() == "blocked" || track.value("streamable") == false) continue;
                 m_waveSeen.insert(id); m_queue.append(entry);
-                if (m_waveMode == "discovery" && m_waveSeeds.size() < 100) m_waveSeeds.append(entry);
+                if (m_waveMode == "discovery") {
+                    m_waveSeeds.append(entry);
+                    if (m_waveSeeds.size() > 100) m_waveSeeds.removeFirst();
+                }
             }
             if (m_waveMode == "library" && m_waveNext.isEmpty()) m_waveSeen.clear();
             if (m_queue.size() > before) {
-                m_waveEmptyPages = 0;
+                m_waveEmptyPages = 0; m_waveRetryAttempts = 0;
                 // Keep a short playback history and a bounded session footprint.
                 if (m_queueIndex > 40) {
                     const int remove = m_queueIndex - 20;
@@ -1005,15 +1226,21 @@ void SoundCloud::refillWave() {
                 }
                 set("queue", m_queue);
                 if (m_waveWaiting) { m_waveWaiting = false; playQueue(m_queueIndex + 1); }
-                else prepareNext();
+                else { savePlayback(); prepareNext(); }
                 return;
             }
         }
         if (++m_waveEmptyPages < 6 && (!m_waveSeeds.isEmpty() || !m_waveNext.isEmpty())) { refillWave(); return; }
-        set("waveError", m_waveMode == "library" ? "Добавьте любимые треки и попробуйте снова." : "Не удалось найти новые треки. Попробуйте снова.");
+        if (m_waveMode == "discovery") {
+            m_waveRelatedNext.clear();
+            m_waveLoadSeeds = !m_waveNext.isEmpty();
+            scheduleWaveRefill();
+        } else set("waveError", "Добавьте любимые треки и попробуйте снова.");
     }, "GET", {}, true, [this, generation](QString) {
         if (generation != m_waveGeneration) return;
-        set("waveBusy", false); set("waveError", "Волна не загрузилась. Проверьте подключение и повторите.");
+        set("waveBusy", false);
+        if (m_waveMode == "discovery") scheduleWaveRefill();
+        else set("waveError", "Волна не загрузилась. Проверьте подключение и повторите.");
     });
 }
 
@@ -1100,6 +1327,51 @@ void SoundCloud::saveToPlaylist(const QString &track, const QString &playlist, c
 }
 
 void SoundCloud::more() { if (!m_state.value("busy").toBool() && !m_nextHref.isEmpty()) collection(m_nextHref, true); }
+void SoundCloud::loadPlaylist(const QVariantMap &item, bool append) {
+    const auto id = urn(item);
+    const auto previewType = item.value("preview_type").toString();
+    const bool station = previewType == "station";
+    const bool local = previewType == "mix";
+    if (!local && !(station ? id.startsWith("soundcloud:tracks:") : id.startsWith("soundcloud:playlists:"))) return;
+    if (append && (m_state.value("playlistBusy").toBool() || m_playlistNext.isEmpty())) return;
+    const int generation = ++m_playlistGeneration;
+    const auto path = append ? m_playlistNext : station
+        ? apiPath("tracks", id) + "/related?limit=40&linked_partitioning=true"
+        : apiPath("playlists", id) + "/tracks?limit=100&linked_partitioning=true";
+    if (!append) {
+        m_playlistNext.clear();
+        set("playlistTracks", station ? QVariantList{item.value("seed").toMap()} : QVariantList{});
+    }
+    if (local) {
+        set("playlistTracks", withLikeStates(item.value("tracks").toList()));
+        set("playlistError", ""); set("playlistBusy", false); set("playlistHasMore", false);
+        return;
+    }
+    set("playlistError", "");
+    set("playlistBusy", true);
+    set("playlistHasMore", false);
+    request(path, [this, generation, append, path, station](QJsonDocument doc) {
+        if (generation != m_playlistGeneration) return;
+        auto tracks = (append || station) ? m_state.value("playlistTracks").toList() : QVariantList{};
+        QSet<QString> seen;
+        for (const auto &track : tracks) seen.insert(urn(track.toMap()));
+        for (const auto &track : items(doc)) {
+            const auto id = urn(track.toMap());
+            if (!id.startsWith("soundcloud:tracks:") || seen.contains(id)) continue;
+            seen.insert(id); tracks.append(track);
+        }
+        m_playlistNext = doc.object().value("next_href").toString();
+        if (m_playlistNext == path) m_playlistNext.clear();
+        set("playlistTracks", withLikeStates(tracks));
+        set("playlistHasMore", !m_playlistNext.isEmpty());
+        set("playlistBusy", false);
+    }, "GET", {}, true, [this, generation](QString error) {
+        if (generation != m_playlistGeneration) return;
+        set("playlistError", error);
+        set("playlistHasMore", !m_playlistNext.isEmpty());
+        set("playlistBusy", false);
+    });
+}
 void SoundCloud::openPlaylist(const QVariantMap &item) {
     if (urn(item).isEmpty()) return;
     m_lastPath = apiPath("playlists", urn(item)) + "/tracks?linked_partitioning=true";
@@ -1165,7 +1437,7 @@ void SoundCloud::removeQueue(int index) {
     prepareNext();
 }
 void SoundCloud::next() {
-    if (!m_waveMode.isEmpty() && m_queueIndex + 1 >= m_queue.size()) { m_waveWaiting = true; refillWave(); return; }
+    if (!m_waveMode.isEmpty() && m_queueIndex + 1 >= m_queue.size()) { m_waveWaiting = true; set("playbackActive", true); refillWave(); return; }
     if (m_queue.isEmpty()) { m_queueIndex = -1; set("queueIndex", -1); stopPlayback(); return; }
     int index = m_queueIndex + 1;
     if (m_waveMode.isEmpty() && !m_forceNext && m_state.value("shuffle").toBool() && m_queue.size() > 1) { do { index = QRandomGenerator::global()->bounded(int(m_queue.size())); } while (index == m_queueIndex); }
@@ -1178,12 +1450,20 @@ void SoundCloud::togglePlayback() {
     if (m_state.value("playbackActive").toBool()) pausePlayback(); else resumePlayback();
 }
 void SoundCloud::pausePlayback() {
+    m_waveWaiting = false;
+    if (m_waveRetryTimer.isActive()) { m_waveRetryTimer.stop(); set("waveBusy", false); }
     set("playbackActive", false);
     if (m_crossfadeStarted) { m_crossfade.pause(); m_preloadPlayer->pause(); }
     player().pause();
     savePlayback();
 }
 void SoundCloud::resumePlayback() {
+    if (!m_waveMode.isEmpty() && (m_queueIndex < 0 || player().mediaStatus() == QMediaPlayer::EndOfMedia)) {
+        set("playbackActive", true);
+        if (m_queueIndex + 1 < m_queue.size()) playQueue(m_queueIndex + 1);
+        else { m_waveWaiting = true; refillWave(); }
+        return;
+    }
     if (player().source().isEmpty()) {
         if (m_state.value("buffering").toBool()) set("playbackActive", true);
         else if (m_queueIndex >= 0 && m_queueIndex < m_queue.size()) {
@@ -1198,6 +1478,7 @@ void SoundCloud::resumePlayback() {
     if (m_crossfadeStarted) { m_preloadPlayer->play(); m_crossfade.resume(); }
 }
 void SoundCloud::stopPlayback() {
+    m_pendingSeek = -1;
     stopWave();
     m_androidRestorePending = false; m_androidRestoreTrack.clear(); m_restoringPlayback = false;
     ++m_playGeneration; ++m_preloadGeneration;
@@ -1218,12 +1499,26 @@ void SoundCloud::stopPlayback() {
     savePlayback();
 }
 void SoundCloud::seek(qint64 position) {
-    auto *media = m_activePlayer;
-    if (!media->isSeekable()) return;
-    const qint64 duration = media->duration();
+    if (m_state.value("current").toMap().isEmpty() && player().source().isEmpty()) return;
+    const qint64 duration = this->duration();
     const qint64 target = duration > 0 ? qBound(qint64(0), position, duration) : qMax(qint64(0), position);
-    media->setPosition(target);
-    set("position", media->position());
+    m_pendingSeek = target;
+    set("position", target);
+    applyPendingSeek();
+}
+void SoundCloud::applyPendingSeek() {
+    if (m_pendingSeek < 0 || !player().isSeekable()) return;
+    const auto status = player().mediaStatus();
+    if (status == QMediaPlayer::NoMedia || status == QMediaPlayer::LoadingMedia || status == QMediaPlayer::InvalidMedia) return;
+    const qint64 target = player().duration() > 0 ? qMin(m_pendingSeek, player().duration()) : m_pendingSeek;
+    m_pendingSeek = -1;
+    m_restorePosition = target;
+    m_restoringPlayback = false;
+    m_playerEffects.clear(); m_spareEffects.clear();
+    player().setPosition(target);
+    set("position", player().position());
+    if (m_state.value("playbackActive").toBool()) player().play();
+    savePlaybackPosition();
     emit playbackSeeked();
 }
 void SoundCloud::volume(double value) {
@@ -1249,6 +1544,7 @@ void SoundCloud::setCrossfade(bool enabled) {
     QSettings().setValue("player/crossfade", enabled);
 }
 void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 position, bool recovery) {
+    m_pendingSeek = -1;
     m_forceNext = false;
     if (position <= 0) m_snapshotPlayback = false;
     if (!urn(track).startsWith("soundcloud:tracks:")) return;
@@ -1258,7 +1554,7 @@ void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 posi
     m_startupSourceSet = false; m_startupLoadedLogged = false; m_startupUsedPreload = false;
     m_streamCandidates.clear(); m_streamCandidateIndex = -1; m_previewStreamAvailable = false;
     m_androidRestorePending = false; m_androidRestoreTrack.clear();
-    m_restoringPlayback = !autoplay || (recovery && position > 0);
+    m_restoringPlayback = !autoplay || position > 0;
     m_restorePosition = qMax<qint64>(0, position);
     set("restoreCleared", false); set("playbackActive", autoplay);
     m_streamCache.suspend();
@@ -1375,21 +1671,14 @@ void SoundCloud::resolveStream(const QUrl &url, int generation, int redirects) {
 }
 void SoundCloud::like(const QVariantMap &item) {
     if (!m_state.value("signedIn").toBool()) { fail("Войдите в аккаунт, чтобы менять избранное."); return; }
-    const auto id = urn(item); if (!id.startsWith("soundcloud:tracks:")) return; const bool liked = item.value("user_favorite").toBool();
+    const auto id = urn(item); if (!id.startsWith("soundcloud:tracks:")) return; const bool liked = withLikeState(item).value("user_favorite").toBool();
     ++m_likeRevision;
     request(apiPath("likes/tracks", id), [this, id, liked](QJsonDocument) {
-        auto update = [id, liked](QVariantList list) { for (auto &v : list) { auto m = v.toMap(); if (urn(m) == id) { m["user_favorite"] = !liked; v = m; } } return list; };
-        for (auto it = m_listings.begin(); it != m_listings.end(); ++it) it->tracks = update(it->tracks);
+        m_likeOverrides.insert(id, !liked);
+        if (liked) m_likedTracks.remove(id); else m_likedTracks.insert(id);
+        refreshLikeStates();
         m_listings.remove("/me/likes/tracks?limit=30&linked_partitioning=true");
-        set("tracks", update(m_state.value("tracks").toList())); m_queue = update(m_queue); set("queue", m_queue);
-        auto shelves = m_state.value("home").toList();
-        for (auto &entry : shelves) {
-            auto shelf = entry.toMap();
-            shelf["tracks"] = update(shelf.value("tracks").toList());
-            entry = shelf;
-        }
-        set("home", shelves);
-        auto current = m_state.value("current").toMap(); if (urn(current) == id) { current["user_favorite"] = !liked; set("current", current); }
+        savePlayback();
     }, liked ? "DELETE" : "POST");
 }
 void SoundCloud::createPlaylist(const QString &title, bool includeCurrent) {

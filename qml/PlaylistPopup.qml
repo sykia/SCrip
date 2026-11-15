@@ -1,0 +1,190 @@
+import QtQuick
+import QtQuick.Controls.Basic
+import QtQuick.Layouts
+
+Popup {
+    id: popup
+    required property var host
+    property bool mobile: false
+    property real safeBottomPadding: 0
+    property var playlist: ({})
+    property real reveal: 0
+    readonly property int transitionDuration: host.motion > 0 ? Math.max(280, host.motion) : 0
+    opacity: 0
+    // Transform the surface as one piece without moving its layout or hit area.
+    onContentItemChanged: if (contentItem) contentItem.transform = [surfaceOffset]
+    onBackgroundChanged: if (background) background.transform = [surfaceOffset]
+    Translate { id: surfaceOffset; y: (1 - popup.reveal) * (popup.mobile ? 40 : 12) }
+    Behavior on height {
+        enabled: popup.visible && popup.transitionDuration > 0
+        NumberAnimation { duration: popup.transitionDuration; easing.type: Easing.InOutCubic }
+    }
+    readonly property var state: sc.catalogState
+    readonly property var songs: state.playlistTracks || []
+    function begin(item) {
+        playlist = item
+        sc.loadPlaylist(item)
+        open()
+        list.positionViewAtBeginning()
+    }
+    function beginStation(seed, artist = true) {
+        begin({urn: seed.urn, preview_type: "station", seed: seed,
+               title: artist ? seed.user?.username || seed.title : "По треку «" + (seed.title || "Без названия") + "»",
+               artwork_url: artist ? seed.user?.avatar_url || seed.artwork_url : seed.artwork_url,
+               user: seed.user})
+    }
+    function beginMix(collection, tracks) {
+        begin({preview_type: "mix", title: collection.title || "Подборка",
+               tracks: tracks, track_count: tracks.length,
+               artwork_url: collection.artwork_url || tracks[0]?.artwork_url,
+               user: {username: collection.subtitle || "Подборка SCrip"}})
+    }
+    function playAt(index) { sc.playMix(songs, index) }
+    width: Math.min(parent.width - (mobile ? 0 : 64), 680)
+    height: Math.min(parent.height - (mobile ? 36 : 64),
+                     (mobile ? 310 : 350) + Math.max(1, Math.min(playlist.track_count ?? (state.playlistBusy ? 4 : songs.length), 7)) * (mobile ? 72 : 62) + safeBottomPadding)
+    x: (parent.width - width) / 2
+    y: mobile ? parent.height - height : (parent.height - height) / 2
+    padding: mobile ? 20 : 28
+    bottomPadding: padding + safeBottomPadding
+    modal: true
+    focus: true
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    background: Rectangle { color: host.panel; radius: mobile ? 24 : 18; border.width: mobile ? 0 : 1; border.color: host.raised }
+    Overlay.modal: Rectangle {
+        color: "#99000000"
+        Behavior on opacity {
+            NumberAnimation { duration: popup.transitionDuration; easing.type: Easing.OutCubic }
+        }
+    }
+    enter: Transition {
+        ParallelAnimation {
+            NumberAnimation { property: "opacity"; to: 1; duration: popup.transitionDuration; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "reveal"; to: 1; duration: popup.transitionDuration; easing.type: Easing.OutCubic }
+        }
+    }
+    exit: Transition {
+        ParallelAnimation {
+            NumberAnimation { property: "opacity"; to: 0; duration: popup.transitionDuration * 0.75; easing.type: Easing.InOutCubic }
+            NumberAnimation { property: "reveal"; to: 0; duration: popup.transitionDuration * 0.75; easing.type: Easing.InOutCubic }
+        }
+    }
+
+    component Copy: Text {
+        color: host.ink
+        font.pixelSize: 14
+        textFormat: Text.PlainText
+        elide: Text.ElideRight
+    }
+    component Command: Button {
+        id: button
+        property bool primary: false
+        implicitHeight: mobile ? 48 : 38
+        leftPadding: 16; rightPadding: 16
+        hoverEnabled: true
+        contentItem: Text {
+            text: button.text; font.pixelSize: 13; font.weight: Font.Medium
+            color: button.primary ? host.foreground(host.accent) : host.ink
+            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        background: Rectangle {
+            radius: 10
+            color: button.primary ? host.accent : host.raised
+            opacity: !button.enabled ? 0.4 : button.down ? 0.65 : button.hovered ? 0.8 : 1
+        }
+    }
+    contentItem: ColumnLayout {
+        spacing: 16
+        RowLayout {
+            Layout.fillWidth: true
+            Copy { Layout.fillWidth: true; text: popup.playlist.preview_type === "station" ? "СТАНЦИЯ" : popup.playlist.preview_type === "mix" ? "ПОДБОРКА" : popup.playlist.is_album || popup.playlist.playlist_type === "album" ? "АЛЬБОМ" : "ПЛЕЙЛИСТ"; font.pixelSize: 11; font.letterSpacing: 1.5; color: host.muted }
+            Command { text: "Закрыть"; onClicked: popup.close() }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: mobile ? 16 : 24
+            Rectangle {
+                Layout.preferredWidth: mobile ? 104 : 148
+                Layout.preferredHeight: width
+                radius: mobile ? host.coverRadius : host.artworkRadius
+                color: host.raised
+                Copy { anchors.centerIn: parent; text: "♫"; color: host.muted; font.pixelSize: 32 }
+                Artwork { id: coverImage; anchors.fill: parent; radius: parent.radius; source: host.cover(popup.playlist); visible: !!source }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Copy { Layout.fillWidth: true; text: popup.playlist.title || "Без названия"; font.pixelSize: mobile ? 20 : 26; font.weight: Font.DemiBold; wrapMode: Text.Wrap; maximumLineCount: 3 }
+                Copy { Layout.fillWidth: true; text: popup.playlist.user?.username || "SoundCloud"; color: host.muted }
+                Copy { Layout.fillWidth: true; text: (popup.playlist.track_count ?? popup.songs.length) + " треков"; font.pixelSize: 12; color: host.muted }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+            Command { Layout.fillWidth: mobile; text: "Слушать"; primary: true; enabled: popup.songs.length > 0 && !popup.state.playlistError && !popup.state.playlistBusy; onClicked: popup.playAt(0) }
+            Command { Layout.fillWidth: mobile; text: "Перемешать"; enabled: popup.songs.length > 0 && !popup.state.playlistError && !popup.state.playlistBusy; onClicked: { const shuffled = popup.songs.slice(); for (let i = shuffled.length - 1; i > 0; --i) { const j = Math.floor(Math.random() * (i + 1)); const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t } sc.playMix(shuffled, 0) } }
+            Item { visible: !mobile; Layout.fillWidth: true }
+            Command { visible: !mobile && !!popup.playlist.permalink_url; text: "Поделиться"; onClicked: sc.copyText(popup.playlist.permalink_url) }
+        }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: host.raised }
+        ListView {
+            id: list
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            model: popup.songs
+            ScrollBar.vertical: ScrollBar {}
+            delegate: ItemDelegate {
+                id: row
+                required property var modelData
+                required property int index
+                readonly property bool current: modelData.urn === popup.state.current?.urn
+                width: list.width
+                height: mobile ? 72 : 62
+                padding: 8
+                onClicked: popup.playAt(index)
+                background: Rectangle { radius: 10; color: row.current ? Qt.alpha(host.accent, 0.12) : row.hovered || row.down ? host.raised : "transparent" }
+                contentItem: RowLayout {
+                    spacing: 12
+                    Copy { Layout.preferredWidth: 24; text: row.current ? "♪" : row.index + 1; color: row.current ? host.accent : host.muted; horizontalAlignment: Text.AlignHCenter }
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 4
+                        Copy { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; color: row.current ? host.accent : host.ink; font.weight: Font.Medium }
+                        Copy { Layout.fillWidth: true; text: row.modelData.user?.username || "SoundCloud"; color: host.muted; font.pixelSize: 12 }
+                    }
+                    Copy { visible: !mobile; text: host.time(row.modelData.duration); color: host.muted; font.pixelSize: 12 }
+                    AbstractButton {
+                        objectName: "previewTrackActions" + row.index
+                        implicitWidth: mobile ? 48 : 38; implicitHeight: mobile ? 48 : 38
+                        hoverEnabled: true
+                        Accessible.name: "Действия с треком"
+                        onClicked: host.openTrackActions(row.modelData)
+                        background: Rectangle { radius: 10; color: parent.down || parent.hovered ? Qt.alpha(host.ink, 0.1) : host.raised }
+                        contentItem: Canvas {
+                            property color ink: host.ink
+                            onInkChanged: requestPaint()
+                            onPaint: {
+                                const c = getContext("2d"); c.reset()
+                                c.strokeStyle = ink; c.lineWidth = 1.6; c.lineCap = "round"
+                                c.beginPath()
+                                for (let y = -6; y <= 6; y += 6) { c.moveTo(width / 2 - 8, height / 2 + y); c.lineTo(width / 2 + 8, height / 2 + y) }
+                                c.stroke()
+                            }
+                        }
+                    }
+                }
+            }
+            footer: Column {
+                width: list.width
+                spacing: 8
+                Copy { width: parent.width; visible: !!popup.state.playlistError; text: popup.state.playlistError || ""; wrapMode: Text.Wrap; elide: Text.ElideNone; color: host.muted }
+                Command { anchors.horizontalCenter: parent.horizontalCenter; visible: !popup.state.playlistBusy && (!!popup.state.playlistError || !!popup.state.playlistHasMore); text: popup.state.playlistError ? "Повторить" : "Загрузить ещё"; onClicked: sc.loadPlaylist(popup.playlist, !!popup.state.playlistHasMore) }
+                BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; visible: running; running: !!popup.state.playlistBusy; height: 44 }
+                Copy { width: parent.width; horizontalAlignment: Text.AlignHCenter; visible: !popup.state.playlistBusy && !popup.state.playlistError && !popup.songs.length; text: "В этом плейлисте пока нет треков"; color: host.muted }
+            }
+        }
+    }
+}

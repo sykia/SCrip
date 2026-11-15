@@ -1,0 +1,17 @@
+# Discord Rich Presence
+
+Desktop SCrip can publish the current SoundCloud track to the locally running Discord desktop client. Enable **Settings → Discord Rich Presence → Show music in Discord**. The shared project Application ID `1555593977367887893` is included by default, restored from `shared/constants.js` in release `v0.5.0` (the earlier SKD/cusade application). No manual ID entry, bot, account token, client secret or Discord login is needed.
+
+An optional custom Application ID can be entered in settings; clearing the field restores the shared default. Empty settings from earlier builds also fall back to that default. The activity requests the display name **SCrip** and also includes SCrip in the subtitle and icon tooltip, so clients that retain the registered legacy name still show the player branding. The registered name itself is managed in the [Discord Developer Portal](https://discord.com/developers/applications).
+
+Presence is disabled by default. The switch and Application ID persist in the user's Qt settings outside the repository. Discord activity sharing must also be enabled in Discord. Android has no compatible desktop IPC endpoint, so the integration is unavailable there and its controls are hidden.
+
+The activity includes a clickable track title, an artist / SCrip subtitle, public cover image (artist avatar fallback), and a small SCrip logo linking to the GitHub project. When artwork is missing, the main image also falls back to the SCrip logo. Cover hover text includes title, artist, and total duration. Listening activities send both start and end timestamps to request the native elapsed / total track progress UI; the exact layout depends on the Discord client. Unknown durations only send the start timestamp. Positions are clamped to the known duration, and track metadata supplies the duration until the media backend knows it. Seeking and resuming recalibrate both timestamps; late duration corrections update the range. Pausing or buffering removes the running timer and shows a static `elapsed / total` time in the subtitle. Clearing the player, disabling the integration or exiting SCrip clears the activity. Buttons **Listen on SoundCloud** and **Download SCrip · GitHub** open the public track page and the latest SCrip releases. Discord may only show these buttons to other users viewing the presence.
+
+The transport uses Qt Network's asynchronous `QLocalSocket`: named pipes on Windows and Unix sockets on Linux, including common Flatpak and Snap locations. It performs the Discord RPC handshake, handles fragmented frames and ping/pong, bounds incoming frame sizes, reconnects when Discord becomes available, and suppresses redundant playback updates. It never sends SoundCloud authorization headers, stream URLs or local artwork paths.
+
+Protocol references: [Discord RPC](https://github.com/discord/discord-api-docs/blob/main/developers/topics/rpc.mdx), [setting Rich Presence](https://github.com/discord/discord-api-docs/blob/main/developers/discord-social-sdk/development-guides/setting-rich-presence.mdx).
+
+Run `ctest --test-dir build/debug -R discordpresence --output-on-failure` for payload and local IPC regression checks. These use a fake Discord server and isolated settings; a real Discord profile still requires manual verification with a valid Application ID.
+
+For local diagnostics, `QT_LOGGING_RULES="scrip.discord.debug=true"` logs Discord activity acknowledgements (display name, type, timeline presence and button count), without track titles, artists or URLs.

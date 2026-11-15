@@ -27,10 +27,14 @@ public:
     qint64 position() const { return 0; }
     QVariantMap state() const {
         return {{"home", QVariantList{QVariantMap{{"title", "Микс любимых"},
-            {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}}}}}}},
+            {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}, {"urn", "soundcloud:tracks:seed"}, {"user", QVariantMap{{"urn", "soundcloud:users:artist"}, {"username", "Исполнитель"}}}}}}}}},
+            {"playlistTracks", QVariantList{QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Первый трек"}, {"user", QVariantMap{{"username", "Исполнитель"}}}}, QVariantMap{{"urn", "soundcloud:tracks:2"}, {"title", "Второй трек"}}}},
             {"profile", QVariantMap{}}, {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}}}};
     }
+    Q_INVOKABLE void setWaveVisualActive(bool) {}
     Q_INVOKABLE void volume(double) {}
+    QVariantMap lastPreview;
+    Q_INVOKABLE void loadPlaylist(const QVariantMap &item, bool = false) { lastPreview = item; }
     Q_INVOKABLE void loadHome(bool = false) {}
     Q_INVOKABLE void browse(const QString &, const QString & = {}, bool = false) {}
 signals:
@@ -751,7 +755,7 @@ class PluginTests : public QObject {
         QFile mainFile(fixture + "/Main.qml");
         QVERIFY(mainFile.open(QIODevice::WriteOnly));
         mainFile.write(source.readAll()); mainFile.close();
-        for (auto name : {"PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
+        for (auto name : {"PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
             const auto sourcePath = QString(SCRIP_SOURCE_DIR) + (QString(name) == "RoundedImage.qml" || QString(name) == "AndroidGlyph.qml" ? "/qml/android/" : "/qml/") + name;
             QFile::remove(fixture + "/" + name);
             QVERIFY(QFile::copy(sourcePath, fixture + "/" + name));
@@ -781,6 +785,62 @@ class PluginTests : public QObject {
         QTest::qWait(950);
         window->resize(412,860); QTest::qWait(40);
         QVERIFY(window->grabWindow().save("android-header.png"));
+        const auto findStationCard = [&]() -> QQuickItem * {
+            std::function<QQuickItem *(QQuickItem *)> visit = [&](QQuickItem *item) -> QQuickItem * {
+                if (item->objectName() == "artistStationCard0") return item;
+                for (auto *child : item->childItems()) if (auto *found = visit(child)) return found;
+                return nullptr;
+            };
+            return visit(window->contentItem());
+        };
+        QTRY_VERIFY(findStationCard());
+        QVERIFY(QMetaObject::invokeMethod(findStationCard(), "clicked"));
+        QCOMPARE(sc.lastPreview["preview_type"].toString(), QString("station"));
+        QCOMPARE(sc.lastPreview["urn"].toString(), QString("soundcloud:tracks:seed"));
+        QTest::qWait(300);
+        QVERIFY(window->grabWindow().save("android-artist-station.png"));
+        QQmlExpression preview(QQmlEngine::contextForObject(object.data()), object.data(),
+            "playlistView.playlist = {title: 'Вечерняя коллекция', track_count: 2, user: {username: 'SCrip'}}; playlistView.open()");
+        preview.evaluate();
+        QVERIFY2(!preview.hasError(), qPrintable(preview.error().toString()));
+        QTest::qWait(300);
+        QVERIFY(window->grabWindow().save("android-playlist.png"));
+        std::function<QQuickItem *(QQuickItem *)> findTrackActions = [&](QQuickItem *item) -> QQuickItem * {
+            if (item->objectName() == "previewTrackActions0") return item;
+            for (auto *child : item->childItems()) if (auto *found = findTrackActions(child)) return found;
+            return nullptr;
+        };
+        QTRY_VERIFY(findTrackActions(window->contentItem()));
+        auto *actionsButton = findTrackActions(window->contentItem());
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+            actionsButton->mapToScene(QPointF(actionsButton->width() / 2, actionsButton->height() / 2)).toPoint());
+        QQmlExpression actionMenuObject(QQmlEngine::contextForObject(object.data()), object.data(), "trackMenu");
+        auto *actionMenu = actionMenuObject.evaluate().value<QObject *>();
+        QVERIFY(actionMenu);
+        QTest::qWait(80);
+        auto *menuBackground = actionMenu->property("background").value<QQuickItem *>();
+        auto *menuBody = actionMenu->property("contentItem").value<QQuickItem *>();
+        QVERIFY(menuBackground); QVERIFY(menuBody);
+        const auto contentInset = actionMenu->property("topPadding").toReal();
+        const auto checkSurface = [&] {
+            return qAbs(menuBody->mapToScene(QPointF()).y() - menuBackground->mapToScene(QPointF()).y() - contentInset) < 1;
+        };
+        QVERIFY2(checkSurface(), "Menu background and content separated during entrance");
+        QVERIFY(window->grabWindow().save("android-track-actions-opening.png"));
+        QTest::qWait(60);
+        QVERIFY2(checkSurface(), "Menu background and content moved at different speeds");
+        QTRY_VERIFY(actionMenu->property("opened").toBool());
+        QVERIFY(window->grabWindow().save("android-track-actions.png"));
+        QVERIFY(QMetaObject::invokeMethod(actionMenu, "close"));
+        QTRY_VERIFY(!actionMenu->property("visible").toBool());
+        window->resize(320, 640);
+        QTest::qWait(100);
+        QVERIFY(window->grabWindow().save("android-playlist-compact.png"));
+        QQmlExpression dismissPreview(QQmlEngine::contextForObject(object.data()), object.data(), "playlistView.close()");
+        dismissPreview.evaluate();
+        window->resize(412, 860);
+        QTest::qWait(300);
+
         QQmlExpression miniExpression(QQmlEngine::contextForObject(object.data()), object.data(), "miniPlayer");
         auto *mini = qobject_cast<QQuickItem *>(miniExpression.evaluate().value<QObject *>());
         QVERIFY(mini);
@@ -792,6 +852,12 @@ class PluginTests : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(playerVisible.evaluate().toBool(), 1500);
         QTest::qWait(500);
         const QPoint playerStart(200, 100);
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, playerStart);
+        for (int y = 10; y <= 50; y += 10) QTest::mouseMove(window, playerStart + QPoint(0, y), 5);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, playerStart + QPoint(0, 50));
+        QQmlExpression dragOffset(QQmlEngine::contextForObject(object.data()), object.data(), "player.dragOffset");
+        QTRY_COMPARE(dragOffset.evaluate().toReal(), 0.0);
+        QVERIFY(playerVisible.evaluate().toBool());
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, playerStart);
         for (int y = 10; y <= 130; y += 10) QTest::mouseMove(window, playerStart + QPoint(0, y), 5);
         QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, playerStart + QPoint(0, 130));

@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick Network Multimedia)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick Network Multimedia ShaderTools)
 # Для динамического Qt плагины загружаются при запуске; Android deployment
 # сканирует QT_QML_ROOT_PATH. Не сканируем весь репозиторий с build/ и SDK.
 get_target_property(qt_core_type Qt6::Core TYPE)
@@ -29,7 +29,7 @@ set(executable_options)
 if(ANDROID)
     list(APPEND executable_options MANUAL_FINALIZATION)
 endif()
-qt_add_executable(scrip ${executable_options} src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/soundcloud.cpp src/soundcloud.h src/streamcache.cpp src/streamcache.h src/artworknetwork.cpp src/artworknetwork.h)
+qt_add_executable(scrip ${executable_options} src/discordpresence.cpp src/discordpresence.h src/plugins.cpp src/plugins.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/lyrics.cpp src/lyrics.h src/soundcloud.cpp src/soundcloud.h src/audioeffects.cpp src/audioeffects.h src/streamcache.cpp src/streamcache.h src/artworknetwork.cpp src/artworknetwork.h)
 set(SCRIP_APP_VERSION "${PROJECT_VERSION}")
 # Выпуск 1.6.1 предназначен только для ПК. Версия Android остаётся прежней.
 if(ANDROID)
@@ -37,9 +37,13 @@ if(ANDROID)
 endif()
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
+set_source_files_properties(qml/WavePanel.qml PROPERTIES QT_RESOURCE_ALIAS WavePanel.qml)
+set_source_files_properties(qml/PlaylistPopup.qml PROPERTIES QT_RESOURCE_ALIAS PlaylistPopup.qml)
 set_source_files_properties(qml/Artwork.qml PROPERTIES QT_RESOURCE_ALIAS Artwork.qml)
 set_source_files_properties(qml/android/RoundedImage.qml PROPERTIES QT_RESOURCE_ALIAS RoundedImage.qml)
 set_source_files_properties(qml/android/AndroidGlyph.qml PROPERTIES QT_RESOURCE_ALIAS AndroidGlyph.qml)
+set_source_files_properties(qml/InteractionFeedback.qml PROPERTIES QT_RESOURCE_ALIAS InteractionFeedback.qml)
+set_source_files_properties(qml/SurfaceTransition.qml PROPERTIES QT_RESOURCE_ALIAS SurfaceTransition.qml)
 set_source_files_properties(qml/PluginAction.qml PROPERTIES QT_RESOURCE_ALIAS PluginAction.qml)
 set_source_files_properties(qml/PluginManagerView.qml PROPERTIES QT_RESOURCE_ALIAS PluginManagerView.qml)
 set_source_files_properties(qml/PluginToolsPopup.qml PROPERTIES QT_RESOURCE_ALIAS PluginToolsPopup.qml)
@@ -50,7 +54,12 @@ qt_add_qml_module(scrip
     URI SCrip
     VERSION 1.0
     RESOURCES qml/assets/blob.png
-    QML_FILES ${main_qml} qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
+    QML_FILES qml/PlaylistPopup.qml qml/InteractionFeedback.qml qml/SurfaceTransition.qml ${main_qml} qml/WavePanel.qml qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
+)
+qt_add_shaders(scrip wave_shaders
+    PREFIX "/shaders"
+    BASE "qml/shaders"
+    FILES qml/shaders/wave.frag
 )
 qt_add_resources(scrip callback_page PREFIX "/" FILES resources/callback.html)
 target_link_libraries(scrip PRIVATE Qt6::Quick Qt6::Network Qt6::Multimedia)
@@ -106,14 +115,22 @@ if(BUILD_TESTING AND NOT ANDROID)
         target_link_libraries(scrip_hls_seek_tests PRIVATE Qt6::Test Qt6::Multimedia)
         add_test(NAME hls_seek COMMAND scrip_hls_seek_tests)
     endif()
+    qt_add_executable(discordpresence_tests tests/tst_discordpresence.cpp src/discordpresence.cpp src/discordpresence.h)
+    target_include_directories(discordpresence_tests PRIVATE src)
+    target_link_libraries(discordpresence_tests PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME discordpresence COMMAND discordpresence_tests)
+    set_tests_properties(discordpresence PROPERTIES ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_BINARY_DIR}/discord-test-config")
     qt_add_executable(streamcache_tests tests/tst_streamcache.cpp src/streamcache.cpp src/streamcache.h)
     target_include_directories(streamcache_tests PRIVATE src)
     target_link_libraries(streamcache_tests PRIVATE Qt6::Test Qt6::Network Qt6::Multimedia)
     add_test(NAME streamcache COMMAND streamcache_tests)
-    qt_add_executable(scrip_tests tests/tst_soundcloud.cpp src/soundcloud.cpp src/soundcloud.h src/streamcache.cpp src/streamcache.h)
+    qt_add_executable(scrip_tests tests/tst_soundcloud.cpp src/lyrics.cpp src/lyrics.h src/soundcloud.cpp src/soundcloud.h src/audioeffects.cpp src/audioeffects.h src/streamcache.cpp src/streamcache.h)
     if(qt_core_type STREQUAL "SHARED_LIBRARY")
         set_target_properties(scrip_tests PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN TRUE)
     endif()
+    qt_add_shaders(scrip_tests wave_test_shaders
+        PREFIX "/shaders" BASE "qml/shaders" FILES qml/shaders/wave.frag
+    )
     scrip_secret_store(scrip_tests)
     qt_add_resources(scrip_tests callback_test PREFIX "/" FILES resources/callback.html)
     target_include_directories(scrip_tests PRIVATE src)

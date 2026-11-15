@@ -5,6 +5,7 @@
 #include <QSet>
 #include "secretstore.h"
 #include "streamcache.h"
+#include "audioeffects.h"
 #include <QVariantMap>
 #include <QNetworkAccessManager>
 #include <QMediaPlayer>
@@ -45,6 +46,11 @@ private:
 // Секреты доступны только хосту через системное защищённое хранилище.
 class SoundCloud : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QVariantList spectrum READ spectrum NOTIFY spectrumChanged)
+    Q_PROPERTY(QVariantList equalizerGains READ equalizerGains NOTIFY soundControlsChanged)
+    Q_PROPERTY(bool equalizerEnabled READ equalizerEnabled WRITE setEqualizerEnabled NOTIFY soundControlsChanged)
+    Q_PROPERTY(bool equalizerAvailable READ equalizerAvailable CONSTANT)
+    Q_PROPERTY(QString equalizerError READ equalizerError NOTIFY soundControlsChanged)
     Q_PROPERTY(double waveLevel READ waveLevel NOTIFY waveAudioChanged)
     Q_PROPERTY(double waveBass READ waveBass NOTIFY waveAudioChanged)
     Q_PROPERTY(double waveBeat READ waveBeat NOTIFY waveAudioChanged)
@@ -77,6 +83,21 @@ public:
     double waveLevel() const { return m_waveLevel; }
     double waveBass() const { return m_waveBass; }
     double waveBeat() const { return m_waveBeat; }
+    QVariantList spectrum() const { return m_spectrum; }
+    QVariantList equalizerGains() const;
+    bool equalizerEnabled() const { return m_equalizerEnabled; }
+    bool equalizerAvailable() const {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        return qEnvironmentVariable("QT_MEDIA_BACKEND", "ffmpeg") == "ffmpeg";
+#else
+        return false;
+#endif
+    }
+    QString equalizerError() const { return m_equalizerError; }
+    Q_INVOKABLE void setEqualizerEnabled(bool enabled);
+    Q_INVOKABLE void setEqualizerGain(int band, double db);
+    Q_INVOKABLE void resetEqualizer();
+    Q_INVOKABLE void setTrackVisualActive(bool enabled);
     Q_INVOKABLE void setWaveVisualActive(bool enabled);
     Q_INVOKABLE void startWave(const QString &mode);
     Q_INVOKABLE void stopWave();
@@ -84,6 +105,7 @@ public:
     Q_INVOKABLE void playStation(const QVariantMap &seed);
     Q_INVOKABLE void listDestinations(const QString &next = {});
     Q_INVOKABLE void saveToPlaylist(const QString &track, const QString &playlist, const QString &newTitle);
+    Q_INVOKABLE void loadPlaylist(const QVariantMap &item, bool append = false);
     Q_INVOKABLE void openPlaylist(const QVariantMap &item);
     Q_INVOKABLE void play(const QVariantMap &item);
     Q_INVOKABLE void enqueue(const QVariantMap &item);
@@ -113,6 +135,8 @@ public:
     Q_INVOKABLE void setShuffle(bool enabled);
     Q_INVOKABLE void setCrossfade(bool enabled);
 signals:
+    void spectrumChanged();
+    void soundControlsChanged();
     void waveAudioChanged();
     void changed();
     void catalogChanged();
@@ -142,6 +166,11 @@ private:
     void collection(const QString &path, bool append = false);
     void resolveRepostLikes(const QString &path, int generation, int revision, QSet<QString> pending);
     void profile();
+    QVariantMap withLikeState(QVariantMap track) const;
+    QVariantList withLikeStates(QVariantList tracks) const;
+    void refreshLikeStates();
+    void syncLikes(const QString &path = "/me/likes/tracks?limit=200&linked_partitioning=true");
+    void applyPendingSeek();
     void savePlayback();
     void savePlaybackPosition();
     void restorePlayback(const QVariantMap &profile);
@@ -153,6 +182,17 @@ private:
     void startupStage(const char *stage);
     void prepareNext();
     void refillWave();
+    void scheduleWaveRefill();
+    void restoreWaveState(const QVariantMap &snapshot);
+    void updateAudioRouting();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    void processAudio(QMediaPlayer *media, const QAudioBuffer &buffer);
+#endif
+    AudioEffects m_playerEffects, m_spareEffects;
+    std::array<double, 5> m_equalizerGains{};
+    bool m_equalizerEnabled = false, m_trackVisualActive = false;
+    QString m_equalizerError;
+    QVariantList m_spectrum, m_spectrumTarget;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     void analyzeWaveAudio(const QAudioBuffer &buffer);
     QAudioBufferOutput m_waveOutput, m_waveSpareOutput;
@@ -165,7 +205,10 @@ private:
     double m_waveLowPass = 0, m_waveBaseline = 0;
 
     int m_waveGeneration = 0, m_waveSeedIndex = 0, m_waveEmptyPages = 0;
-    QString m_waveMode, m_waveNext;
+    QString m_waveMode, m_waveNext, m_waveRelatedNext;
+    QTimer m_waveRetryTimer;
+    int m_waveRetryAttempts = 0;
+    bool m_waveLoadSeeds = false;
     QVariantList m_waveSeeds;
     QSet<QString> m_waveSeen;
     bool m_waveWaiting = false;
@@ -222,6 +265,12 @@ private:
     bool m_crossfadeStarted = false;
     int m_homeGeneration = 0;
     int m_likeRevision = 0;
+    QSet<QString> m_likedTracks, m_likePages;
+    QHash<QString, bool> m_likeOverrides;
+    bool m_likesComplete = false;
+    qint64 m_pendingSeek = -1;
+    int m_playlistGeneration = 0;
+    QString m_playlistNext;
     int m_epoch = 0, m_listing = 0, m_playGeneration = 0, m_queueIndex = -1;
     int m_loginEpoch = 0;
     QVariantMap m_androidRestoreTrack;

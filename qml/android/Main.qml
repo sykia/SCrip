@@ -25,6 +25,7 @@ ApplicationWindow {
     palette.highlightedText: app.foreground(app.accent)
     readonly property var api: sc.catalogState
     readonly property bool dark: prefs.darkMode
+    onDarkChanged: if (androidMedia) androidMedia.setDarkTheme(dark)
     property bool requestedDark: prefs.darkMode
     function switchTheme(value) {
         requestedDark = value
@@ -47,24 +48,42 @@ ApplicationWindow {
     }
     SequentialAnimation {
         id: themeTransition
-        NumberAnimation { target: themeVeil; property: "opacity"; to: 1; duration: app.motion / 2; easing.type: Easing.InOutQuad }
+        NumberAnimation { target: themeVeil; property: "opacity"; to: 0.16; duration: app.motion / 2; easing.type: Easing.InOutQuad }
         ScriptAction { script: prefs.darkMode = app.requestedDark }
         NumberAnimation { target: themeVeil; property: "opacity"; to: 0; duration: app.motion / 2; easing.type: Easing.InOutQuad }
         onFinished: if (app.requestedDark !== prefs.darkMode) start()
     }
 
+    Connections {
+        target: prefs
+        function onMotionChanged() {
+            if (!prefs.motion) {
+                if (themeTransition.running) {
+                    themeTransition.stop()
+                    prefs.darkMode = app.requestedDark
+                }
+                themeVeil.opacity = 0
+            }
+        }
+    }
+
     readonly property color baseAccent: prefs.accentOverride ? prefs.accent : pluginManager.theme.accent || prefs.accent
-    readonly property color accent: (dark ? Qt.tint(baseAccent, Qt.rgba(1, 1, 1, 0.28)) : baseAccent)
-    readonly property color surface: (dark ? "#111111" : "#fafafa")
-    readonly property color panel: (dark ? "#1c1c1c" : "#ffffff")
-    readonly property color raised: (dark ? "#2c2c2c" : "#f0edef")
+    property color accent: (dark ? Qt.tint(baseAccent, Qt.rgba(1, 1, 1, 0.28)) : baseAccent)
+    property color surface: (dark ? "#111111" : "#fafafa")
+    property color panel: (dark ? "#1c1c1c" : "#ffffff")
+    property color raised: (dark ? "#2b2b2b" : "#eeeeee")
     function foreground(c) {
         function linear(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
         return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b) > 0.179 ? "#111113" : "#ffffff"
     }
     readonly property real coverRadius: prefs.coverRadiusOverride ? prefs.coverRadius : pluginManager.theme.coverRadius ?? prefs.coverRadius
-    readonly property color ink: (dark ? "#f1f1f1" : "#242426")
-    readonly property color muted: (dark ? "#aaaaaa" : "#858589")
+    property color ink: (dark ? "#f4f4f4" : "#242424")
+    Behavior on surface { ColorAnimation { duration: app.motion; easing.type: Easing.InOutQuad } }
+    Behavior on panel { ColorAnimation { duration: app.motion; easing.type: Easing.InOutQuad } }
+    Behavior on raised { ColorAnimation { duration: app.motion; easing.type: Easing.InOutQuad } }
+    Behavior on ink { ColorAnimation { duration: app.motion; easing.type: Easing.InOutQuad } }
+    Behavior on accent { ColorAnimation { duration: app.motion; easing.type: Easing.InOutQuad } }
+    readonly property color muted: (dark ? "#aaaaaa" : "#747474")
     // SafeArea появился в Qt 6.9. Остальные версии используют нулевые отступы.
     function safeAreaTop(item) {
         return typeof SafeArea !== "undefined" ? item.SafeArea.margins.top : 0
@@ -96,6 +115,7 @@ ApplicationWindow {
     property var guest: null
     property int profileTab: 0
     readonly property var profile: guest ? (api.visitedProfile?.urn === guest.urn ? api.visitedProfile : guest) : api.profile
+    function openTrackActions(track) { selectedTrack = track; selectedQueue = -1; trackMenu.open() }
     function openProfile(user) {
         pageHistory.push({page: page, guest: guest, profileTab: profileTab})
         navigatingBack = true
@@ -109,6 +129,9 @@ ApplicationWindow {
     property int previousPage: 0
     property bool navigatingBack: false
     function goBack() {
+        if (trackMenu.visible) { trackMenu.close(); return true }
+        if (playlistView.visible) { playlistView.close(); return true }
+        if (lyricsSheet.visible) { lyricsSheet.close(); return true }
         if (player.visible) { player.close(); return true }
         if (pageHistory.length) {
             navigatingBack = true
@@ -125,6 +148,8 @@ ApplicationWindow {
     property int page: 0
     property string library: "likes"
     property string searchKind: "tracks"
+    readonly property var lyricState: lyricsBackend.state
+    property var lyricTrack: ({})
     property var selectedTrack: ({})
     property int selectedQueue: -1
     function cover(item) { return (pluginManager.theme.covers === "artist" ? item?.user?.avatar_url || item?.artwork_url || "" : item?.artwork_url || item?.tracks?.[0]?.artwork_url || item?.user?.avatar_url || "").replace("-large.", "-t500x500.") }
@@ -155,11 +180,18 @@ ApplicationWindow {
             restoringScroll = false
         })
     }
-    onPageChanged: { if (!navigatingBack) pageHistory.push({page: previousPage, guest: guest, profileTab: profileTab}); previousPage = page; refresh(); pageArrival.restart() }
+    onPageChanged: { if (!navigatingBack) pageHistory.push({page: previousPage, guest: guest, profileTab: profileTab}); previousPage = page; refresh(); if (prefs.motion && !pageArrival.running) pageArrival.start() }
     ParallelAnimation {
         id: pageArrival
-        NumberAnimation { target: body; property: "opacity"; from: 0; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
-        NumberAnimation { target: pageOffset; property: "y"; from: 14; to: 0; duration: app.motion; easing.type: Easing.OutQuint }
+        NumberAnimation { target: body; property: "opacity"; from: 0.9; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
+        NumberAnimation { target: pageOffset; property: "y"; from: 5; to: 0; duration: app.motion; easing.type: Easing.OutQuint }
+    }
+    PlaylistPopup {
+        id: playlistView
+        parent: Overlay.overlay
+        host: app
+        mobile: true
+        safeBottomPadding: app.safeAreaBottom(app)
     }
     component FineSlider: Slider {
         id: fine
@@ -179,15 +211,17 @@ ApplicationWindow {
         }
     }
     component PlayerButton: AbstractButton {
+        
         id: transport
+        hoverEnabled: true
         property string symbol: ""
         property bool active: false
         property bool main: false
         property bool loading: false
-        implicitWidth: main ? 64 : 48
-        implicitHeight: main ? 64 : 48
+        implicitWidth: main ? 76 : 48
+        implicitHeight: main ? 76 : 48
         Accessible.name: text
-        scale: down ? 0.96 : 1
+        scale: down && app.motion > 0 ? 0.965 : 1
         Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
         background: Rectangle {
             radius: width / 2
@@ -202,25 +236,36 @@ ApplicationWindow {
     }
     component Sheet: Popup {
         id: sheet
-        property real reveal: 1
-        // Смещение содержимого сохраняет привязку самой панели к низу экрана.
+        property real reveal: 0
+        property bool unifiedSurface: false
+        property real dragOffset: 0
+        property bool dragging: false
+        opacity: 0
+        // Move background and content together, preserving each popup's anchors.
         onContentItemChanged: if (contentItem) contentItem.transform = [sheetOffset]
-        Translate { id: sheetOffset; y: (1 - sheet.reveal) * 36 }
+        onBackgroundChanged: if (background) background.transform = [sheetOffset]
+        Translate { id: sheetOffset; y: sheet.unifiedSurface ? 0 : (1 - sheet.reveal) * sheet.height + sheet.dragOffset }
+        Behavior on dragOffset {
+            enabled: !sheet.dragging
+            NumberAnimation { duration: app.motion * 0.7; easing.type: Easing.OutCubic }
+        }
         enter: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: app.motion * 0.7; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "reveal"; from: 0; to: 1; duration: app.motion; easing.type: Easing.OutQuint }
+                NumberAnimation { property: "opacity"; to: 1; duration: app.motion * 0.45; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "reveal"; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
             }
         }
         exit: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: app.motion * 0.55; easing.type: Easing.InCubic }
-                NumberAnimation { property: "reveal"; to: 0; duration: app.motion * 0.55; easing.type: Easing.InCubic }
+                NumberAnimation { property: "opacity"; to: 0; duration: app.motion * 0.8; easing.type: Easing.InQuad }
+                NumberAnimation { property: "reveal"; to: 0; duration: app.motion * 0.8; easing.type: Easing.InOutCubic }
             }
         }
     }
     component Action: Button {
         id: control
+        
+        hoverEnabled: true
         property bool primary: false
         property string symbol: ""
         implicitHeight: 48
@@ -229,7 +274,7 @@ ApplicationWindow {
         font.pixelSize: 14
         font.bold: true
         Accessible.name: text
-        scale: down ? 0.96 : 1
+        scale: down && app.motion > 0 ? 0.965 : 1
         Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
         contentItem: Item {
             implicitWidth: control.symbol ? 16 : label.implicitWidth
@@ -237,23 +282,24 @@ ApplicationWindow {
             AndroidGlyph { anchors.centerIn: parent; visible: !!control.symbol; name: control.symbol; ink: control.primary ? app.foreground(app.accent) : app.ink; width: 22; height: 22 }
             Text { id: label; visible: !control.symbol; anchors.fill: parent; text: control.text; font: control.font; color: control.primary ? app.foreground(app.accent) : app.ink; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
         }
-        background: Rectangle { radius: height / 2; color: control.down ? (control.primary ? Qt.darker(app.accent, 1.12) : (app.dark ? "#393939" : "#e7e3e7")) : control.primary ? app.accent : (app.dark ? "#2c2c2c" : "#f0edef"); opacity: control.enabled ? 1 : 0.45; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
+        background: Rectangle { radius: height / 2; color: control.down ? (control.primary ? Qt.darker(app.accent, 1.12) : (app.dark ? "#393939" : "#e7e3e7")) : control.primary ? app.accent : (app.dark ? "#2b2b2b" : "#eeeeee"); opacity: control.enabled ? 1 : 0.45; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
     }
     component Caption: Label { color: app.ink; font.pixelSize: 15; elide: Text.ElideRight }
     component Track: ItemDelegate {
+        
         id: row
         required property var modelData
         property bool queued: false
         property int queueIndex: -1
         width: ListView.view.width
-        height: 68
+        height: 80
         leftPadding: 20
         rightPadding: 12
-        background: Rectangle { x: 8; width: parent.width - 16; radius: 16; color: row.down ? (app.dark ? "#333333" : "#eaeaec") : "transparent" }
+        background: Rectangle { x: 8; width: parent.width - 16; radius: 18; y: 4; height: parent.height - 8; color: row.down ? Qt.alpha(app.ink, 0.055) : "transparent"; Behavior on color { ColorAnimation { duration: prefs.motion ? 120 : 0 } } }
         contentItem: RowLayout {
             spacing: 12
             Rectangle {
-                Layout.preferredWidth: 44; Layout.preferredHeight: 44
+                Layout.preferredWidth: 54; Layout.preferredHeight: 54
                 radius: app.page === 2 && app.searchKind === "users" ? width / 2 : app.coverRadius; color: (app.dark ? "#2c2c2c" : "#ededed"); clip: true
                 RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.page === 2 && app.searchKind === "users" ? row.modelData.avatar_url || "" : app.cover(row.modelData); avatar: app.page === 2 && app.searchKind === "users" }
             }
@@ -263,18 +309,19 @@ ApplicationWindow {
                 Caption { text: row.modelData.user?.username || (row.modelData.track_count ? row.modelData.track_count + " треков" : "SoundCloud"); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
             }
             PlayerButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); implicitWidth: 40; implicitHeight: 40; active: !!row.modelData.user_favorite; symbol: active ? "liked" : "heart"; text: active ? "Убрать из любимых" : "Добавить в любимые"; onClicked: sc.like(row.modelData) }
-            Action { text: "Действия"; symbol: "more"; implicitWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = row.modelData; app.selectedQueue = row.queued ? row.queueIndex : -1; trackMenu.open() } }
+            Action { text: "Действия"; symbol: "menu"; implicitWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = row.modelData; app.selectedQueue = row.queued ? row.queueIndex : -1; trackMenu.open() } }
         }
         onClicked: {
             if (queued) sc.playQueue(queueIndex)
             else if (app.page === 2 && app.searchKind === "users") app.openProfile(modelData)
+            else if ((modelData.urn || "").startsWith("soundcloud:playlists:") || modelData.kind === "playlist") playlistView.begin(modelData)
             else sc.play(modelData)
         }
     }
 
     header: Item {
         id: topBar
-        height: 66 + app.headerTopInset
+        height: 94 + app.headerTopInset
         Item {
             anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 16
             anchors.topMargin: app.headerTopInset
@@ -285,11 +332,12 @@ ApplicationWindow {
                 RowLayout {
                     spacing: 5
                     Rectangle { Layout.preferredWidth: 22; Layout.preferredHeight: 22; radius: 7; color: app.accent; Image { anchors.fill: parent; anchors.margins: 3; source: "qrc:/qt/qml/SCrip/assets/blob.png"; fillMode: Image.PreserveAspectFit } }
-                    Caption { text: "SCrip"; color: app.accent; font.bold: true; font.pixelSize: 12 }
+                    Caption { text: "SCrip  /  ТВОЙ РИТМ"; color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
                 }
-                Caption { text: ["Главная", "Лента", "Поиск", "Медиатека", "Профиль", "Настройки", "Плагины"][app.page]; font.pixelSize: 21; font.bold: true }
+                Caption { text: ["Слушай своё", "На твоей волне", "Найди свой звук", "Твоя коллекция", "Профиль", "Настройки", "Плагины"][app.page]; font.pixelSize: 27; font.bold: true }
             }
             AbstractButton {
+                
                 id: accountButton
                 width: 48; height: 48
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -297,7 +345,7 @@ ApplicationWindow {
                 scale: down ? 0.94 : 1
                 Behavior on scale { NumberAnimation { duration: app.motion / 2 } }
                 contentItem: Item {
-                    RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.centerIn: parent; width: 36; height: 36; avatar: true; source: app.api.profile?.avatar_url || ""; visible: app.page !== 4 }
+                    RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.centerIn: parent; width: 42; height: 42; avatar: true; source: app.api.profile?.avatar_url || ""; visible: app.page !== 4 }
                     AndroidGlyph { anchors.centerIn: parent; name: "settings"; visible: app.page === 4 }
                 }
                 background: Rectangle { radius: 24; color: accountButton.down ? (app.dark ? "#383838" : "#e7e7e7") : "transparent"; Behavior on color { ColorAnimation { duration: app.motion } } }
@@ -372,34 +420,61 @@ ApplicationWindow {
             Layout.fillWidth: true; Layout.fillHeight: true
             contentWidth: availableWidth
             Column {
-                width: parent.width; spacing: 16
+                width: parent.width; spacing: 24
+                WavePanel {
+                    x: 18; width: parent.width - 36
+                    backend: sc
+                    dark: app.dark
+                    panelColor: app.panel
+                    inkColor: app.ink
+                    waveColor: app.accent
+                    motion: prefs.motion
+                    foreground: app.visible && app.visibility !== Window.Minimized
+                        && (Qt.platform.os !== "android" || Qt.application.state === Qt.ApplicationActive)
+                }
                 Repeater {
-                    model: app.api.home || []
+                    model: {
+                        const shelves = app.api.home || []
+                        const artists = new Set()
+                        const seeds = []
+                        for (const shelf of shelves) for (const track of shelf.tracks || []) {
+                            const id = track.user?.urn
+                            if (id && !artists.has(id) && seeds.length < 16) { artists.add(id); seeds.push(track) }
+                        }
+                        return (seeds.length ? [{title: "Станции исполнителей", station: true, tracks: seeds}] : []).concat(shelves)
+                    }
                     Column {
+                        id: homeShelf
                         required property var modelData
                         width: parent.width; spacing: 10
-                        Label { x: 18; width: parent.width - 36; text: parent.modelData.title; color: app.ink; font.pixelSize: 19; font.bold: true; wrapMode: Text.Wrap }
+                        Label { x: 18; width: parent.width - 36; text: parent.modelData.title; color: app.ink; font.pixelSize: 19; font.bold: true; wrapMode: Text.Wrap; TapHandler { enabled: !homeShelf.modelData.station; onTapped: playlistView.beginMix(homeShelf.modelData, shelf.songs) } }
                         ListView {
                             id: shelf
                             property var songs: parent.modelData.tracks || []
-                            width: parent.width; height: 174; orientation: ListView.Horizontal
-                            leftMargin: 18; rightMargin: 18; spacing: 10; clip: true
+                            width: parent.width; height: 218; orientation: ListView.Horizontal
+                            leftMargin: 20; rightMargin: 20; spacing: 14; clip: true
                             model: songs
                             delegate: ItemDelegate {
+                                
                                 required property var modelData
                                 required property int index
-                                width: 120; height: 174; padding: 0
+                                objectName: homeShelf.modelData.station ? "artistStationCard" + index : "homeTrackCard" + index
+                                width: 154; height: 218; padding: 0
                                 background: Item {}
                                 contentItem: Column {
                                     spacing: 7
                                     Rectangle {
-                                        width: 120; height: 120; radius: app.coverRadius; color: (app.dark ? "#2c2c2c" : "#ededed"); clip: true
-                                        RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: app.cover(modelData) }
+                                        width: 154; height: 154; radius: app.coverRadius; color: (app.dark ? "#2c2c2c" : "#ededed"); clip: true
+                                        RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: homeShelf.modelData.station ? modelData.user?.avatar_url || app.cover(modelData) : app.cover(modelData) }
                                     }
-                                    Caption { width: 120; text: modelData.title || ""; font.bold: true; font.pixelSize: 13 }
-                                    Caption { width: 120; text: modelData.user?.username || ""; color: app.muted; font.pixelSize: 12 }
+                                    Caption { width: 154; text: homeShelf.modelData.station ? modelData.user?.username || "Исполнитель" : modelData.title || ""; font.bold: true; font.pixelSize: 13 }
+                                    Caption { width: 154; text: homeShelf.modelData.station ? "Станция исполнителя" : modelData.user?.username || ""; color: app.muted; font.pixelSize: 12 }
                                 }
-                                onClicked: sc.playMix(shelf.songs, index)
+                                onClicked: {
+                                    if (homeShelf.modelData.station) playlistView.beginStation(modelData)
+                                    else if ((modelData.urn || "").startsWith("soundcloud:playlists:") || modelData.kind === "playlist") playlistView.begin(modelData)
+                                    else playlistView.beginMix(homeShelf.modelData, shelf.songs)
+                                }
                             }
                         }
                     }
@@ -430,12 +505,13 @@ ApplicationWindow {
                     Action { text: "Отмена"; visible: !!app.api.updateDownloading; Layout.fillWidth: true; onClicked: sc.cancelUpdateDownload() }
                     Action { text: "Установить сейчас"; visible: !!app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.installUpdate() }
                     Caption { text: "Оформление"; font.bold: true; font.pixelSize: 19 }
-                    Switch { text: "Тёмная тема"; checked: prefs.darkMode; onToggled: app.switchTheme(checked) }
+                    Switch {  text: "Тёмная тема"; checked: prefs.darkMode; onToggled: app.switchTheme(checked) }
                     Row {
                         spacing: 14
                         Repeater {
                             model: ["#f43756", "#7554ba", "#238579", "#2777c7", "#242426"]
                             AbstractButton {
+                                
                                 required property string modelData
                                 width: 42; height: 42; Accessible.name: "Цвет " + modelData
                                 background: Rectangle { color: modelData; radius: 21; border.width: prefs.accentOverride && prefs.accent === modelData ? 4 : 0; border.color: (app.dark ? "#e7e7e7" : "#d0d0d0") }
@@ -446,8 +522,8 @@ ApplicationWindow {
                     Caption { text: "Скругление обложек"; color: app.muted }
                     FineSlider { Layout.fillWidth: true; from: 0; to: 28; value: prefs.coverRadius; onMoved: { prefs.coverRadius = value; prefs.coverRadiusOverride = true } Accessible.name: "Скругление обложек" }
                     Action { text: "Использовать оформление плагинов"; onClicked: { prefs.accentOverride = false; prefs.coverRadiusOverride = false } }
-                    Switch { text: "Анимации"; checked: prefs.motion; onToggled: prefs.motion = checked }
-                    Switch { text: "Загружать треки при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
+                    Switch {  text: "Анимации"; checked: prefs.motion; onToggled: prefs.motion = checked }
+                    Switch {  text: "Загружать треки при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
                     Action { text: "Плагины"; Layout.fillWidth: true; onClicked: app.page = 6 }
                     Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
                     Caption { text: "Аккаунт"; font.bold: true; font.pixelSize: 19 }
@@ -555,8 +631,18 @@ ApplicationWindow {
                 Item { height: 8; width: 1 }
             }
             delegate: Track {}
-            Label { anchors.centerIn: parent; width: parent.width - 48; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; visible: !tracks.count; color: app.muted; text: app.api.busy ? "Загрузка…" : app.page === 2 ? "Найди то, что хочется услышать" : "Здесь пока нет треков" }
-            footer: Action { visible: !!app.api.hasMore; text: "Показать ещё"; enabled: !app.api.busy; onClicked: sc.more() }
+            footer: Column {
+                width: tracks.width
+                spacing: 16
+                Label {
+                    width: parent.width - 48; x: 24
+                    topPadding: 24; bottomPadding: 24
+                    horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
+                    visible: !tracks.count; color: app.muted
+                    text: app.api.busy ? "Загрузка…" : app.page === 2 ? "Найди то, что хочется услышать" : app.page === 4 && app.profileTab === 1 ? "Здесь пока нет плейлистов" : "Здесь пока нет треков"
+                }
+                Action { anchors.horizontalCenter: parent.horizontalCenter; visible: !!app.api.hasMore; text: "Показать ещё"; enabled: !app.api.busy; onClicked: sc.more() }
+            }
         }
     }
 
@@ -589,39 +675,70 @@ ApplicationWindow {
         AbstractButton {
             id: miniPlayer
             visible: !!app.api.current?.title
-            x: 16; width: parent.width - 32; height: 64
+            x: 12; width: parent.width - 24; height: 72
             Accessible.name: "Открыть плеер: " + (app.api.current?.title || "")
             onClicked: player.open()
-            background: Rectangle { radius: 20; color: miniPlayer.down ? (app.dark ? "#383838" : "#e6e6e8") : (app.dark ? "#242424" : "#eeeeef") }
+            background: Rectangle {
+                radius: 22
+                color: miniPlayer.down ? app.raised : app.panel
+                border.width: 1; border.color: Qt.alpha(app.ink, 0.07)
+                Behavior on color { ColorAnimation { duration: prefs.motion ? 120 : 0 } }
+            }
             DragHandler {
                 target: null
                 onActiveTranslationChanged: if (active && activeTranslation.y < -45 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.open()
             }
             RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 10
-                RoundedImage { Layout.preferredWidth: 44; Layout.preferredHeight: 44; source: app.cover(app.api.current); radius: 10; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0 }
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Caption { text: app.api.current?.title || ""; Layout.fillWidth: true; font.bold: true }
-                    Caption { text: app.api.current?.user?.username || ""; Layout.fillWidth: true; color: app.muted; font.pixelSize: 12 }
+                anchors.fill: parent; anchors.margins: 12; spacing: 10
+                RoundedImage {
+                    Layout.preferredWidth: 48; Layout.preferredHeight: 48
+                    source: app.cover(app.api.current); radius: 14
+                    placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0
                 }
-                PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; Accessible.name: app.api.playing ? "Пауза" : "Воспроизвести"; onClicked: sc.togglePlayback() }
-                PlayerButton { visible: (app.api.current?.urn || "").startsWith("soundcloud:tracks:"); active: !!app.api.current?.user_favorite; symbol: active ? "liked" : "heart"; text: active ? "Убрать из любимых" : "Добавить в любимые"; Accessible.name: text; onClicked: sc.like(app.api.current) }
-            }
-            Rectangle {
-                anchors.bottom: parent.bottom; anchors.bottomMargin: 4
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - 40; height: 2; radius: 1; color: (app.dark ? "#464646" : "#dedede")
-                Rectangle { height: parent.height; radius: 1; width: parent.width * Math.min(1, (sc.position || 0) / Math.max(1, sc.duration || 0)); color: app.accent }
+                ColumnLayout {
+                    Layout.fillWidth: true; spacing: 4
+                    Caption { text: app.api.current?.title || ""; Layout.fillWidth: true; font.pixelSize: 14; font.weight: Font.DemiBold }
+                    Caption { text: app.api.current?.user?.username || ""; Layout.fillWidth: true; color: app.muted; font.pixelSize: 11 }
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.topMargin: 3
+                        height: 3; radius: 1.5; color: Qt.alpha(app.ink, 0.10)
+                        Rectangle {
+                            height: parent.height; radius: parent.radius
+                            width: parent.width * Math.max(0, Math.min(1, (sc.position || 0) / Math.max(1, sc.duration || 0)))
+                            color: app.ink; opacity: 0.65
+                        }
+                    }
+                }
+                AbstractButton {
+                    id: miniPlay
+                    Layout.preferredWidth: 44; Layout.preferredHeight: 44
+                    Accessible.name: app.api.playing ? "Пауза" : "Воспроизвести"
+                    onClicked: sc.togglePlayback()
+                    scale: down ? 0.94 : 1
+                    Behavior on scale { NumberAnimation { duration: prefs.motion ? 120 : 0 } }
+                    background: Rectangle { radius: 22; color: miniPlay.down ? Qt.alpha(app.ink, 0.8) : app.ink }
+                    contentItem: Item {
+                        AndroidGlyph { anchors.centerIn: parent; width: 20; height: 20; name: app.api.playing ? "pause" : "play"; ink: app.surface; visible: !app.api.buffering }
+                        BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; palette.dark: app.surface; running: !!app.api.buffering; visible: running }
+                    }
+                }
+                PlayerButton {
+                    visible: (app.api.current?.urn || "").startsWith("soundcloud:tracks:")
+                    implicitWidth: 40; implicitHeight: 44
+                    active: false
+                    symbol: app.api.current?.user_favorite ? "liked" : "heart"
+                    text: app.api.current?.user_favorite ? "Убрать из любимых" : "Добавить в любимые"
+                    onClicked: sc.like(app.api.current)
+                }
             }
         }
         Item {
             width: parent.width
-            height: 80
+            height: 78
             RowLayout {
                 anchors.left: parent.left; anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.leftMargin: 16; anchors.rightMargin: 16
+                anchors.leftMargin: 12; anchors.rightMargin: 12
                 height: 62; spacing: 10
                 Rectangle {
                     id: navigationCapsule
@@ -676,7 +793,7 @@ ApplicationWindow {
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         text: navigationTab.modelData.title
-                                        font.pixelSize: 10; font.bold: navigationTab.selected
+                                        font.pixelSize: 11; font.bold: navigationTab.selected
                                         color: navigationTab.selected ? app.accent : app.ink
                                         Behavior on color { ColorAnimation { duration: app.motion / 2 } }
                                     }
@@ -717,13 +834,43 @@ ApplicationWindow {
         id: player
         parent: Overlay.overlay
         width: parent.width; height: parent.height
-        modal: true; focus: true; closePolicy: Popup.CloseOnEscape; padding: 20
+        modal: true; focus: true; closePolicy: Popup.CloseOnEscape; padding: 26
         topPadding: 12 + app.safeAreaTop(parent)
         bottomPadding: 16 + app.safeAreaBottom(parent)
-        background: Rectangle { color: app.surface }
+        background: Rectangle {
+            color: app.surface
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop { position: 0; color: app.panel }
+                    GradientStop { position: 0.65; color: app.surface }
+                }
+            }
+        }
         DragHandler {
+            id: playerSwipe
             target: null
-            onActiveTranslationChanged: if (active && activeTranslation.y > 80 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.close()
+            xAxis.enabled: false
+            onActiveTranslationChanged: {
+                if (active) player.dragOffset = Math.max(0, activeTranslation.y)
+            }
+            onActiveChanged: {
+                if (active) {
+                    player.dragging = true
+                } else {
+                    const dismiss = player.dragOffset > Math.min(100, player.height * 0.15)
+                    if (dismiss) {
+                        // Transfer the gesture position into the closing animation without a jump.
+                        player.reveal = Math.max(0, 1 - player.dragOffset / Math.max(1, player.height))
+                        player.dragOffset = 0
+                        player.dragging = false
+                        player.close()
+                    } else {
+                        player.dragging = false
+                        player.dragOffset = 0
+                    }
+                }
+            }
         }
         contentItem: ColumnLayout {
             spacing: 10
@@ -732,7 +879,7 @@ ApplicationWindow {
                 Action { text: "Свернуть"; symbol: "back"; Layout.preferredWidth: 48; Accessible.name: "Свернуть плеер"; onClicked: player.close() }
                 Action { text: "Дополнения плеера"; symbol: "grid"; Layout.preferredWidth: 48; visible: pluginManager.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
                 Caption { text: "СЕЙЧАС ИГРАЕТ"; font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-                Action { text: "Действия"; symbol: "more"; Layout.preferredWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = app.api.current; app.selectedQueue = -1; trackMenu.open() } }
+                Action { text: "Действия"; symbol: "menu"; Layout.preferredWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = app.api.current; app.selectedQueue = -1; trackMenu.open() } }
             }
             Item { Layout.fillHeight: true }
             Rectangle {
@@ -801,23 +948,145 @@ ApplicationWindow {
             }
         }
     }
+    component MenuRow: Button {
+        id: menuRow
+        property string glyph: "music"
+        Layout.fillWidth: true
+        implicitHeight: 50
+        leftPadding: 14; rightPadding: 14
+        Accessible.name: text
+        background: Rectangle { radius: 14; color: menuRow.down ? app.raised : "transparent" }
+        contentItem: RowLayout {
+            spacing: 16
+            AndroidGlyph { name: menuRow.glyph; ink: app.muted; Layout.preferredWidth: 22; Layout.preferredHeight: 22 }
+            Label { text: menuRow.text; color: app.ink; font.pixelSize: 14; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
+    }
     Sheet {
         id: trackMenu
-        parent: Overlay.overlay; width: parent.width; y: parent.height - height; modal: true; padding: 20
-        background: Rectangle { color: app.panel; radius: 24 }
+        // Move the popup itself so its background, clipping and contents share one surface.
+        unifiedSurface: true
+        enter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "reveal"; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
+            }
+        }
+        exit: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; to: 0; duration: app.motion * 0.75; easing.type: Easing.InOutCubic }
+                NumberAnimation { property: "reveal"; to: 0; duration: app.motion * 0.75; easing.type: Easing.InOutCubic }
+            }
+        }
+        Overlay.modal: Rectangle {
+            color: "#99000000"
+            Behavior on opacity { NumberAnimation { duration: app.motion; easing.type: Easing.OutCubic } }
+        }
+        onAboutToShow: {
+            app.lyricTrack = app.selectedTrack
+            lyricsBackend.lookup(app.selectedTrack.title || "", app.selectedTrack.user?.username || "", app.selectedTrack.duration || 0, String(app.selectedTrack.urn || app.selectedTrack.id || ""))
+        }
+        parent: Overlay.overlay
+        width: parent.width
+        height: Math.min(parent.height - app.safeAreaTop(parent) - 16, menuContent.implicitHeight + topPadding + bottomPadding)
+        y: parent.height - height + (1 - reveal) * height
+        modal: true; padding: 16
+        bottomPadding: 16 + app.safeAreaBottom(parent)
+        background: Rectangle { color: app.panel; radius: 28 }
+        contentItem: Flickable {
+            clip: true; contentHeight: menuContent.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            ColumnLayout {
+                id: menuContent
+                width: parent.width; spacing: 2
+                Rectangle { Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: 12; width: 36; height: 4; radius: 2; color: Qt.alpha(app.muted, 0.4) }
+                RowLayout {
+                    Layout.fillWidth: true; Layout.bottomMargin: 12; spacing: 12
+                    RoundedImage { source: app.cover(app.selectedTrack); radius: 12; Layout.preferredWidth: 54; Layout.preferredHeight: 54; placeholderInk: app.muted }
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 4
+                        Caption { text: app.selectedTrack.title || "Без названия"; font.bold: true; Layout.fillWidth: true }
+                        Caption { text: app.selectedTrack.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 12; Layout.fillWidth: true }
+                    }
+                    PlayerButton { symbol: "close"; text: "Закрыть меню"; onClicked: trackMenu.close() }
+                }
+                Rectangle { Layout.fillWidth: true; height: 1; color: Qt.alpha(app.muted, 0.15) }
+                    MenuRow { glyph: "list"; text: "Текст песни"; visible: (app.lyricState.lines || []).length > 0; onClicked: { trackMenu.close(); lyricsSheet.open() } }
+                    MenuRow { glyph: "heart"; text: app.selectedTrack.user_favorite ? "Убрать из любимых" : "Добавить в любимые"; Layout.fillWidth: true; onClicked: { sc.like(app.selectedTrack); trackMenu.close() } }
+                    MenuRow { glyph: "next"; visible: app.selectedQueue >= 0; text: "Играть следующим"; Layout.fillWidth: true; onClicked: { sc.queueNext(app.selectedQueue); trackMenu.close() } }
+                    MenuRow { glyph: "close"; visible: app.selectedQueue >= 0; text: "Удалить из очереди"; Layout.fillWidth: true; onClicked: { sc.removeQueue(app.selectedQueue); trackMenu.close() } }
+                    MenuRow { glyph: "plus"; text: "Добавить в очередь"; Layout.fillWidth: true; onClicked: { sc.enqueue(app.selectedTrack); trackMenu.close() } }
+                    MenuRow { glyph: "music"; text: "Сохранить в плейлист"; Layout.fillWidth: true; onClicked: { sc.listDestinations(); destinations.open(); trackMenu.close() } }
+                    MenuRow { glyph: "profile"; text: "Профиль исполнителя"; Layout.fillWidth: true; onClicked: { app.openProfile(app.selectedTrack.user); trackMenu.close(); playlistView.close(); player.close() } }
+                    MenuRow { glyph: "play"; text: "Станция по треку"; Layout.fillWidth: true; onClicked: { trackMenu.close(); playlistView.beginStation(app.selectedTrack, false) } }
+                    MenuRow { glyph: "cloud"; text: "Открыть в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.openExternal(app.selectedTrack.permalink_url); trackMenu.close() } }
+                    MenuRow { glyph: "list"; text: "Копировать название и исполнителя"; Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || "Без названия") + " — " + (app.selectedTrack.user?.username || "SoundCloud")); trackMenu.close() } }
+                    MenuRow { glyph: "arrow"; text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
+            }
+        }
+    }
+    Sheet {
+        id: lyricsSheet
+        onOpened: { lyricScroll.cancelFlick(); lyricScroll.contentY = 0 }
+        parent: Overlay.overlay
+        width: parent.width; height: parent.height
+        modal: true; focus: true
+        padding: 20
+        topPadding: 12 + app.safeAreaTop(parent)
+        bottomPadding: 16 + app.safeAreaBottom(parent)
+        background: Rectangle { color: app.surface }
         contentItem: ColumnLayout {
-            Caption { text: app.selectedTrack.title || ""; font.bold: true; Layout.fillWidth: true }
-            Action { text: "♡ Нравится / снять лайк"; Layout.fillWidth: true; onClicked: { sc.like(app.selectedTrack); trackMenu.close() } }
-            Action { visible: app.selectedQueue >= 0; text: "Играть следующим"; Layout.fillWidth: true; onClicked: { sc.queueNext(app.selectedQueue); trackMenu.close() } }
-            Action { visible: app.selectedQueue >= 0; text: "Удалить из очереди"; Layout.fillWidth: true; onClicked: { sc.removeQueue(app.selectedQueue); trackMenu.close() } }
-            Action { text: "Добавить в очередь"; Layout.fillWidth: true; onClicked: { sc.enqueue(app.selectedTrack); trackMenu.close() } }
-            Action { text: "Сохранить в плейлист"; Layout.fillWidth: true; onClicked: { sc.listDestinations(); destinations.open(); trackMenu.close() } }
-            Action { text: "Профиль исполнителя"; Layout.fillWidth: true; onClicked: { app.openProfile(app.selectedTrack.user); trackMenu.close(); player.close() } }
-            Action { text: "Станция по треку"; Layout.fillWidth: true; onClicked: { sc.playStation(app.selectedTrack); trackMenu.close() } }
-            Action { text: "Открыть в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.openExternal(app.selectedTrack.permalink_url); trackMenu.close() } }
-            Action { text: "Копировать название и исполнителя"; Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || "Без названия") + " — " + (app.selectedTrack.user?.username || "SoundCloud")); trackMenu.close() } }
-            Action { text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
-            Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: trackMenu.close() }
+            spacing: 16
+            RowLayout {
+                Layout.fillWidth: true
+                ColumnLayout {
+                    Layout.fillWidth: true; spacing: 4
+                    Caption { text: "Текст песни"; font.pixelSize: 24; font.bold: true; Layout.fillWidth: true }
+                    Caption { text: (app.lyricTrack.title || "") + " · " + (app.lyricTrack.user?.username || ""); color: app.muted; font.pixelSize: 12; Layout.fillWidth: true }
+                }
+                PlayerButton { symbol: "close"; text: "Закрыть текст песни"; onClicked: lyricsSheet.close() }
+            }
+            Flickable {
+                id: lyricScroll
+                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.minimumHeight: 0; Layout.preferredHeight: 0
+                clip: true
+                contentWidth: width
+                contentHeight: lyricLines.implicitHeight + 48
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.DragOverBounds
+                boundsMovement: Flickable.FollowBoundsBehavior
+                flickDeceleration: 1800
+                maximumFlickVelocity: 3500
+                pressDelay: 0
+                pixelAligned: false
+                rebound: Transition {
+                    NumberAnimation { properties: "x,y"; duration: prefs.motion ? 320 : 0; easing.type: Easing.OutCubic }
+                }
+                Column {
+                    id: lyricLines
+                    x: 4; y: 16; width: Math.max(0, lyricScroll.width - 20)
+                    spacing: 22
+                    Repeater {
+                        model: app.lyricState.lines || []
+                        delegate: Text {
+                            required property var modelData
+                            width: lyricLines.width
+                            text: modelData.text || ""
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            color: app.ink; font.pixelSize: 22; font.weight: Font.Medium
+                            lineHeight: 1.25
+                        }
+                    }
+                }
+                ScrollBar.vertical: ScrollBar {
+                    width: 3
+                    policy: ScrollBar.AsNeeded
+                    contentItem: Rectangle { implicitWidth: 3; radius: 1.5; color: app.muted; opacity: lyricScroll.moving ? 0.65 : 0.25; Behavior on opacity { NumberAnimation { duration: 180 } } }
+                }
+            }
+            Caption { text: app.lyricState.custom ? "Сохранённый текст" : "Источник: " + (app.lyricState.source || ""); color: app.muted; font.pixelSize: 11; Layout.fillWidth: true }
         }
     }
     Sheet {
@@ -866,6 +1135,7 @@ ApplicationWindow {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 model: app.api.destinations || []
                 delegate: ItemDelegate {
+                    
                     required property var modelData
                     width: ListView.view.width; height: 56; text: modelData.title
                     onClicked: { sc.saveToPlaylist(app.selectedTrack.urn, modelData.urn, ""); destinations.close() }
@@ -925,5 +1195,5 @@ ApplicationWindow {
         }
         Timer { interval: 900; running: startup.opened; onTriggered: startup.close() }
     }
-    Component.onCompleted: { startup.open(); if (sc.signedIn) sc.loadHome() }
+    Component.onCompleted: { if (androidMedia) androidMedia.setDarkTheme(dark); startup.open(); if (sc.signedIn) sc.loadHome() }
 }

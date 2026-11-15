@@ -1,4 +1,6 @@
 #include "plugins.h"
+#include "discordpresence.h"
+#include "lyrics.h"
 #include "soundcloud.h"
 #include "artworknetwork.h"
 #include <QQuickWindow>
@@ -38,6 +40,7 @@ int main(int argc, char *argv[])
     qputenv("QT_BLOCK_EVENT_LOOPS_WHEN_SUSPENDED", "0");
     QGuiApplication app(argc, argv);
 #else
+    // Preserve transparent pixels outside the rounded window surface.
     QQuickWindow::setDefaultAlphaBuffer(true);
     QApplication app(argc, argv);
 #endif
@@ -65,6 +68,12 @@ int main(int argc, char *argv[])
         if (!opened) opened = QDesktopServices::openUrl(url);
         if (!opened) soundcloud.browserFailed();
     });
+    DiscordPresence discordPresence;
+    auto updateDiscord = [&] { discordPresence.updatePlayer(soundcloud.state()); };
+    QObject::connect(&soundcloud, &SoundCloud::catalogChanged, &discordPresence, updateDiscord);
+    QObject::connect(&soundcloud, &SoundCloud::progressChanged, &discordPresence, updateDiscord);
+    updateDiscord();
+    Lyrics lyrics;
     Plugins plugins;
     plugins.setPlayerCommand([&soundcloud](const QString &command, const QJsonObject &args) -> QString {
         const auto state = soundcloud.state();
@@ -108,6 +117,8 @@ int main(int argc, char *argv[])
     engine.setNetworkAccessManagerFactory(&artwork);
     artwork.prepare(&app, [] {});
     engine.rootContext()->setContextProperty("sc", &soundcloud);
+    engine.rootContext()->setContextProperty("discordPresence", &discordPresence);
+    engine.rootContext()->setContextProperty("lyricsBackend", &lyrics);
 #ifdef Q_OS_ANDROID
     engine.rootContext()->setContextProperty("androidMedia", &androidMedia);
 #else
@@ -117,7 +128,11 @@ int main(int argc, char *argv[])
     engine.loadFromModule("SCrip", "Main");
     if (engine.rootObjects().isEmpty())
         return EXIT_FAILURE;
-
+    if (auto *quickWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
+        // Recreate graphical resources on restore instead of retaining a hidden scene.
+        quickWindow->setPersistentSceneGraph(false);
+        quickWindow->setPersistentGraphics(false);
+    }
 #ifndef Q_OS_ANDROID
     auto *window = qobject_cast<QWindow *>(engine.rootObjects().first());
     QIcon icon(":/qt/qml/SCrip/assets/blob.png");
