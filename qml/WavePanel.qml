@@ -11,7 +11,7 @@ Rectangle {
     property color panelColor: dark ? "#1a1a1a" : "#f7f7f8"
     property color inkColor: dark ? "#f1f1f1" : "#242426"
     property color waveColor: inkColor
-    readonly property var api: backend.catalogState
+    readonly property var api: backend.uiState
     readonly property bool discovery: true
     readonly property string mode: "discovery"
     readonly property bool selected: api.waveMode === mode

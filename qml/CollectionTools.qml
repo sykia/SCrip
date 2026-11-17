@@ -9,7 +9,7 @@ ColumnLayout {
     required property var backend
     property bool mobile: false
     property bool playlistContext: false
-    readonly property var sourceRows: playlistContext ? state.playlistTracks || [] : state.tracks || []
+    readonly property var sourceRows: playlistContext ? backend.playlistRows : backend.collectionTracks
     readonly property bool hasMore: playlistContext ? !!state.playlistHasMore : !!state.hasMore
     readonly property bool busy: playlistContext ? !!state.playlistBusy : !!state.busy
     property bool catalogue: false
@@ -21,7 +21,7 @@ ColumnLayout {
     property bool descending: false
     property var filters: ({})
     signal presetApplied(string query, var filters)
-    readonly property var state: backend.catalogState
+    readonly property var state: backend.uiState
     readonly property bool transformed: !!query.trim() || sortKey !== "source"
     readonly property var rows: {
         const needle = (catalogue ? "" : query).trim().toLocaleLowerCase()

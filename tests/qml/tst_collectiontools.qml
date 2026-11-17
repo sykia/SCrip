@@ -24,9 +24,12 @@ TestCase {
     }
     QtObject {
         id: mockBackend
+        readonly property var collectionTracks: catalogState.tracks || []
+        readonly property var playlistRows: catalogState.playlistTracks || []
         property bool signedIn: true
         property int requests: 0
         property int cancellations: 0
+        readonly property var uiState: catalogState
         property var catalogState: ({tracks: [], hasMore: true})
         function displayArtist(t) { return t.metadata_artist || t.user?.username || "" }
         function cancelCollectionSearch() { cancellations++ }

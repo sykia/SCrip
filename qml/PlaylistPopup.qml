@@ -20,7 +20,7 @@ Popup {
         enabled: popup.visible && popup.transitionDuration > 0
         NumberAnimation { duration: popup.transitionDuration; easing.type: Easing.InOutCubic }
     }
-    readonly property var state: sc.catalogState
+    readonly property var state: sc.uiState
     readonly property var songs: collectionTools.rows
     function begin(item) {
         popupSelection.reset()

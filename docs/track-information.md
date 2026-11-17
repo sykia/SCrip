@@ -75,3 +75,37 @@ git diff --check
 
 Device builds and real-device gesture behavior must additionally be checked on
 Android and Windows when their toolchains/devices are available.
+
+## Availability and visibility
+
+Desktop collection rows and Android track rows show restricted API playback
+(`Only preview` or `Unavailable through API`) and explicitly private tracks.
+Track information shows full API playback status, visibility when supplied, and
+an explanation of restrictions. Missing fields remain unknown rather than being
+interpreted as deletion or a subscription requirement. Explicit `streamable: false`
+is treated as unavailable even alongside `access: playable`.
+
+SoundCloud documents `access` as `playable`, `preview`, or `blocked`:
+https://developers.soundcloud.com/docs/api/guide
+A blocked track can be paywalled, region-restricted, or restricted by its creator;
+the access field does not identify the cause. A preview alone is not conclusive
+proof of a Go+ requirement. Private visibility (`sharing: private`) is independent
+of playback availability.
+
+A missing track or HTTP 404 cannot reliably distinguish deletion, a private track
+without permission, removal, or a hidden upload. Tracks omitted entirely from API
+collections cannot be reconstructed from those responses. No deleted-track label
+is inferred, and the UI does not promise that a subscription enables API playback.
+See https://help.soundcloud.com/hc/en-us/articles/115003563948-Can-t-find-a-track-anymore
+and https://help.soundcloud.com/hc/en-us/articles/115003448167-Embedding-a-SoundCloud-Go-Track.
+Availability reflects the last received metadata and current API session; it is
+not an additional background audit of the library.
+
+Preview-only collection rows also display a theme-accent dot in a subtle circular badge beside the title on
+desktop and Android. Its tooltip explains that only a fragment is available and
+that the full version may require Go+. The indicator supports keyboard focus and
+an accessible text label; on touch screens the tooltip appears while pressed.
+It is shown from received `access: preview` metadata before playback is attempted.
+
+The preview badge follows the active theme accent, with a translucent background
+and outline. Hover, press, and keyboard focus strengthen the same accent treatment.

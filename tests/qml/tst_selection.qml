@@ -24,6 +24,7 @@ TestCase {
     }
     QtObject {
         id: mockBackend
+        readonly property var uiState: catalogState
         property var catalogState: ({})
         property bool signedIn: true
         signal selectionSaved(string token, bool success, string error)

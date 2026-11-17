@@ -48,20 +48,22 @@ inline QVariantList select(QVariantList pool, int limit, QSet<QString> excluded 
     return result;
 }
 // Bounded local mixing: two familiar/one new, alternating, or one familiar/three new.
-// Exhausted sources fall back to the other pool without fetching more pages.
+// Discovery never fills missing new slots with familiar tracks.
 inline QVariantList mix(const QVariantList &familiar, const QVariantList &novel, int preference,
                         int limit, QSet<QString> excluded = {}) {
     const auto known = select(familiar, limit, excluded);
     QSet<QString> knownIds;
     for (const auto &track : familiar) knownIds.insert(id(track));
     QVariantList fresh;
-    for (const auto &track : novel) if (!knownIds.contains(id(track))) fresh.append(track);
+    for (const auto &track : novel)
+        if (!knownIds.contains(id(track)) && !track.toMap().value("user_favorite").toBool()) fresh.append(track);
     fresh = select(fresh, limit, excluded);
     QVariantList result;
+    const int knownLimit = preference == 2 ? qMin(int(known.size()), int(fresh.size()) / 3) : int(known.size());
     int a = 0, b = 0, step = 0;
-    while (result.size() < limit && (a < known.size() || b < fresh.size())) {
+    while (result.size() < limit && (a < knownLimit || b < fresh.size())) {
         const bool preferKnown = preference == 0 ? step % 3 != 2 : preference == 2 ? step % 4 == 0 : step % 2 == 0;
-        const auto track = ((preferKnown && a < known.size()) || b >= fresh.size()) ? known[a++] : fresh[b++];
+        const auto track = ((preferKnown && a < knownLimit) || b >= fresh.size()) ? known[a++] : fresh[b++];
         ++step;
         if (excluded.contains(id(track))) continue;
         excluded.insert(id(track)); result.append(track);

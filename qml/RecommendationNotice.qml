@@ -29,7 +29,7 @@ Popup {
         target: notice.backend
         function onRecommendationExclusionAdded() { notice.open(); timeout.restart() }
         function onCatalogChanged() {
-            if (!notice.backend.catalogState.recommendationUndo) notice.close()
+            if (!notice.backend.uiState.recommendationUndo) notice.close()
         }
     }
 }

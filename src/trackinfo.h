@@ -53,6 +53,23 @@ inline QString license(const QVariant &v) {
         {"cc-by-nc-nd", "Creative Commons — указание авторства, некоммерческая, без изменений"}};
     return s.isEmpty() ? QString() : names.value(s, "Неизвестная лицензия: " + s.left(120));
 }
+// Access describes API playback; sharing is independent of playback entitlement.
+inline QString availability(const QVariantMap &t) {
+    const auto access = text(t.value("access"));
+    if (access == "blocked") return "Недоступен через API";
+    if (access == "preview") return "Только фрагмент";
+    if (t.value("streamable").metaType().id() == QMetaType::Bool && !t.value("streamable").toBool()) return "Недоступен через API";
+    if (access == "playable") return "Полная версия";
+    return {};
+}
+inline QString availabilityNote(const QVariantMap &t) {
+    const auto status = availability(t);
+    if (status == "Только фрагмент")
+        return "SoundCloud предоставляет только фрагмент. Полная версия может требовать подписку Go+. Проверьте условия на странице трека в SoundCloud.";
+    if (status == "Недоступен через API")
+        return "SoundCloud не разрешает воспроизведение через API. Возможны ограничения региона, правообладателя или подписки. Точная причина не сообщается; проверьте страницу трека в SoundCloud.";
+    return {};
+}
 inline QVariantList rows(const QVariantMap &t) {
     QVariantList out;
     auto add = [&](QString label, QString value) { if (!value.isEmpty()) out << QVariantMap{{"label", label}, {"value", value}}; };
@@ -60,8 +77,10 @@ inline QVariantList rows(const QVariantMap &t) {
     add("Загрузил", text(t.value("user").toMap().value("username")));
     const double duration = number(t.value("duration"));
     if (std::isfinite(duration) && duration > 0 && duration < 1e12) { const auto sec = qint64(duration / 1000); add("Длительность", QString::number(sec / 60) + ":" + QString::number(sec % 60).rightJustified(2, '0')); }
-    const auto access = t.value("access").toString();
-    add("Воспроизведение", access == "playable" ? "Полная версия" : access == "preview" ? "Только короткий фрагмент" : access == "blocked" ? "Недоступно" : QString{});
+    add("Воспроизведение", availability(t));
+    add("Ограничения", availabilityNote(t));
+    const auto sharing = text(t.value("sharing"));
+    add("Видимость", sharing == "private" ? "Приватный трек" : sharing == "public" ? "Публичный трек" : QString{});
     add("Жанр", text(t.value("genre")));
     const double bpm = number(t.value("bpm"));
     if (std::isfinite(bpm) && bpm > 0 && bpm <= 1000) add("BPM", QString::number(bpm, 'g', 6));

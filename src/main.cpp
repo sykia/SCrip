@@ -20,6 +20,11 @@
 #include <QQuickWindow>
 #include <QQmlContext>
 #include <cstdlib>
+#include <cstdio>
+#include <atomic>
+#include <chrono>
+#include <QScreen>
+#include <QSGRendererInterface>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QDesktopServices>
@@ -149,6 +154,47 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty())
         return EXIT_FAILURE;
     if (auto *quickWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
+        // Opt-in aggregate timing only: no account, track, URL, or input data.
+        if (qEnvironmentVariableIntValue("SCRIP_PERF") == 1) {
+            struct Timing {
+                std::atomic<qint64> lastFrame{0}, frames{0}, frameMax{0}, slowFrames{0};
+                qint64 lastTick = 0, tickMax = 0, slowTicks = 0;
+            };
+            auto timing = std::make_shared<Timing>();
+            auto now = [] { return std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count(); };
+            QObject::connect(quickWindow, &QQuickWindow::frameSwapped, quickWindow, [timing, now] {
+                const qint64 stamp = now(), previous = timing->lastFrame.exchange(stamp);
+                ++timing->frames;
+                // Ignore gaps between independent updates of an idle window.
+                const qint64 gap = stamp - previous;
+                if (previous && gap < 250000) {
+                    if (gap > 25000) ++timing->slowFrames;
+                    auto maximum = timing->frameMax.load();
+                    while (gap > maximum && !timing->frameMax.compare_exchange_weak(maximum, gap)) {}
+                }
+            }, Qt::DirectConnection);
+            auto *tick = new QTimer(quickWindow);
+            tick->setTimerType(Qt::PreciseTimer); tick->setInterval(16);
+            timing->lastTick = now();
+            QObject::connect(tick, &QTimer::timeout, quickWindow, [timing, now] {
+                const qint64 stamp = now(), gap = stamp - timing->lastTick;
+                timing->lastTick = stamp; timing->tickMax = qMax(timing->tickMax, qint64(gap));
+                if (gap > 32000) ++timing->slowTicks;
+            });
+            tick->start();
+            auto *report = new QTimer(quickWindow); report->setInterval(5000);
+            QObject::connect(report, &QTimer::timeout, quickWindow, [timing, quickWindow] {
+                const auto *screen = quickWindow->screen();
+                std::fprintf(stderr, "SCripPerf ui_max_ms=%.1f ui_slow=%lld frames=%lld frame_max_ms=%.1f frame_gaps=%lld refresh_hz=%.1f graphics_api=%d\n",
+                    timing->tickMax / 1000.0, static_cast<long long>(timing->slowTicks),
+                    static_cast<long long>(timing->frames.exchange(0)), timing->frameMax.exchange(0) / 1000.0,
+                    static_cast<long long>(timing->slowFrames.exchange(0)), screen ? screen->refreshRate() : 0,
+                    int(quickWindow->rendererInterface()->graphicsApi()));
+                std::fflush(stderr); timing->tickMax = timing->slowTicks = 0;
+            });
+            report->start();
+        }
         // Recreate graphical resources on restore instead of retaining a hidden scene.
         quickWindow->setPersistentSceneGraph(false);
         quickWindow->setPersistentGraphics(false);

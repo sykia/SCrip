@@ -24,6 +24,7 @@ TestCase {
     }
     QtObject {
         id: mockBackend
+        readonly property var uiState: catalogState
         property var catalogState: ({})
         property bool signedIn: true
         property int writes: 0

@@ -55,6 +55,19 @@ private slots:
         QVERIFY(TrackInfo::license("something-new").startsWith("Неизвестная лицензия:"));
         QVERIFY(TrackInfo::rows({{"bpm", -1}, {"duration", INFINITY}}).isEmpty());
     }
+    void availability() {
+        QCOMPARE(TrackInfo::availability({{"access", "playable"}}), "Полная версия");
+        QCOMPARE(TrackInfo::availability({{"access", "preview"}}), "Только фрагмент");
+        QCOMPARE(TrackInfo::availability({{"access", "blocked"}}), "Недоступен через API");
+        QCOMPARE(TrackInfo::availability({{"access", "playable"}, {"streamable", false}}), "Недоступен через API");
+        QVERIFY(TrackInfo::availability({{"streamable", "false"}}).isEmpty());
+        QVERIFY(TrackInfo::availability({{"sharing", "private"}}).isEmpty());
+        QVERIFY(TrackInfo::availability({}).isEmpty());
+        QVERIFY(TrackInfo::availabilityNote({{"access", "blocked"}}).contains("Точная причина"));
+        const auto rows = TrackInfo::rows({{"sharing", "private"}, {"access", "playable"}});
+        QCOMPARE(rows.size(), 2);
+        QCOMPARE(rows.last().toMap().value("value").toString(), "Приватный трек");
+    }
     void dates() {
         QCOMPARE(TrackInfo::releaseDate({{"created_at", "2024-05-03"}}), QString());
         QCOMPARE(TrackInfo::releaseDate({{"release_year", 2024}}), "2024");

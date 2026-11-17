@@ -6,7 +6,7 @@ Popup {
     id: popup
     required property var host
     property bool mobile: false
-    readonly property var state: sc.catalogState
+    readonly property var state: sc.uiState
     readonly property bool busy: !!state.queuePlaylistBusy
     function begin() { open(); title.forceActiveFocus() }
     parent: Overlay.overlay
@@ -48,7 +48,7 @@ Popup {
             RowLayout {
                 Layout.fillWidth: true
                 Action { text: "Отмена"; enabled: !popup.busy; onClicked: popup.close() }
-                Action { text: popup.busy ? "Сохранение…" : "Сохранить"; primary: true; enabled: !!title.text.trim() && !popup.busy && sc.signedIn && (popup.state.queue || []).length > 0; onClicked: sc.saveQueueAsPlaylist(title.text) }
+                Action { text: popup.busy ? "Сохранение…" : "Сохранить"; primary: true; enabled: !!title.text.trim() && !popup.busy && sc.signedIn && sc.queueTracks.length > 0; onClicked: sc.saveQueueAsPlaylist(title.text) }
             }
         }
     }

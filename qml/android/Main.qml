@@ -24,7 +24,7 @@ ApplicationWindow {
     palette.buttonText: app.ink
     palette.highlight: app.accent
     palette.highlightedText: app.foreground(app.accent)
-    readonly property var api: sc.catalogState
+    readonly property var api: sc.uiState
     readonly property bool dark: prefs.darkMode
     onDarkChanged: if (androidMedia) androidMedia.setDarkTheme(dark)
     property bool requestedDark: prefs.darkMode
@@ -389,8 +389,29 @@ ApplicationWindow {
             }
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
-                Caption { text: row.modelData.title || row.modelData.username || "Без названия"; Layout.fillWidth: true; font.bold: true; color: row.modelData.urn === app.api.current?.urn ? app.accent : app.ink }
-                Caption { text: (sc.displayArtist(row.modelData) || (row.modelData.track_count ? row.modelData.track_count + " треков" : "SoundCloud")) + (row.modelData.access === "preview" ? " · Фрагмент" : row.modelData.access === "blocked" ? " · Недоступно" : ""); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 6
+                    Caption { text: row.modelData.title || row.modelData.username || "Без названия"; Layout.fillWidth: true; font.bold: true; color: row.modelData.urn === app.api.current?.urn ? app.accent : app.ink }
+                    AbstractButton {
+                        visible: row.modelData.access === "preview"
+                        Layout.preferredWidth: 18; Layout.preferredHeight: 18
+                        hoverEnabled: true; focusPolicy: Qt.StrongFocus
+                        Accessible.name: "Только фрагмент; полная версия может требовать Go+"
+                        ToolTip.text: Accessible.name
+                        ToolTip.visible: hovered || down || visualFocus
+                        ToolTip.delay: 250
+                        contentItem: Item {
+                            Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: app.accent }
+                        }
+                        background: Rectangle {
+                            radius: width / 2
+                            color: Qt.alpha(app.accent, parent.down ? 0.20 : parent.hovered ? 0.14 : 0.07)
+                            border.width: 1
+                            border.color: Qt.alpha(app.accent, parent.visualFocus ? 0.75 : parent.hovered ? 0.32 : 0.16)
+                        }
+                    }
+                }
+                Caption { text: (sc.displayArtist(row.modelData) || (row.modelData.track_count ? row.modelData.track_count + " треков" : "SoundCloud")) + (sc.trackAvailability(row.modelData) ? " · " + sc.trackAvailability(row.modelData) : ""); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
             }
             EngagementAction { host: app; mobile: true; visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); item: row.modelData }
             Action { text: "Действия"; symbol: "menu"; implicitWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = row.modelData; app.selectedQueue = row.queued ? row.queueIndex : -1; trackMenu.open() } }
@@ -552,7 +573,7 @@ ApplicationWindow {
                     id: homeShelves
                     model: shelves.length
                     readonly property var shelves: {
-                        const shelves = app.api.home || []
+                        const shelves = sc.homeShelves || []
                         const artists = new Set()
                         const seeds = []
                         for (const shelf of shelves) for (const track of shelf.tracks || []) {
@@ -599,7 +620,7 @@ ApplicationWindow {
                         }
                     }
                 }
-                Label { x: 18; width: parent.width - 36; visible: !(app.api.home || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
+                Label { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
                 PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted; x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: navigationFooter.height + 16 }
             }
@@ -1143,8 +1164,8 @@ ApplicationWindow {
             }
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                model: (app.api.queue || []).length
-                delegate: Track { required property int index; modelData: app.api.queue[index] || ({}); queued: true; queueIndex: index }
+                model: (sc.queueTracks || []).length
+                delegate: Track { required property int index; modelData: sc.queueTracks[index] || ({}); queued: true; queueIndex: index }
             }
         }
     }
@@ -1161,10 +1182,10 @@ ApplicationWindow {
         contentItem: ColumnLayout {
             id: queueMenuContent
             spacing: 2
-            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "plus"; text: "Сохранить как плейлист"; enabled: sc.signedIn && (app.api.queue || []).length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
+            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "plus"; text: "Сохранить как плейлист"; enabled: sc.signedIn && (sc.queueTracks || []).length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
             MenuRow { text: "Отменить изменение очереди"; enabled: !!app.api.queueUndoAvailable; onClicked: { sc.undoQueueEdit(); queueOptions.close() } }
-            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "list"; text: "Убрать повторы"; enabled: { const queue = app.api.queue; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
-            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "close"; text: "Очистить после текущего"; enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < (app.api.queue || []).length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
+            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "list"; text: "Убрать повторы"; enabled: { const queue = sc.queueTracks; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
+            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "close"; text: "Очистить после текущего"; enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < (sc.queueTracks || []).length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
         }
     }
     component MenuRow: Button {

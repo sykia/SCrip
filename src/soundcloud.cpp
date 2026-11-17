@@ -33,6 +33,8 @@
 #include <QVersionNumber>
 #include <QProcess>
 #include <QDebug>
+#include <QScopeGuard>
+#include <cstdio>
 #ifdef Q_OS_LINUX
 #include <mutex>
 #include <thread>
@@ -56,6 +58,37 @@ struct SoundCloudStorageCompletion {
 #endif
 
 namespace {
+// Frequent checkpoints stay separate from multi-megabyte queue snapshots.
+QString progressPath() {
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)).filePath("playback-progress.json");
+}
+QJsonObject readProgress() {
+    QFile file(progressPath());
+    if (!file.open(QIODevice::ReadOnly) || file.size() > 4096) return {};
+    return QJsonDocument::fromJson(file.readAll()).object();
+}
+void writeProgress(const QVariantMap &position, const QString &mode) {
+    auto data = readProgress();
+    const auto record = QJsonObject::fromVariantMap(position);
+    data["current"] = record;
+    if (mode == "library" || mode == "discovery") data[mode] = record;
+    const auto path = progressPath();
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) return;
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) return;
+    const auto bytes = QJsonDocument(data).toJson(QJsonDocument::Compact);
+    if (file.write(bytes) == bytes.size()) file.commit();
+}
+qint64 wavePosition(const QVariantMap &snapshot, const QString &mode) {
+    const auto checkpoint = readProgress().value(mode).toObject().toVariantMap();
+    const auto queue = snapshot.value("queue").toList();
+    const int index = snapshot.value("index", -1).toInt();
+    if (index >= 0 && index < queue.size()
+        && checkpoint.value("account") == snapshot.value("account")
+        && checkpoint.value("track") == queue[index].toMap().value("urn"))
+        return qMax<qint64>(0, checkpoint.value("position").toLongLong());
+    return qMax<qint64>(0, snapshot.value("position").toLongLong());
+}
 QByteArray callbackPage(bool valid, bool receivedCode) {
     static const QByteArray page = [] {
         QFile file(":/resources/callback.html");
@@ -189,6 +222,8 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         }
     } else fail(AuthStorage::errorMessage());
 #endif
+    m_volumeSaveTimer.setSingleShot(true); m_volumeSaveTimer.setInterval(250);
+    connect(&m_volumeSaveTimer, &QTimer::timeout, this, [this] { QSettings().setValue("player/volume", volumeLevel()); });
     m_saveTimer.setInterval(1000);
     connect(&m_saveTimer, &QTimer::timeout, this, &SoundCloud::savePlaybackPosition);
     player().setAudioOutput(&m_audio);
@@ -384,6 +419,9 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     });
 }
 SoundCloud::~SoundCloud() {
+    if (m_volumeSaveTimer.isActive()) {
+        m_volumeSaveTimer.stop(); QSettings().setValue("player/volume", volumeLevel());
+    }
     savePlayback();
 #ifdef Q_OS_LINUX
     if (m_storageCompletion) {
@@ -408,6 +446,16 @@ void SoundCloud::finishStorageLoad(bool ok, const QJsonObject &connection, const
 }
 #endif
 void SoundCloud::set(const QString &key, const QVariant &input) {
+    static const bool measure = qEnvironmentVariableIntValue("SCRIP_PERF") == 1;
+    QElapsedTimer elapsed;
+    if (measure) elapsed.start();
+    const auto report = qScopeGuard([&] {
+        if (measure && elapsed.elapsed() >= 10) {
+            std::fprintf(stderr, "SCripPerf state=%s elapsed_ms=%lld\n", key.toUtf8().constData(),
+                         static_cast<long long>(elapsed.elapsed()));
+            std::fflush(stderr);
+        }
+    });
     QVariant value = input;
     if ((key == "likePending" || key == "engagementPending") && input != m_state.value(key))
         ++m_engagementRevision;
@@ -477,8 +525,13 @@ void SoundCloud::set(const QString &key, const QVariant &input) {
     if (key == "current" && !urn(m_commentTrack).isEmpty() && urn(value.toMap()) == urn(m_commentTrack)) setCommentTrack(value.toMap());
     if (key == "queue" && m_queueIds != m_undoAfterIds) set("queueUndoAvailable", false);
     if (key == "tracks") m_trackModel.update(value.toList());
+    if (key == "tracks") emit collectionTracksChanged();
+    else if (key == "playlistTracks") emit playlistRowsChanged();
+    else if (key == "queue") emit queueTracksChanged();
+    else if (key == "home") emit homeShelvesChanged();
     emit changed();
-    if (key == "position" || key == "duration") emit progressChanged();
+    if (key == "volume") emit volumeChanged();
+    else if (key == "position" || key == "duration") emit progressChanged();
     else emit catalogChanged();
     if (key == "signedIn") emit signedInChanged();
     if (key == "connected" && value.toBool() && !m_pendingLink.isEmpty()) {
@@ -982,19 +1035,20 @@ void SoundCloud::savePlayback() {
     savePlaybackPosition();
 }
 void SoundCloud::savePlaybackPosition() {
+    QElapsedTimer elapsed;
+    const bool measure = qEnvironmentVariableIntValue("SCRIP_PERF") == 1;
+    if (measure) elapsed.start();
+    const auto report = qScopeGuard([&] {
+        if (measure && elapsed.elapsed() >= 10) {
+            std::fprintf(stderr, "SCripPerf save_position_ms=%lld\n", static_cast<long long>(elapsed.elapsed()));
+            std::fflush(stderr);
+        }
+    });
     const auto account = urn(m_state.value("profile").toMap());
     const auto track = urn(m_state.value("current").toMap());
     if (!m_restoreChecked || !signedIn() || account.isEmpty() || track.isEmpty()) return;
     const QVariantMap position{{"account", account}, {"track", track}, {"position", m_state.value("position")}};
-    QSettings settings;
-    settings.setValue("playback/position", QJsonDocument::fromVariant(position).toJson(QJsonDocument::Compact));
-    if (!m_waveMode.isEmpty()) {
-        auto snapshot = QJsonDocument::fromJson(settings.value("playback/waves/" + m_waveMode).toByteArray()).object().toVariantMap();
-        if (snapshot.value("account").toString() == account) {
-            snapshot["position"] = m_state.value("position");
-            settings.setValue("playback/waves/" + m_waveMode, QJsonDocument::fromVariant(snapshot).toJson(QJsonDocument::Compact));
-        }
-    }
+    writeProgress(position, m_waveMode);
 }
 void SoundCloud::restorePlayback(const QVariantMap &profile) {
     if (m_restoreChecked) return;
@@ -1019,7 +1073,9 @@ void SoundCloud::restorePlayback(const QVariantMap &profile) {
     pruneRecommendations(false);
     set("queue", m_queue); set("queueIndex", index);
     const auto track = queue[index].toMap();
-    const auto savedPosition = QJsonDocument::fromJson(QSettings().value("playback/position").toByteArray()).object().toVariantMap();
+    auto savedPosition = readProgress().value("current").toObject().toVariantMap();
+    if (savedPosition.isEmpty())
+        savedPosition = QJsonDocument::fromJson(QSettings().value("playback/position").toByteArray()).object().toVariantMap();
     const bool sameTrack = savedPosition.value("account").toString() == urn(profile) && savedPosition.value("track").toString() == urn(track);
     m_restorePosition = qMax<qint64>(0, (sameTrack ? savedPosition.value("position") : snapshot.value("position")).toLongLong());
     set("current", track); set("duration", track.value("duration")); set("position", m_restorePosition);
@@ -1089,7 +1145,7 @@ void SoundCloud::callbackConnection() {
                 set("loadingDestinations", false); set("savingTrack", false); set("busy", false);
                 m_queue.clear(); m_queueIndex = -1; resetQueueOrder(); set("queue", m_queue); set("queueIndex", -1);
                 stopPlayback();
-                QSettings().remove("playback/waves");
+                QSettings().remove("playback/waves"); QFile::remove(progressPath());
                 set("connected", true); set("signedIn", true);
                 set("authBusy", false);
                 set("authStep", "");
@@ -1113,7 +1169,7 @@ bool SoundCloud::clearSession() {
     m_followPages.clear();
     set("followings", QVariantMap{}); set("followingPending", QVariantMap{});
     set("followingsReady", false); set("followingsLoading", false);
-    QSettings().remove("playback/waves");
+    QSettings().remove("playback/waves"); QFile::remove(progressPath());
     ++m_commentsGeneration; m_commentsNext.clear(); m_commentsPages.clear(); m_comments.clear(); emit commentsChanged();
     ++m_epoch; m_reads.clear(); ++m_listing; ++m_playlistGeneration;
     m_playlistNext.clear();
@@ -1624,7 +1680,7 @@ void SoundCloud::startWave(const QString &mode) {
         m_waveWaiting = false; m_waveEmptyPages = 0;
         pruneRecommendations(false);
         set("queue", m_queue); set("queueIndex", index);
-        startTrack(queue[index].toMap(), true, qMax<qint64>(0, saved.value("position").toLongLong()));
+        startTrack(queue[index].toMap(), true, wavePosition(saved, mode));
         return;
     }
     m_familiarTracks.clear(); m_waveCandidates.clear();
@@ -1670,7 +1726,7 @@ void SoundCloud::chooseWavePreference(int value) {
     }
     m_waveMode = "discovery"; set("waveMode", m_waveMode);
     const auto selected = Recommendations::mix(filterRecommendations(m_familiarTracks),
-        filterRecommendations(candidates), value, 20, excluded);
+        filterRecommendations(withLikeStates(candidates)), value, 20, excluded);
     int first = -1;
     for (const auto &entry : selected) {
         auto track = entry.toMap(); track["scripAutomaticRecommendation"] = true;
@@ -1768,7 +1824,7 @@ void SoundCloud::refillWave() {
                 auto excluded = m_waveSeen;
                 for (const auto &entry : std::as_const(m_queue)) excluded.insert(urn(entry.toMap()));
                 tracks = Recommendations::mix(filterRecommendations(m_familiarTracks),
-                    filterRecommendations(tracks), m_recommendationPreference, 20, excluded);
+                    filterRecommendations(withLikeStates(tracks)), m_recommendationPreference, 20, excluded);
                 for (auto &entry : tracks) {
                     auto track = entry.toMap(); track["scripAutomaticRecommendation"] = true; entry = track;
                 }
@@ -2412,14 +2468,14 @@ void SoundCloud::volume(double value) {
         const qreal progress = m_crossfade.currentValue().toReal();
         m_audio.setVolume(target * (1.0 - progress));
         m_preloadAudio.setVolume(target * progress);
-        set("volume", target); QSettings().setValue("player/volume", target); return;
+        set("volume", target); m_volumeSaveTimer.start(); return;
     }
     m_volumeFade.stop();
     m_volumeFade.setStartValue(double(m_audio.volume()));
     m_volumeFade.setEndValue(target);
     m_volumeFade.start();
     set("volume", target);
-    QSettings().setValue("player/volume", target);
+    m_volumeSaveTimer.start();
 }
 void SoundCloud::setRepeat(bool enabled) { setRepeatMode(enabled ? 1 : 0); }
 void SoundCloud::setRepeatMode(int mode) {

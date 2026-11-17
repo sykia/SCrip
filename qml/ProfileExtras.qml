@@ -9,7 +9,7 @@ Column {
     property bool mobile: false
     property bool expanded: false
     readonly property string userUrn: user?.urn || ""
-    readonly property var api: sc.catalogState
+    readonly property var api: sc.uiState
     readonly property var links: api.profileLinksUser === userUrn ? api.profileLinks || [] : []
     signal relatedRequested()
     spacing: 12

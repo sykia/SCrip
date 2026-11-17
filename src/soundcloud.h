@@ -66,6 +66,12 @@ class SoundCloud : public QObject {
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
     // Каталог не инвалидируется при каждом обновлении позиции воспроизведения.
     Q_PROPERTY(QVariantMap catalogState READ state NOTIFY catalogChanged)
+    Q_PROPERTY(QVariantMap uiState READ uiState NOTIFY catalogChanged)
+    Q_PROPERTY(double volumeLevel READ volumeLevel NOTIFY volumeChanged)
+    Q_PROPERTY(QVariantList collectionTracks READ collectionTracks NOTIFY collectionTracksChanged)
+    Q_PROPERTY(QVariantList playlistRows READ playlistRows NOTIFY playlistRowsChanged)
+    Q_PROPERTY(QVariantList queueTracks READ queueTracks NOTIFY queueTracksChanged)
+    Q_PROPERTY(QVariantList homeShelves READ homeShelves NOTIFY homeShelvesChanged)
     Q_PROPERTY(qint64 position READ position NOTIFY progressChanged)
     Q_PROPERTY(qint64 duration READ duration NOTIFY progressChanged)
 public:
@@ -76,9 +82,28 @@ public:
     bool signedIn() const { return m_state.value("signedIn").toBool(); }
     bool seekable() const { return m_activePlayer->isSeekable(); }
     QVariantMap state() const { return m_state; }
+    QVariantMap uiState() const {
+        auto state = m_state;
+        for (const auto *key : {"tracks", "playlistTracks", "queue", "home"}) state.remove(key);
+        return state;
+    }
+
+    double volumeLevel() const { return m_state.value("volume").toDouble(); }
+    QVariantList collectionTracks() const { return m_state.value("tracks").toList(); }
+    QVariantList playlistRows() const { return m_state.value("playlistTracks").toList(); }
+    QVariantList queueTracks() const { return m_queue; }
+    QVariantList homeShelves() const { return m_state.value("home").toList(); }
+
     qint64 position() const { return m_state.value("position").toLongLong(); }
     qint64 duration() const { return m_state.value("duration").toLongLong(); }
     QVariantMap commentsState() const { return m_comments; }
+    Q_INVOKABLE QString trackAvailability(const QVariantMap &track) const {
+        auto status = TrackInfo::availability(track);
+        if (status == "Полная версия") status.clear();
+        if (TrackInfo::text(track.value("sharing")) == "private")
+            status += (status.isEmpty() ? "" : " · ") + QString("Приватный");
+        return status;
+    }
     Q_INVOKABLE QVariantList trackInfo(const QVariantMap &track) const { return TrackInfo::rows(track); }
     Q_INVOKABLE QString trackDescription(const QVariantMap &track) const { return TrackInfo::text(track.value("description")); }
     Q_INVOKABLE QString displayArtist(const QVariantMap &track) const { return TrackMetadata::displayArtist(track); }
@@ -208,6 +233,11 @@ signals:
     void changed();
     void catalogChanged();
     void progressChanged();
+    void volumeChanged();
+    void collectionTracksChanged();
+    void playlistRowsChanged();
+    void queueTracksChanged();
+    void homeShelvesChanged();
     void playbackSeeked();
     void signedInChanged();
     void trackSaved();
@@ -355,6 +385,7 @@ private:
     struct CachedListing { QVariantList tracks; QString next; };
     QHash<QString, CachedListing> m_listings;
     QTimer m_saveTimer;
+    QTimer m_volumeSaveTimer;
     bool m_restoreChecked = false, m_snapshotPlayback = false, m_homeLoaded = false;
     QNetworkAccessManager *m_network;
     StreamCache m_streamCache;

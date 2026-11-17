@@ -8,7 +8,7 @@ Popup {
     property bool mobile: false
     property var user: ({})
     property string kind: "followers"
-    readonly property var state: sc.catalogState
+    readonly property var state: sc.uiState
     signal profileRequested(var user)
     function begin(person, listKind) {
         user = person; kind = listKind

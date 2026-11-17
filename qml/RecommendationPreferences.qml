@@ -10,7 +10,7 @@ Popup {
     property color surface: "#292929"
     property color accent: "#f43756"
     property color selectedInk: "white"
-    readonly property var api: backend.catalogState
+    readonly property var api: backend.uiState
     readonly property var entries: (api.recommendationExclusions || []).filter(entry =>
         entry.name.toLowerCase().includes(search.text.toLowerCase()) || entry.urn.toLowerCase().includes(search.text.toLowerCase()))
     QtObject {

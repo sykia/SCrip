@@ -68,7 +68,10 @@ inline segments on desktop and Android. These preferences affect only
 future discovery-wave batches. For each bounded batch (at most 20 tracks), local
 selection follows respectively two familiar then one new, alternating familiar
 and new, or one familiar then three new. These are ordering rules, not promised
-percentages: exhausted pools fall back to available eligible candidates. Familiar
+percentages for Familiar and Balance: exhausted pools fall back to available eligible
+candidates. Discovery permits at most one familiar track per three new candidates
+and leaves the batch short when new candidates run out. Related results marked as
+liked by the synchronized library or current like overrides are never counted as new. Familiar
 tracks come from at most 200 already fetched liked tracks, saved with the wave;
 new candidates come from the existing related-track requests. No additional
 request or pagination loop is introduced to satisfy a mix. All three segments use

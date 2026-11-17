@@ -10,7 +10,7 @@ Popup {
     property bool initialized: false
     property bool tracksChanged: false
     property int selectedTrackIndex: -1
-    readonly property var state: sc.catalogState
+    readonly property var state: sc.uiState
     readonly property var draft: state.playlistDraft || ({})
     readonly property bool busy: !!state.playlistEditBusy
     readonly property bool dirty: initialized && (tracksChanged || titleField.text !== (playlist.title || "") || description.text !== (playlist.description || "") || privacy.checked !== (playlist.sharing === "private"))

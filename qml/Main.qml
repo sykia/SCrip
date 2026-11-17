@@ -24,7 +24,7 @@ Window {
     palette.buttonText: app.ink
     palette.highlight: app.accent
     palette.highlightedText: app.foreground(app.accent)
-    readonly property var api: sc.catalogState
+    readonly property var api: sc.uiState
     readonly property var extensions: typeof pluginManager === "undefined" ? null : pluginManager
     readonly property var pluginTheme: extensions ? extensions.theme : ({})
     readonly property var themes: JSON.parse(prefs.savedThemes)
@@ -369,7 +369,7 @@ Window {
         }
     }
     component VolumeSlider: LineSlider {
-        readonly property real level: app.api.volume || 0
+        readonly property real level: sc.volumeLevel
         value: level <= 0.3 ? level / 0.6 : 0.5 + (level - 0.3) / 1.4
         live: true
         snapMode: Slider.NoSnap
@@ -635,7 +635,7 @@ Window {
                         contentItem: Column {
                         width: parent.width; spacing: 8
                         Txt { width: parent.width; text: app.pageTitle; font.pixelSize: 30; font.weight: Font.DemiBold; font.letterSpacing: -0.7 }
-                        Txt { visible: app.section !== 4; width: parent.width; color: app.muted; text: app.section === 5 ? "Музыка из ваших подписок и новые открытия" : app.section === 0 ? (app.query ? "Результаты поиска · " + app.query : "Музыка и исполнители SoundCloud") : app.api.tracks.length + " в подборке"; font.pixelSize: 12 }
+                        Txt { visible: app.section !== 4; width: parent.width; color: app.muted; text: app.section === 5 ? "Музыка из ваших подписок и новые открытия" : app.section === 0 ? (app.query ? "Результаты поиска · " + app.query : "Музыка и исполнители SoundCloud") : sc.collectionTracks.length + " в подборке"; font.pixelSize: 12 }
                     }
                     }
                     TrackSearchFilters {
@@ -706,13 +706,13 @@ Window {
                     SelectionBar { id: selectionBar; width: parent.width; host: app; showEntry: false; selection: trackSelection; visible: (trackSelection.active || !!trackSelection.message) && app.section !== 4 && app.section !== 5 && !(app.section === 0 && app.category === 2) }
                     Loader { id: collectionLoader; width: parent.width; active: (app.section !== 4 && app.section !== 5); visible: active; sourceComponent: app.section === 0 && app.category === 2 ? userResults : prefs.gridView ? coverGrid : trackList }
                     Txt {
-                        visible: app.section >= 1 && app.section <= 3 && app.api.tracks.length > 0 && app.filteredCollection.length === 0
+                        visible: app.section >= 1 && app.section <= 3 && sc.collectionTracks.length > 0 && app.filteredCollection.length === 0
                         width: parent.width; text: app.api.hasMore || app.api.busy || app.api.collectionSearchStatus === "error" || app.api.collectionSearchStatus === "limit" ? "В загруженной части совпадений нет" : "Ничего не найдено"; color: app.muted
                         horizontalAlignment: Text.AlignHCenter
                     }
                     BusyIndicator { visible: app.api.busy && (app.section !== 4 && app.section !== 5); running: visible; width: 32; height: 32; anchors.horizontalCenter: parent.horizontalCenter }
                     Column {
-                        visible: (app.section !== 4 && app.section !== 5) && !app.api.busy && app.api.tracks.length === 0
+                        visible: (app.section !== 4 && app.section !== 5) && !app.api.busy && sc.collectionTracks.length === 0
                         width: parent.width; topPadding: 90; spacing: 12
                         Glyph { name: app.section === 0 ? "search" : app.section === 2 ? "grid" : "music"; width: 42; height: 42; ink: (app.dark ? "#777777" : "#c5c0c5"); anchors.horizontalCenter: parent.horizontalCenter }
                         Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 19; font.weight: Font.DemiBold; text: app.api.collectionStatus === "unavailable" ? "Раздел недоступен" : app.api.collectionStatus === "error" ? "Не удалось загрузить раздел" : app.section === 0 ? "Найдите любимую музыку" : app.section === 3 ? "В этом разделе пока пусто" : app.section === 2 ? "Ваши плейлисты" : "Пока нет треков" }
@@ -767,7 +767,7 @@ Window {
                                 background: Rectangle { radius: width / 2; color: parent.enabled ? app.accent : "#a7a7af" }
                                 BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: !!app.api.buffering; visible: running }
                             }
-                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!app.api.queue?.length; onClicked: sc.next() }
+                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!sc.queueTracks?.length; onClicked: sc.next() }
                             Tool { ToolTip.visible: hovered; ToolTip.text: text; anchors.verticalCenter: parent.verticalCenter; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; text: ["Повтор выключен", "Повтор трека", "Повтор очереди"][app.api.repeatMode || 0]; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
                         }
                         RowLayout {
@@ -1318,7 +1318,7 @@ Window {
         Column {
             width: parent.width; spacing: app.gutter
             id: homeContent
-            readonly property var mixes: app.api.home.filter(s => s.mix)
+            readonly property var mixes: sc.homeShelves.filter(s => s.mix)
             WavePanel {
                 width: parent.width
                 backend: sc
@@ -1400,7 +1400,7 @@ Window {
                 id: homeShelves
                 model: shelves.length
                 readonly property var shelves: {
-                    const shelves = app.api.home
+                    const shelves = sc.homeShelves
                     const artists = new Set()
                     const seeds = []
                     for (const shelf of shelves) for (const track of shelf.tracks) {
@@ -1471,7 +1471,7 @@ Window {
             }
             BusyIndicator { visible: app.api.homeBusy; running: visible; width: 32; height: 32 }
             Txt { visible: !!app.api.homeError; width: parent.width; text: app.api.homeError; color: app.muted; wrapMode: Text.WordWrap }
-            Txt { visible: !app.api.homeBusy && !app.api.homeError && !app.api.home.length; width: parent.width; text: "Добавьте любимые треки или подпишитесь на исполнителей, чтобы здесь появились подборки."; wrapMode: Text.WordWrap }
+            Txt { visible: !app.api.homeBusy && !app.api.homeError && !sc.homeShelves.length; width: parent.width; text: "Добавьте любимые треки или подпишитесь на исполнителей, чтобы здесь появились подборки."; wrapMode: Text.WordWrap }
             Tool { text: "Обновить главную"; enabled: !app.api.homeBusy; onClicked: sc.loadHome(true) }
         }
     }
@@ -1480,7 +1480,7 @@ Window {
         Column {
             spacing: 6
             Repeater {
-                model: app.api.tracks
+                model: sc.collectionTracks
                 delegate: AbstractButton {
                     InteractionFeedback {}
                     id: person
@@ -1663,8 +1663,29 @@ Window {
                     Artwork { radius: app.artworkRadius; width: 40; height: 40; source: app.cover(row.modelData); TapHandler { onTapped: app.openTrack(row.modelData) } }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
-                        Txt { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; font.pixelSize: 12; font.weight: row.currentTrack ? Font.DemiBold : Font.Medium; TapHandler { onTapped: app.openTrack(row.modelData) } }
-                        Txt { Layout.fillWidth: true; text: sc.displayArtist(row.modelData) || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 6
+                            Txt { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; font.pixelSize: 12; font.weight: row.currentTrack ? Font.DemiBold : Font.Medium; TapHandler { onTapped: app.openTrack(row.modelData) } }
+                            AbstractButton {
+                                visible: row.modelData.access === "preview"
+                                Layout.preferredWidth: 18; Layout.preferredHeight: 18
+                                hoverEnabled: true; focusPolicy: Qt.StrongFocus
+                                Accessible.name: "Только фрагмент; полная версия может требовать Go+"
+                                ToolTip.text: Accessible.name
+                                ToolTip.visible: hovered || down || visualFocus
+                                ToolTip.delay: 250
+                                contentItem: Item {
+                                    Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: app.accent }
+                                }
+                                background: Rectangle {
+                                    radius: width / 2
+                                    color: Qt.alpha(app.accent, parent.down ? 0.20 : parent.hovered ? 0.14 : 0.07)
+                                    border.width: 1
+                                    border.color: Qt.alpha(app.accent, parent.visualFocus ? 0.75 : parent.hovered ? 0.32 : 0.16)
+                                }
+                            }
+                        }
+                        Txt { Layout.fillWidth: true; text: (sc.displayArtist(row.modelData) || "SoundCloud") + (sc.trackAvailability(row.modelData) ? " · " + sc.trackAvailability(row.modelData) : ""); color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
                     }
                     LikeButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); track: row.modelData }
                     Tool { visible: (row.modelData.urn || "").indexOf("soundcloud:tracks:") === 0; symbol: "menu"; text: "Действия с треком"; onClicked: app.openTrackActions(row.modelData) }
@@ -1824,10 +1845,10 @@ Window {
         padding: 12
         contentItem: ColumnLayout {
             spacing: 2
-            TrackAction { symbol: "plus"; text: "Сохранить как плейлист"; enabled: sc.signedIn && app.api.queue.length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
+            TrackAction { symbol: "plus"; text: "Сохранить как плейлист"; enabled: sc.signedIn && sc.queueTracks.length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
             TrackAction { text: "Отменить изменение очереди"; enabled: !!app.api.queueUndoAvailable; onClicked: { sc.undoQueueEdit(); queueOptions.close() } }
-                TrackAction { symbol: "list"; text: "Убрать повторы"; enabled: { const queue = app.api.queue; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
-            TrackAction { symbol: "close"; text: "Очистить после текущего"; enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < app.api.queue.length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
+                TrackAction { symbol: "list"; text: "Убрать повторы"; enabled: { const queue = sc.queueTracks; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
+            TrackAction { symbol: "close"; text: "Очистить после текущего"; enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < sc.queueTracks.length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
         }
     }
     component Sheet: Popup {
@@ -2089,8 +2110,8 @@ Window {
 Здесь появятся обложка и очередь."; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; color: app.muted; font.pixelSize: 12; lineHeight: 1.4 }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: (app.dark ? "#323232" : "#eaeaec") }
-        RowLayout { Layout.fillWidth: true; Txt { text: "Очередь"; font.weight: Font.DemiBold; Layout.fillWidth: true } Txt { text: app.api.queue.length; color: app.muted; font.pixelSize: 11 } Tool { symbol: "menu"; text: "Действия с очередью"; implicitHeight: 44; implicitWidth: 44; onClicked: queueOptions.open() } }
-        Txt { visible: app.api.queue.length === 0; text: "Добавляйте треки кнопкой +"; color: app.muted; font.pixelSize: 12 }
+        RowLayout { Layout.fillWidth: true; Txt { text: "Очередь"; font.weight: Font.DemiBold; Layout.fillWidth: true } Txt { text: sc.queueTracks.length; color: app.muted; font.pixelSize: 11 } Tool { symbol: "menu"; text: "Действия с очередью"; implicitHeight: 44; implicitWidth: 44; onClicked: queueOptions.open() } }
+        Txt { visible: sc.queueTracks.length === 0; text: "Добавляйте треки кнопкой +"; color: app.muted; font.pixelSize: 12 }
         ListView {
             id: queueList
             objectName: "queueListView"
@@ -2101,13 +2122,13 @@ Window {
             property var dragTrack: ({})
             onDragFromChanged: dragTo = dragFrom
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 64
-            clip: true; model: app.api.queue.length; spacing: 4
+            clip: true; model: sc.queueTracks.length; spacing: 4
             currentIndex: app.api.queueIndex || 0
             onCurrentIndexChanged: { if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain) }
             delegate: Rectangle {
                 id: queuedTrack
                 required property int index
-                readonly property var modelData: app.api.queue[index] || ({})
+                readonly property var modelData: sc.queueTracks[index] || ({})
                 width: Math.max(0, queueList.width - queueBar.implicitWidth - 4); height: 52; radius: 6
                 color: index === app.api.queueIndex ? app.raised : queueHover.hovered ? app.panel : "transparent"
 

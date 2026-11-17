@@ -10,7 +10,7 @@ ColumnLayout {
     property bool mobile: false
     property bool showEntry: true
     property int serial: 0
-    readonly property bool writeBusy: !!backend.catalogState.savingTrack || !!backend.catalogState.queuePlaylistBusy || !!backend.catalogState.playlistEditBusy
+    readonly property bool writeBusy: !!backend.uiState.savingTrack || !!backend.uiState.queuePlaylistBusy || !!backend.uiState.playlistEditBusy
     spacing: 4
     implicitHeight: controls.implicitHeight + (status.visible ? status.implicitHeight + spacing : 0)
     function back() {
@@ -71,12 +71,12 @@ ColumnLayout {
             Label { text: "Добавить в плейлист"; color: bar.host.ink; font.pixelSize: 18 }
             ListView {
                 Layout.fillWidth: true; Layout.preferredHeight: Math.min(220, count * (bar.mobile ? 48 : 40)); clip: true
-                model: bar.backend.catalogState.destinations || []
+                model: bar.backend.uiState.destinations || []
                 delegate: SurfaceButton { required property var modelData; width: ListView.view.width; host: bar.host; mobile: bar.mobile; text: modelData.title; enabled: !bar.selection.busy && !bar.writeBusy; onClicked: picker.save(modelData.urn, "") }
             }
-            SurfaceButton { host: bar.host; mobile: bar.mobile; visible: !!bar.backend.catalogState.destinationNext; text: "Ещё плейлисты"; enabled: !bar.backend.catalogState.loadingDestinations; onClicked: bar.backend.listDestinations(bar.backend.catalogState.destinationNext) }
+            SurfaceButton { host: bar.host; mobile: bar.mobile; visible: !!bar.backend.uiState.destinationNext; text: "Ещё плейлисты"; enabled: !bar.backend.uiState.loadingDestinations; onClicked: bar.backend.listDestinations(bar.backend.uiState.destinationNext) }
             TextField { id: title; Layout.fillWidth: true; maximumLength: 255; placeholderText: "Название нового плейлиста"; Accessible.name: placeholderText; color: bar.host.ink; background: Rectangle { color: bar.host.raised; radius: 8 } enabled: !bar.selection.busy }
-            Label { Layout.fillWidth: true; text: bar.selection.message || bar.backend.catalogState.error || ""; visible: !!text; color: bar.host.muted; wrapMode: Text.Wrap; textFormat: Text.PlainText }
+            Label { Layout.fillWidth: true; text: bar.selection.message || bar.backend.uiState.error || ""; visible: !!text; color: bar.host.muted; wrapMode: Text.Wrap; textFormat: Text.PlainText }
             SurfaceButton { host: bar.host; mobile: bar.mobile; text: bar.selection.busy ? "Сохранение…" : "Создать и добавить"; enabled: !!title.text.trim() && !bar.selection.busy && !bar.writeBusy; onClicked: picker.save("", title.text) }
             SurfaceButton { host: bar.host; mobile: bar.mobile; text: "Закрыть"; enabled: !bar.selection.busy; onClicked: picker.close() }
         }

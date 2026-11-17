@@ -10,7 +10,7 @@ SurfaceButton {
     readonly property string itemUrn: item?.urn || ""
     readonly property bool track: itemUrn.startsWith("soundcloud:tracks:")
     readonly property string kind: repost ? (track ? "trackReposts" : "playlistReposts") : track ? "trackLikes" : itemUrn.startsWith("soundcloud:system-playlists:") ? "stationLikes" : "playlistLikes"
-    readonly property var api: backend.catalogState
+    readonly property var api: backend.uiState
     readonly property bool ready: track && !repost || !!api.engagementReady?.[kind]
     readonly property bool loading: !!api.engagementLoading?.[kind]
     readonly property bool pending: track && !repost ? !!api.likePending?.[itemUrn] : !!api.engagementPending?.[kind + ":" + itemUrn]

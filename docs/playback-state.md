@@ -126,3 +126,43 @@ Plugin `player.next` and `player.previous` use `canGoNext()` and
 its existing empty-string success and localized error contract. Queue repeat,
 shuffle exhaustion, forward/backward history, wave refill and restarting the
 current track therefore follow the same availability rules as system media.
+
+## Opt-in responsiveness diagnostics
+
+Launch with `SCRIP_PERF=1` to print aggregate timing to stderr every five seconds.
+`ui_max_ms` measures the longest interval of a precise 16 ms GUI timer;
+`ui_slow` counts intervals over 32 ms. `frames` counts frame swaps, while
+`frame_max_ms` and `frame_gaps` summarize intervals below 250 ms, with gaps over
+25 ms counted separately. An idle window does not continuously render, so frame
+counts and gaps alone are not an FPS benchmark; compare during the same ongoing
+interaction. The report includes the current screen refresh rate and Qt graphics
+API enum. No account, track, URL, or input contents are logged. Diagnostics are
+disabled by default. Store diagnostic output outside the repository.
+
+## Avoiding UI work on unrelated player changes
+
+Collection, playlist, queue, and home data expose independent QML properties and
+notify only when their own contents change. Collection filtering and home shelf
+models consume these properties rather than the broad catalog map. Volume uses
+`volumeLevel` / `volumeChanged`; it retains legacy `state` notifications and MPRIS
+updates without invalidating the catalog or sending redundant plugin snapshots.
+
+Frequent position checkpoints use a small atomic `playback-progress.json` in the
+application configuration directory, separately from queue and wave snapshots.
+The file contains at most the current, library-wave, and discovery-wave checkpoint
+records (account, track, position). Reads are bounded to 4 KiB. Wave resume applies
+a checkpoint only when account and track match the saved queue row. Existing
+`playback/position` settings remain a fallback for installations without the new
+checkpoint. Sign-out and successful account replacement remove checkpoints.
+The timer no longer parses and rewrites a complete wave snapshot every second.
+
+`independentPlaybackAndCollectionNotifications` guards notification isolation;
+`checkpointDoesNotRewriteLargeWaveSnapshot` verifies that frequent checkpoints
+leave large settings untouched. Existing playback restoration tests verify that
+position updates survive separately from queue snapshots.
+
+Built-in QML consumes `uiState`, a lightweight map without the four large list
+fields. The legacy `state` and `catalogState` maps remain available unchanged.
+Volume preferences are persisted after 250 ms without further movement (and
+flushed on controller destruction), so dragging applies audio changes immediately
+without synchronously rewriting preferences at every pointer update.

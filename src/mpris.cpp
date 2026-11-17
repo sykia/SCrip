@@ -102,6 +102,7 @@ DesktopMedia::DesktopMedia(SoundCloud *controller, QWindow *window, QObject *par
         QTimer::singleShot(0, this, [this, pending] { *pending = false; emit updated(); });
     });
     connect(controller, &SoundCloud::progressChanged, this, &DesktopMedia::updated);
+    connect(controller, &SoundCloud::volumeChanged, this, &DesktopMedia::updated);
     connect(controller, &SoundCloud::playbackSeeked, this, [this] { emit seeked(m_controller->position() * 1000); });
 }
 void DesktopMedia::initializePlatform() {
