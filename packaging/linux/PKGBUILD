@@ -9,7 +9,7 @@ url='https://github.com/sykia/SCrip'
 depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
 makedepends=('cmake' 'ninja')
 source=("$url/releases/download/v$pkgver/Sange-$pkgver-source.tar.gz")
-sha256sums=('577f5619f0667a17c2f2b1379888fa2804a96413f8eaeafcbbaa23c87adf8ea4')
+sha256sums=('a5a1614a4099ea47c1f63cfee350544dc989c8dec444af7bc2d31dc6c4bef41a')
 build() {
     cmake -S "Sange-$pkgver" -B build -G Ninja -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     cmake --build build --parallel 2

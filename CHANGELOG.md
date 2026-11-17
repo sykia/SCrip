@@ -2,6 +2,8 @@
 
 ## 2.0.0 — Sange
 
+- Android package update: hide collection tools on profiles and load Home recommendations when the account profile becomes ready.
+
 - Rename the application while preserving package IDs, settings, secure-storage keys and link handlers for in-place upgrades.
 - Retry denied or failed SoundCloud sign-in in the same browser tab with fresh PKCE and state.
 - Clear the busy state after denied authorization and invalidate retry links after use, cancellation or timeout.
