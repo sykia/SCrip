@@ -36,10 +36,10 @@ TestCase {
         Rectangle {
             color: mockHost.panel
             height: panel.implicitHeight
-            property alias selection: panel.selection
-            property alias mobile: panel.mobile
+            required property var selection
+            property bool mobile: false
             function back() { return panel.back() }
-            Scrip.SelectionBar { id: panel; width: parent.width; host: mockHost; backend: mockBackend }
+            Scrip.SelectionBar { id: panel; width: parent.width; host: mockHost; backend: mockBackend; selection: parent.selection; mobile: parent.mobile }
         }
     }
     Component {

@@ -25,10 +25,12 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             cmake ninja-build pkg-config libsecret-1-dev libgl1-mesa-dev ffmpeg dbus-daemon
 
-      - name: Install Qt 6.8
+      - name: Install Qt 6.10
         uses: jurplel/install-qt-action@v4
         with:
-          version: 6.8.3
+          # Qt 6.8.3 bundles FFmpeg 7.1, which fails the fMP4 HLS seek regression.
+          # Keep decoded-audio checks enabled with a corrected FFmpeg runtime.
+          version: 6.10.3
           host: linux
           target: desktop
           arch: linux_gcc_64
