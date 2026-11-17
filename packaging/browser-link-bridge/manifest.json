@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SCrip · SoundCloud links",
-  "version": "1.0.0",
-  "description": "Open SoundCloud links in the SCrip desktop application.",
+  "name": "Sange · SoundCloud links",
+  "version": "2.0.0",
+  "description": "Open SoundCloud links in the Sange desktop application.",
   "permissions": ["activeTab"],
   "content_scripts": [{
     "matches": ["http://*/*", "https://*/*"],
@@ -11,7 +11,7 @@
     "all_frames": false
   }],
   "action": {
-    "default_title": "Открыть в SCrip",
+    "default_title": "Открыть в Sange",
     "default_popup": "popup.html"
   },
   "browser_specific_settings": {
