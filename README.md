@@ -7,15 +7,15 @@
 <p align="center">Your SoundCloud music, in a dedicated player for Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
 
 <p align="center">
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.1/SCrip-1.6.1-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.1/SCrip-1.6.1-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.1/scrip-1.6.1-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v1.6.0/SCrip-1.6.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/Sange-2.0.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/Sange-2.0.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/scrip-2.0.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
+  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/Sange-2.0.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
 </p>
 
 <p align="center">
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="https://github.com/sykia/SCrip/releases/tag/v1.6.1">Release files &amp; SHA-256</a> ·
+  <a href="https://github.com/sykia/SCrip/releases/tag/v2.0.0">Release files &amp; SHA-256</a> ·
   <a href="docs/plugins.md">Plugins</a>
 </p>
 
@@ -25,7 +25,7 @@ Install the package for your platform and sign in through the official SoundClou
 
 Version **2.0.0** renames SCrip to **Sange**. Install over the existing application to preserve sign-in, settings, plugins and playback data. The package and storage identities remain compatible with SCrip. Android updates require the same signing certificate as the installed release.
 
-The download links above refer to the last published packages until the 2.0.0 release artifacts are validated. See [2.0.0 release notes](release-notes/2.0.0.md).
+See the [2.0.0 release notes](release-notes/2.0.0.md) for sign-in recovery and upgrade details.
 
 ## Find your next favorite
 
