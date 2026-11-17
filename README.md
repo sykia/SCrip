@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/logo.svg" width="112" height="112" alt="Sendzh logo">
+  <img src="docs/logo.svg" width="112" height="112" alt="Sange logo">
 </p>
 
-<h1 align="center">Сендж · Sendzh</h1>
+<h1 align="center">Sange</h1>
 
 <p align="center">Your SoundCloud music, in a dedicated player for Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
 
@@ -21,9 +21,9 @@
 
 ## Get started
 
-Install the package for your platform and sign in through the official SoundCloud page in your browser. Sendzh uses the official SoundCloud API.
+Install the package for your platform and sign in through the official SoundCloud page in your browser. Sange uses the official SoundCloud API.
 
-Version **2.0.0** renames SCrip to **Sendzh (Сендж)**. Install over the existing application to preserve sign-in, settings, plugins and playback data. The package and storage identities remain compatible with SCrip. Android updates require the same signing certificate as the installed release.
+Version **2.0.0** renames SCrip to **Sange**. Install over the existing application to preserve sign-in, settings, plugins and playback data. The package and storage identities remain compatible with SCrip. Android updates require the same signing certificate as the installed release.
 
 The download links above refer to the last published packages until the 2.0.0 release artifacts are validated. See [2.0.0 release notes](release-notes/2.0.0.md).
 
@@ -31,33 +31,33 @@ The download links above refer to the last published packages until the 2.0.0 re
 
 Start a personal mix from Home, browse its track list and save a discovery to your likes or a playlist. Open an artist station to explore related music, or catch up with new releases.
 
-![Sendzh Home with personal mixes and track lists](docs/screenshots/home.png)
+![Sange Home with personal mixes and track lists](docs/screenshots/home.png)
 
 ## Make the queue your own
 
-Browse your favorites by artwork and open an artist's profile from their name. Drag tracks into order or choose **Play next**. On desktop, minimize Sendzh to the system tray to control playback and like tracks from the icon menu.
+Browse your favorites by artwork and open an artist's profile from their name. Drag tracks into order or choose **Play next**. On desktop, minimize Sange to the system tray to control playback and like tracks from the icon menu.
 
-![Sendzh library with favorite tracks](docs/screenshots/library.png)
+![Sange library with favorite tracks](docs/screenshots/library.png)
 
 Queue menu actions: save the full queue as a playlist, remove duplicates, or clear
 entries after the current track, with undo from the same menu. See [queue actions](docs/queue-actions.md).
 
 ## Share what you are listening to
 
-Desktop settings include optional [Discord Rich Presence](docs/discord-presence.md): clickable track title, artist, cover, elapsed / total track progress, a Sendzh badge, and buttons to open the track or download Sendzh on GitHub. It requires the Discord desktop client; the shared project Application ID is already configured.
+Desktop settings include optional [Discord Rich Presence](docs/discord-presence.md): clickable track title, artist, cover, elapsed / total track progress, a Sange badge, and buttons to open the track or download Sange on GitHub. It requires the Discord desktop client; the shared project Application ID is already configured.
 
 ## Take your music with you
 
 Android includes a dedicated touch interface, a full-screen player, background playback and system media controls.
 
 <p align="center">
-  <img src="docs/screenshots/android-home-frame.svg" width="32%" alt="Sendzh Home on Android">
-  <img src="docs/screenshots/android-player-frame.svg" width="32%" alt="Sendzh player on Android">
+  <img src="docs/screenshots/android-home-frame.svg" width="32%" alt="Sange Home on Android">
+  <img src="docs/screenshots/android-player-frame.svg" width="32%" alt="Sange player on Android">
 </p>
 
 ## Build from source
 
-Sendzh uses **C++20, Qt Quick and CMake**. For a desktop build, install CMake 3.21+, Ninja, a C++20 compiler and Qt 6.5+ with Quick, Network, Multimedia, Widgets, Test and QuickTest. Linux also requires pkg-config and libsecret development files (`libsecret-1-dev` on Debian/Ubuntu or `libsecret` on Arch), plus a running, unlocked Secret Service for sign-in.
+Sange uses **C++20, Qt Quick and CMake**. For a desktop build, install CMake 3.21+, Ninja, a C++20 compiler and Qt 6.5+ with Quick, Network, Multimedia, Widgets, Test and QuickTest. Linux also requires pkg-config and libsecret development files (`libsecret-1-dev` on Debian/Ubuntu or `libsecret` on Arch), plus a running, unlocked Secret Service for sign-in.
 
 ```sh
 cmake --preset debug
@@ -73,7 +73,7 @@ See [public profile collections and artist credits](docs/public-collections-and-
 
 ## License
 
-Sendzh is independent software and is not an official SoundCloud product.
+Sange is independent software and is not an official SoundCloud product.
 
 Copyright (c) 2026 sykia. The source code is licensed under **GNU GPL v3.0 only (GPL-3.0-only)**. You may use, study, modify and redistribute it under the terms of [LICENSE](LICENSE).
 

@@ -459,7 +459,7 @@ QString Plugins::reason(const QString &id, QSet<QString> &visiting) const {
         if (!row["grants"].toList().contains(perm))
             return "Требуется разрешение: " + perm;
     if (!PluginManifest::compatible(p["requiresHost"].toObject(), hostVersion()))
-        return "Требуется Сендж ≥ " + p["requiresHost"].toObject()["min"].toString() + " и < " +
+        return "Требуется Sange ≥ " + p["requiresHost"].toObject()["min"].toString() + " и < " +
                p["requiresHost"].toObject()["maxExclusive"].toString() + "; установлен " + hostVersion();
     if (visiting.contains(id))
         return "Цикл зависимостей.";

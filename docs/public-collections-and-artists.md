@@ -53,6 +53,6 @@ Tests cover all routes, pagination/retry, quota scheduling, stale responses,
 account changes, error/empty/unavailable states, personal-state isolation, artist
 fallback/validation, legacy queue objects, live credit updates, lyric parameters
 and Discord payloads. Offscreen desktop and Android QML tests save screenshots
-under `build/debug/`; these test harnesses do not launch the Sendzh executable.
+under `build/debug/`; these test harnesses do not launch the Sange executable.
 Native Android media/JNI behavior and Windows integration require their respective
 platforms.

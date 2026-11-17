@@ -1,6 +1,6 @@
 # Plugin API v2: usage and implementation contract
 
-Sendzh accepts API 2 declarative JSON plugins and [trusted executable QML plugins](plugin-runtime.md). This reference describes declarative capabilities; `kind: "qml"`, `code.execute` and `runtime` contributions are specified in the runtime SDK document. Unknown executable runtime kinds are rejected with `unsupported-runtime`.
+Sange accepts API 2 declarative JSON plugins and [trusted executable QML plugins](plugin-runtime.md). This reference describes declarative capabilities; `kind: "qml"`, `code.execute` and `runtime` contributions are specified in the runtime SDK document. Unknown executable runtime kinds are rejected with `unsupported-runtime`.
 
 ## Installation and management
 
@@ -30,7 +30,7 @@ Timers are one-shot and do not survive disabling, logout or restart. They use th
 
 See the JSON examples. Required fields: `api=2`, `kind=declarative` (or `qml` for the trusted runtime), `id`, `name`, `version`, `requiresHost`, `permissions`, `settings`, `contributions`, `rules`. `description` and `dependencies` are optional. Unknown fields, duplicate keys, invalid types, commands/references and exceeded limits are rejected before installation. UTF-8, up to 128 KiB, depth ≤16. Declarative text is PlainText; paths, arbitrary URLs, eval, HTML and resources are unavailable to declarative contributions. QML source is executable code under the separate full-access contract. ID: `[a-z][a-z0-9.-]{0,47}`. Name: ≤48 printable characters; description: ≤1000.
 
-Versions are exactly `major.minor.patch`, with numbers 0–65535 and no leading zeros or suffixes. `requiresHost={min,maxExclusive}` requires both bounds. API compatibility is checked separately; a matching Sendzh version does not add support for a new API. `dependencies` allows up to eight `{id,min,maxExclusive}` entries, v2 only; cycles are forbidden. A missing dependency or incompatible host blocks the whole package.
+Versions are exactly `major.minor.patch`, with numbers 0–65535 and no leading zeros or suffixes. `requiresHost={min,maxExclusive}` requires both bounds. API compatibility is checked separately; a matching Sange version does not add support for a new API. `dependencies` allows up to eight `{id,min,maxExclusive}` entries, v2 only; cycles are forbidden. A missing dependency or incompatible host blocks the whole package.
 
 `permissions` is a unique set drawn from `ui.panels`, `ui.theme`, `player.observe`, `player.control`, `navigation`, `storage`, `timers`. All declared permissions are required for activation. `player.observe` exposes track titles/artists and playback state, which are personal data. Tokens, profiles, stream URLs, networking and arbitrary files are unavailable. Dependency permissions are not inherited.
 
@@ -72,7 +72,7 @@ Rule commands undergo the same permission, activity and availability checks. A b
 
 `storage` is private key/value JSON: up to 128 keys and 256 KiB including `orphanSettings`, depth ≤8. Values are literal, with no player-data substitution; this is not a programmable database. The manager displays data and allows clearing it. Over-quota writes are rejected without changing old data. Basic user settings do not require storage permission.
 
-New commands and panel items are recognized only by compatible Sendzh releases after an update. `requiresHost` does not automatically add support to older hosts: specify the host version range actually tested.
+New commands and panel items are recognized only by compatible Sange releases after an update. `requiresHost` does not automatically add support to older hosts: specify the host version range actually tested.
 
 When releasing a build with new commands, increase the app version beyond the last published release and set `requiresHost.min` to at least that new version. Plugins using commands added after 1.4.2 must require at least `1.5.0`. The manifest currently has no separate Plugin API implementation version.
 

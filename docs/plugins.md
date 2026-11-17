@@ -1,6 +1,6 @@
-# Sendzh plugins
+# Sange plugins
 
-Sendzh supports declarative JSON plugins and trusted executable QML/JavaScript plugins. Declarative plugins use the fixed panel/command API. Executable plugins use the [trusted QML SDK](plugin-runtime.md) to introduce custom interfaces, effects and behavior with full application access.
+Sange supports declarative JSON plugins and trusted executable QML/JavaScript plugins. Declarative plugins use the fixed panel/command API. Executable plugins use the [trusted QML SDK](plugin-runtime.md) to introduce custom interfaces, effects and behavior with full application access.
 
 To install a plugin, select its JSON file in **Plugins**, review the requested permissions and confirm installation. New plugins are disabled by default. Settings and individual permissions can be changed in the plugin card. Appearance contributions are applied in installation order, and independent contributions can be toggled separately.
 

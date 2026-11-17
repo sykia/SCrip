@@ -20,7 +20,7 @@ public final class MediaBridge {
     private static boolean restorePending;
     static volatile boolean preparing;
     static volatile long prepareStartedAt;
-    static String title = "Сендж", artist = "Включи музыку в приложении", artwork = "";
+    static String title = "Sange", artist = "Включи музыку в приложении", artwork = "";
     static boolean playing, active, buffering, hasTrack, liked, seekable;
     static long position, duration, positionUpdatedAt;
     static Bitmap cover;
@@ -86,7 +86,7 @@ public final class MediaBridge {
                 boolean artworkChanged = !nextArtwork.equals(artwork);
                 boolean playbackEnded = hasTrack && playing && (!nextHasTrack || !nextPlaying);
                 if (playbackEnded) save(true);
-                title = nextTitle.isEmpty() ? "Сендж" : nextTitle; artist = nextArtist;
+                title = nextTitle.isEmpty() ? "Sange" : nextTitle; artist = nextArtist;
                 playing = nextPlaying; buffering = nextBuffering; active = nextActive; hasTrack = nextHasTrack; liked = nextLiked;
                 position = nextPosition; duration = nextDuration;
                 positionUpdatedAt = SystemClock.elapsedRealtime();
@@ -157,21 +157,21 @@ public final class MediaBridge {
         ctx.getSharedPreferences("music_widget", Context.MODE_PRIVATE).edit().remove("restore_track").remove("restore_position")
             .remove("title").remove("artist").remove("artwork").remove("position").remove("duration").apply();
         currentUrn = currentArtworkUrl = ""; hasTrack = playing = active = buffering = false;
-        title = "Сендж"; artist = "Включи музыку в приложении"; artwork = ""; position = duration = 0;
+        title = "Sange"; artist = "Включи музыку в приложении"; artwork = ""; position = duration = 0;
         savedKey = ""; savedPosition = -15000;
     }
     static void restore(Context ctx) {
         if (context == null) context = ctx.getApplicationContext();
         if (ready) return;
         android.content.SharedPreferences p = context.getSharedPreferences("music_widget", Context.MODE_PRIVATE);
-        title = p.getString("title", "Сендж"); artist = p.getString("artist", "Включи музыку в приложении");
+        title = p.getString("title", "Sange"); artist = p.getString("artist", "Включи музыку в приложении");
         currentUrn = "";
         JSONObject savedTrack = readSavedTrack(context);
         if (savedTrack != null) {
             JSONObject track = savedTrack.optJSONObject("track");
             if (track != null) { currentUrn = track.optString("urn"); currentArtworkUrl = track.optString("artwork_url"); }
         }
-        hasTrack = !title.isEmpty() && !title.equals("Сендж");
+        hasTrack = !title.isEmpty() && !title.equals("Sange");
         artwork = p.getString("artwork", "");
         if (!artwork.isEmpty()) {
             final String key = artwork;

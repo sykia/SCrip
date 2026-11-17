@@ -109,7 +109,7 @@ if(ANDROID)
         message(FATAL_ERROR "Сначала выполните scripts/build_android_ffmpeg.sh ${CMAKE_ANDROID_ARCH_ABI}")
     endif()
     set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${scrip_avformat}")
-    set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME "Сендж"
+    set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME "Sange"
         QT_ANDROID_VERSION_CODE 20000 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28

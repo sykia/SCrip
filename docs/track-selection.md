@@ -54,4 +54,4 @@ completions and selection bar geometry at phone and desktop widths. C++ tests co
 ordered atomic queue insertion, playlist batch serialization, size limits, shared
 write exclusion, error responses and old-account completions. Existing playlist
 snapshot tests exercise owner, completeness and conflict rejection through the
-shared write path. Offscreen tests exercise UI components without launching Sendzh.
+shared write path. Offscreen tests exercise UI components without launching Sange.

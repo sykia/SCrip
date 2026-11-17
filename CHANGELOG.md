@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 — Sendzh (Сендж)
+## 2.0.0 — Sange
 
 - Rename the application while preserving package IDs, settings, secure-storage keys and link handlers for in-place upgrades.
 - Retry denied or failed SoundCloud sign-in in the same browser tab with fresh PKCE and state.

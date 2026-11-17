@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Qsae");
     // Keep the storage identity for upgrades from SCrip.
     QCoreApplication::setApplicationName("SCrip");
-    QGuiApplication::setApplicationDisplayName(QStringLiteral("Сендж"));
+    QGuiApplication::setApplicationDisplayName(QStringLiteral("Sange"));
     QCoreApplication::setApplicationVersion(SCRIP_VERSION);
     QString incomingLink;
     for (const auto &argument : app.arguments().mid(1)) {
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
         window->raise();
         window->requestActivate();
     };
-    menu.addAction("Открыть Сендж", restore);
+    menu.addAction("Открыть Sange", restore);
     menu.addSeparator();
     auto *play = menu.addAction("Воспроизвести", &soundcloud, &SoundCloud::togglePlayback);
     auto *previous = menu.addAction("Предыдущий трек", &soundcloud, &SoundCloud::previous);
@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) restore();
     });
     tray.setContextMenu(&menu);
-    tray.setToolTip("Сендж");
+    tray.setToolTip("Sange");
     tray.show();
     window->installEventFilter(&filter);
 #endif

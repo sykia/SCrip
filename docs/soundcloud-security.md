@@ -2,7 +2,7 @@
 
 ## Personal local mode
 
-With `SCRIP_AUTH_MODE=local`, Sendzh calls the official SoundCloud API directly. This mode is for the owner of a registered application using their own keys on their own computer. Secrets are not embedded in source code, QML or the executable.
+With `SCRIP_AUTH_MODE=local`, Sange calls the official SoundCloud API directly. This mode is for the owner of a registered application using their own keys on their own computer. Secrets are not embedded in source code, QML or the executable.
 
 OAuth access/refresh tokens, expiry time and the local Client Secret are stored only through the internal `SecretStore`, which is inaccessible to QML and the Plugin API:
 
@@ -10,7 +10,7 @@ OAuth access/refresh tokens, expiry time and the local Client Secret are stored 
 - **Linux:** Secret Service through system libsecret (`libsecret-1` dependency). Building requires pkg-config and libsecret headers (Debian/Ubuntu: `libsecret-1-dev`; Arch: `libsecret`). A running, unlocked service such as GNOME Keyring or compatible KWallet is required. Each operation has a 10-second timeout with GCancellable cancellation. On-disk and backup keyring encryption depends on system service settings: use a password-protected keyring.
 - **Android (API 28+):** AES-256-GCM with a new random IV for every write; the key is created in Android Keystore and is non-exportable. The entry name is included in AAD. Encrypted files are saved atomically in private `noBackupFilesDir/oauth`. Hardware-backed key protection depends on the device; StrongBox is not required.
 
-On first launch, old `GenericConfigLocation/SCrip/soundcloud.json` and `session.json` files are migrated in full, including an existing session. On Android this is private `files/settings/SCrip`; on Linux, usually `~/.config/SCrip`. Each entry is removed from its old location only after a successful write and read-back verification. If interrupted after writing, the system copy takes precedence and the next launch finishes deleting the old one. Corrupt JSON and symbolic links are not migrated. Read, write, verification or deletion failures are shown without system details or secret values. There is no plaintext JSON fallback. Incomplete migration may leave old files on disk: exclude them from archives. Restart Sendzh after unlocking storage.
+On first launch, old `GenericConfigLocation/SCrip/soundcloud.json` and `session.json` files are migrated in full, including an existing session. On Android this is private `files/settings/SCrip`; on Linux, usually `~/.config/SCrip`. Each entry is removed from its old location only after a successful write and read-back verification. If interrupted after writing, the system copy takes precedence and the next launch finishes deleting the old one. Corrupt JSON and symbolic links are not migrated. Read, write, verification or deletion failures are shown without system details or secret values. There is no plaintext JSON fallback. Incomplete migration may leave old files on disk: exclude them from archives. Restart Sange after unlocking storage.
 
 Refreshed OAuth tokens must be confirmed by storage before API requests continue. Save failures stop authorization with a message; the new session is not reported as saved. If the server has already rotated the refresh token but saving fails, signing in again may be necessary after restart. Transactions across the OAuth server and local storage cannot be atomic.
 
@@ -59,9 +59,9 @@ Source and configuration are in `worker/`. To redeploy, run `npx wrangler@4 depl
 
 `tests/run-secretstore-linux.sh` checks real libsecret in an isolated D-Bus session and GNOME Keyring, plus failure when the service is unavailable. Requires `dbus-run-session` and `gnome-keyring-daemon`. The user's keyring is untouched. `secretstore_tests roundTrip` can also be run manually on Windows.
 
-`tests/run-secretstore-android.sh` runs `tests/android/SecretVaultCheck.java` instrumentation in a separate test app/UID: write/read, distinct IVs, no plaintext secrets in files, rejection of ciphertext tampering or key loss, deletion and path traversal prevention. It does not use installed Sendzh data.
+`tests/run-secretstore-android.sh` runs `tests/android/SecretVaultCheck.java` instrumentation in a separate test app/UID: write/read, distinct IVs, no plaintext secrets in files, rejection of ciphertext tampering or key loss, deletion and path traversal prevention. It does not use installed Sange data.
 
-For Android, set `ANDROID_HOME`, `JAVA_HOME` and, if necessary, `GRADLE_USER_HOME` and `SCRIP_GRADLE` (path to an existing Gradle/gradlew). Start a test emulator and run `tests/run-secretstore-android.sh`. The test APK builds offline from the existing cache. It is a separate `org.scrip.vaulttest` app, not Sendzh.
+For Android, set `ANDROID_HOME`, `JAVA_HOME` and, if necessary, `GRADLE_USER_HOME` and `SCRIP_GRADLE` (path to an existing Gradle/gradlew). Start a test emulator and run `tests/run-secretstore-android.sh`. The test APK builds offline from the existing cache. It is a separate `org.scrip.vaulttest` app, not Sange.
 
 ## Local sign-out and remote revocation
 
@@ -76,4 +76,4 @@ error handling, including quarantine of stored authentication where possible.
 
 ## Browser retry and upgrade identity
 
-Sendzh 2.0.0 retains the SCrip settings name and secure-storage identifiers. Renaming the display name does not move or export credentials. Failed or denied authorization offers a one-use, random retry capability on the loopback callback page. It redirects the current tab to a fresh PKCE authorization; invalid state cannot obtain a retry capability. Canceling or timing out closes the listener.
+Sange 2.0.0 retains the SCrip settings name and secure-storage identifiers. Renaming the display name does not move or export credentials. Failed or denied authorization offers a one-use, random retry capability on the loopback callback page. It redirects the current tab to a fresh PKCE authorization; invalid state cannot obtain a retry capability. Canceling or timing out closes the listener.

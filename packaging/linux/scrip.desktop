@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Сендж
+Name=Sange
 Comment=Музыка из SoundCloud
 Exec=scrip %u
 Icon=scrip

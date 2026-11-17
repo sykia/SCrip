@@ -1,4 +1,4 @@
-# Sendzh appearance system
+# Sange appearance system
 
 The desktop interface uses opaque theme-colored capsules with rounded corners.
 Navigation, content panels, settings groups, player controls, queue and plugin

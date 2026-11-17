@@ -106,10 +106,10 @@ QByteArray callbackPage(bool valid, bool receivedCode, const QString &retryToken
     html.replace("RETRY_ACTION", retryToken.isEmpty() ? QByteArray{} :
         ("<p class=retry><a href='/retry?token=" + retryToken.toUtf8() + "'>Повторить вход</a></p>"));
     if (!valid)
-        return html.replace("PAGE_TITLE", "Начните вход в Сендж").replace("PAGE_MESSAGE", "Откройте приложение и нажмите «Войти в SoundCloud».");
+        return html.replace("PAGE_TITLE", "Начните вход в Sange").replace("PAGE_MESSAGE", "Откройте приложение и нажмите «Войти в SoundCloud».");
     if (!receivedCode)
         return html.replace("PAGE_TITLE", "Вход не завершён").replace("PAGE_MESSAGE", "Нажмите «Повторить вход», чтобы начать заново в этой вкладке.");
-    return html.replace("PAGE_TITLE", "Вернитесь в Сендж").replace("PAGE_MESSAGE", "Аккаунт SoundCloud подключён. Эту вкладку можно закрыть.");
+    return html.replace("PAGE_TITLE", "Вернитесь в Sange").replace("PAGE_MESSAGE", "Аккаунт SoundCloud подключён. Эту вкладку можно закрыть.");
 }
 QString nonce() {
     QByteArray bytes(32, Qt::Uninitialized);
@@ -1090,7 +1090,7 @@ QUrl SoundCloud::beginLogin(bool openBrowser) {
     const QUrl redirect(m_redirect);
     if (redirect.scheme() != "http" || redirect.host() != "127.0.0.1" || redirect.path() != "/callback" || (redirect.port() < 1024 || redirect.port() > 65535) || redirect.hasQuery() || redirect.hasFragment() || !redirect.userInfo().isEmpty()) { fail("Настройте локальный адрес возврата."); return {}; }
     m_callback.close();
-    if (!m_callback.listen(QHostAddress::LocalHost, quint16(redirect.port()))) { fail("Порт для входа занят. Закройте второй экземпляр Сендж или измените порт."); return {}; }
+    if (!m_callback.listen(QHostAddress::LocalHost, quint16(redirect.port()))) { fail("Порт для входа занят. Закройте второй экземпляр Sange или измените порт."); return {}; }
     m_retryToken.clear();
     ++m_loginEpoch; clearError(); m_verifier = nonce(); m_oauthState = nonce();
     QUrl url("https://secure.soundcloud.com/authorize"); QUrlQuery query;
@@ -1228,8 +1228,8 @@ void SoundCloud::logout() {
             const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             const bool confirmed = reply->error() == QNetworkReply::NoError && status == 204;
             set("disconnectStatus", confirmed ? "confirmed" : "unconfirmed");
-            set("status", confirmed ? "Вы вышли. Доступ Сендж отозван." : "Вы вышли на этом устройстве. Отзыв доступа не подтверждён.");
-            if (!confirmed) fail("Вы вышли на этом устройстве. Не удалось подтвердить отзыв доступа. Откройте настройки подключённых приложений SoundCloud и отключите Сендж.");
+            set("status", confirmed ? "Вы вышли. Доступ Sange отозван." : "Вы вышли на этом устройстве. Отзыв доступа не подтверждён.");
+            if (!confirmed) fail("Вы вышли на этом устройстве. Не удалось подтвердить отзыв доступа. Откройте настройки подключённых приложений SoundCloud и отключите Sange.");
         });
     }
 }
@@ -1517,7 +1517,7 @@ void SoundCloud::loadHome(bool force) {
         if (generation != m_homeGeneration) return;
         auto tracks = items(doc).mid(0, 24);
         for (auto &entry : tracks) { auto track = entry.toMap(); track["user_favorite"] = true; entry = track; }
-        add("Микс любимых", "Подборка Сендж из последних добавленных любимых треков", tracks, true, 0);
+        add("Микс любимых", "Подборка Sange из последних добавленных любимых треков", tracks, true, 0);
         if (tracks.isEmpty()) { finish(); return; }
         QSet<QString> excluded;
         for (const auto &track : items(doc)) excluded.insert(urn(track.toMap()));
@@ -3021,7 +3021,7 @@ void SoundCloud::installUpdate() {
 #ifdef Q_OS_ANDROID
     const jint result = QJniObject::callStaticMethod<jint>("org/scrip/app/ApkInstaller", "install", "(Landroid/content/Context;Ljava/lang/String;)I", QNativeInterface::QAndroidApplication::context().object(), QJniObject::fromString(m_updatePath).object());
     set("updateInstalling", false);
-    if (result == 1) { set("updateResult", "Разрешите установку Сендж в настройках Android, затем нажмите «Установить сейчас» ещё раз."); set("updateError", "Нужно разрешить установку приложений из этого источника."); }
+    if (result == 1) { set("updateResult", "Разрешите установку Sange в настройках Android, затем нажмите «Установить сейчас» ещё раз."); set("updateError", "Нужно разрешить установку приложений из этого источника."); }
     else if (result == 2) { set("updateResult", "Открыт системный установщик Android. Подтвердите или отмените установку там."); set("updateError", ""); }
     else { set("updateResult", "Не удалось открыть системный установщик Android."); set("updateError", "Android не открыл системный установщик APK."); }
 #elif defined(Q_OS_WIN)
@@ -3042,7 +3042,7 @@ void SoundCloud::installUpdate() {
             });
             watcher->start();
         } else {
-            set("updateResult", "Мастер установки открыт. Завершите его; перезапустите Сендж после установки или отмены.");
+            set("updateResult", "Мастер установки открыт. Завершите его; перезапустите Sange после установки или отмены.");
         }
     }
 #elif defined(Q_OS_LINUX)

@@ -40,7 +40,7 @@ public class PlaybackService extends Service {
         IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(noisy, filter, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(noisy, filter);
-        session = new MediaSession(this, "Сендж");
+        session = new MediaSession(this, "Sange");
         session.setSessionActivity(MediaBridge.openApp(this));
         session.setCallback(new MediaSession.Callback() {
             @Override public void onPlay() { MediaBridge.dispatch(PlaybackService.this, 4, 0); }
@@ -85,7 +85,7 @@ public class PlaybackService extends Service {
         // Даже если загрузка успела завершиться ошибкой до onStartCommand,
         // сначала выполняем обязательство startForegroundService перед Android.
         Notification pending = new Notification.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.widget_notification).setContentTitle("Сендж")
+            .setSmallIcon(R.drawable.widget_notification).setContentTitle("Sange")
             .setContentText("Подготовка воспроизведения…").setOngoing(true)
             .setContentIntent(MediaBridge.openApp(this)).build();
         enterForeground(pending);

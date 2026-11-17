@@ -1,6 +1,6 @@
 # Release validation
 
-Current target: **Sendzh (Сендж) 2.0.0**. See [release notes](../release-notes/2.0.0.md) for user-visible changes and upgrade compatibility.
+Current target: **Sange 2.0.0**. See [release notes](../release-notes/2.0.0.md) for user-visible changes and upgrade compatibility.
 
 ## Required checks
 

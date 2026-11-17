@@ -45,7 +45,7 @@ are rejected even with the same artist/title. At most two matching records per
 source are attempted; unrelated recommendations never trigger lyric downloads.
 The first verified text is displayed; a verified timed version can replace plain
 text. Existing timed lyrics are not overwritten by a slower provider. When no
-matching text is available the page says “Текст не найден”. A retry button repeats
+matching text is available the page says “Lyrics not found”. A retry button repeats
 the lookup; no query editor or result list is exposed.
 
 LRCLIB and Lyrics.ovh have public documented APIs. NetEase, QQ Music and KuGou use

@@ -20,7 +20,7 @@ ignored, duplicates removed, and input/token counts bounded.
 The [SoundCloud public OpenAPI specification](https://github.com/soundcloud/api/blob/master/openapi/api.yaml)
 defines the fields and tag quoting and illustrates waveform_url with an HTTPS
 PNG on wave.sndcdn.com. It does not document a sample-array schema, a JSON
-waveform endpoint, or waveform-to-audio timing offsets. Sendzh therefore requests
+waveform endpoint, or waveform-to-audio timing offsets. Sange therefore requests
 only the supplied PNG URL, stretches the full image over the full track duration
 and colors its alpha silhouette. It never derives another endpoint, downloads
 audio for analysis, or synthesizes a decorative waveform. Other formats and

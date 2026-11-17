@@ -147,7 +147,7 @@ void DiscordPresence::restart()
     m_rejected = false;
     if (!available()) { setStatus("Discord RPC доступен на Linux и Windows"); return; }
     if (!m_enabled) { setStatus("Выключено"); return; }
-    if (!configured()) { setStatus("Укажите Application ID приложения Сендж в Discord"); return; }
+    if (!configured()) { setStatus("Укажите Application ID приложения Sange в Discord"); return; }
     m_endpoints.clear();
 #ifdef Q_OS_WIN
     for (int i = 0; i < 10; ++i) m_endpoints << QString("discord-ipc-%1").arg(i);
@@ -256,9 +256,9 @@ QJsonValue DiscordPresence::activity(const QVariantMap &state, qint64 nowSeconds
         const auto time = playbackTime(position) + (duration > 0 ? " / " + playbackTime(duration) : QString());
         prefix = (buffering ? "Загрузка · " : "Пауза · ") + time + " · ";
     }
-    const QString branding = " · Сендж";
+    const QString branding = " · Sange";
     const auto subtitle = prefix + clipped(artist, 128 - (prefix + branding).toUtf8().size()) + branding;
-    QJsonObject result{{"name", "Сендж"}, {"type", 2}, {"details", clipped(title)},
+    QJsonObject result{{"name", "Sange"}, {"type", 2}, {"details", clipped(title)},
         {"state", clipped(subtitle)}, {"instance", false}};
     if (playing) {
         const qint64 start = nowSeconds - position / 1000;
@@ -271,7 +271,7 @@ QJsonValue DiscordPresence::activity(const QVariantMap &state, qint64 nowSeconds
     const auto link = track.value("permalink_url").toString();
     const bool hasTrackLink = publicUrl(link) && QUrl(link).host() == "soundcloud.com";
     if (hasTrackLink) result.insert("details_url", link);
-    QJsonObject assets{{"small_image", projectIcon}, {"small_text", "Сендж · SoundCloud player · GitHub"},
+    QJsonObject assets{{"small_image", projectIcon}, {"small_text", "Sange · SoundCloud player · GitHub"},
         {"small_url", projectUrl}};
     QString cover = track.value("artwork_url").toString();
     if (!publicUrl(cover)) cover = track.value("user").toMap().value("avatar_url").toString();
@@ -284,13 +284,13 @@ QJsonValue DiscordPresence::activity(const QVariantMap &state, qint64 nowSeconds
         if (hasTrackLink) assets.insert("large_url", link);
     } else {
         assets.insert("large_image", projectIcon);
-        assets.insert("large_text", "Сендж · SoundCloud player");
+        assets.insert("large_text", "Sange · SoundCloud player");
         assets.insert("large_url", projectUrl);
     }
     result.insert("assets", assets);
     QJsonArray buttons;
     if (hasTrackLink) buttons.append(QJsonObject{{"label", "Слушать в SoundCloud"}, {"url", link}});
-    buttons.append(QJsonObject{{"label", "Скачать Сендж · GitHub"}, {"url", "https://github.com/sykia/SCrip/releases/latest"}});
+    buttons.append(QJsonObject{{"label", "Скачать Sange · GitHub"}, {"url", "https://github.com/sykia/SCrip/releases/latest"}});
     result.insert("buttons", buttons);
     return result;
 }

@@ -51,8 +51,8 @@ private slots:
         auto activity = DiscordPresence::activity(state, 1000).toObject();
         QCOMPARE(activity["type"].toInt(), 2);
         QCOMPARE(activity["details"].toString(), "Test track");
-        QCOMPARE(activity["state"].toString(), "Artist · Сендж");
-        QCOMPARE(activity["name"].toString(), "Сендж");
+        QCOMPARE(activity["state"].toString(), "Artist · Sange");
+        QCOMPARE(activity["name"].toString(), "Sange");
         QCOMPARE(activity["timestamps"].toObject()["start"].toInteger(), 958);
         QCOMPARE(activity["timestamps"].toObject()["end"].toInteger(), 1138);
         QCOMPARE(activity["details_url"].toString(), "https://soundcloud.com/artist/track");
@@ -76,10 +76,10 @@ private slots:
         auto state = player(); auto track = state["current"].toMap();
         track["metadata_artist"] = "  Credited artist  "; state["current"] = track;
         auto activity = DiscordPresence::activity(state, 1000).toObject();
-        QCOMPARE(activity["state"].toString(), "Credited artist · Сендж");
+        QCOMPARE(activity["state"].toString(), "Credited artist · Sange");
         QCOMPARE(activity["details_url"].toString(), "https://soundcloud.com/artist/track");
         track["metadata_artist"] = " "; state["current"] = track;
-        QCOMPARE(DiscordPresence::activity(state, 1000).toObject()["state"].toString(), "Artist · Сендж");
+        QCOMPARE(DiscordPresence::activity(state, 1000).toObject()["state"].toString(), "Artist · Sange");
     }
     void durationAndPositionBounds() {
         auto state = player();
@@ -123,7 +123,7 @@ private slots:
         QCOMPARE(activity["buttons"].toArray().size(), 1);
         QVERIFY(activity["details"].toString().toUtf8().size() <= 128);
         QVERIFY(title.startsWith(activity["details"].toString()));
-        QVERIFY(activity["state"].toString().endsWith(" · Сендж"));
+        QVERIFY(activity["state"].toString().endsWith(" · Sange"));
         QVERIFY(activity["state"].toString().toUtf8().size() <= 128);
     }
     void ipcLifecycle() {
