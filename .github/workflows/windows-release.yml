@@ -11,7 +11,8 @@ on:
   release:
     types: [published]
 permissions:
-  contents: read
+  # GitHub hides draft releases from a read-only workflow token.
+  contents: write
 jobs:
   install:
     runs-on: windows-2022
@@ -26,6 +27,7 @@ jobs:
         run: |
           $selector = @(if ($env:TAG) { $env:TAG })
           $release = gh release view @selector --repo $env:GITHUB_REPOSITORY --json assets,tagName | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or !$release) { throw 'Release metadata is unavailable to this workflow token' }
           $asset = @($release.assets | Where-Object name -like '*-Windows-x64.exe')
           if ($asset.Count -eq 0) {
             $version = $release.tagName -replace '^v', ''
