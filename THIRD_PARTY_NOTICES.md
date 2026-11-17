@@ -1,10 +1,10 @@
 # Third-party components and review status
 
-SCrip's license applies to the project's own materials. Rights to dependencies and user content remain with their respective holders. This document is an initial inventory and record of known limitations, rather than a complete license bundle or confirmation of release compliance.
+Sange's license applies to the project's own materials. Rights to dependencies and user content remain with their respective holders. This document is an initial inventory and record of known limitations, rather than a complete license bundle or confirmation of release compliance.
 
 ## Qt
 
-SCrip uses Qt Core, GUI, Widgets (desktop), QML, Quick, Network and Multimedia. Individual modules and their bundled third-party components have their own licenses. Applicable modules may be used under LGPLv3 if its conditions are met; some Qt components may require GPL or a commercial license.
+Sange uses Qt Core, GUI, Widgets (desktop), QML, Quick, Network and Multimedia. Individual modules and their bundled third-party components have their own licenses. Applicable modules may be used under LGPLv3 if its conditions are met; some Qt components may require GPL or a commercial license.
 
 LGPL distribution requires license texts and notices, corresponding library sources or an appropriate offer to provide them, and the ability to replace libraries and run the relinked application. Android also requires consideration of APK rebuilding and signing. Dynamic linking alone does not satisfy every condition.
 
@@ -15,7 +15,7 @@ LGPL distribution requires license texts and notices, corresponding library sour
 
 Inspection of `build/windows-installer/payload/avutil-61.dll`, included in the published 1.3.0 installer, found `--enable-gpl`, `--enable-version3` and the string `libavutil license: GPL version 3 or later`.
 
-SCrip is now distributed under GNU GPLv3, resolving the earlier conflict with GPLv3 FFmpeg components at the level of the project's own code license.
+Sange is now distributed under GNU GPLv3, resolving the earlier conflict with GPLv3 FFmpeg components at the level of the project's own code license.
 
 Compatibility of other dependencies and GPL requirements for sources, license notices and build materials still require verification. Changing LICENSE alone does not confirm compliance of previously published builds.
 
@@ -23,7 +23,7 @@ Compatibility of other dependencies and GPL requirements for sources, license no
 
 ## Other dependencies
 
-Linux uses system libsecret (LGPL-2.1-or-later) for Secret Service; it is dynamically linked and is not bundled in the SCrip package. Source and license: https://gitlab.gnome.org/GNOME/libsecret.
+Linux uses system libsecret (LGPL-2.1-or-later) for Secret Service; it is dynamically linked and is not bundled in the Sange package. Source and license: https://gitlab.gnome.org/GNOME/libsecret.
 
 Android includes OpenSSL from android_openssl. OpenSSL 3 uses Apache License 2.0; exact versions and additional materials for the selected build must be checked. The Windows installer also contains transitive MSYS2 libraries; some license texts are in the installed application's `licenses` directory. That directory does not replace checking notice completeness and providing sources under applicable licenses.
 
@@ -31,9 +31,9 @@ Before the next release, a complete inventory of actually shipped libraries, lic
 
 ## SoundCloud and content
 
-SCrip is an independent client. The SoundCloud name and related identifiers belong to their respective holders; user audio, artwork, avatars and other materials are not covered by SCrip's license. Their appearance in screenshots does not transfer rights.
+Sange is an independent client. The SoundCloud name and related identifiers belong to their respective holders; user audio, artwork, avatars and other materials are not covered by Sange's license. Their appearance in screenshots does not transfer rights.
 
-API terms require, among other things, attribution, data handling rules and a privacy policy. They also restrict alternative listening services. Compliance of specific functionality and the scope of granted permission require separate review; SCrip's license is not SoundCloud's consent.
+API terms require, among other things, attribution, data handling rules and a privacy policy. They also restrict alternative listening services. Compliance of specific functionality and the scope of granted permission require separate review; Sange's license is not SoundCloud's consent.
 
 - https://developers.soundcloud.com/docs/api/terms-of-use
 
@@ -55,4 +55,4 @@ For Windows, FFmpeg 9.0.2 was rebuilt from source without external codecs or lib
 
 Android uses Qt 6.10.1, FFmpeg 7.1.2, OpenSSL 3.1.8 and NDK r27c. FFmpeg with OpenSSL 3 uses the permitted LGPLv3 option from LGPL-2.1-or-later. Materials include the complete Qt source archive, FFmpeg and OpenSSL sources with build parameters, the base LLVM revision with Android patches, and published Java runtime dependency sources. Notices are also in the APK's assets/licenses. The Maven runtime dependency tree and version coordinates are recorded.
 
-Debian and Arch packages contain the application and SCrip materials; Qt and codecs remain system dependencies supplied by the package manager.
+Debian and Arch packages contain the application and Sange materials; Qt and codecs remain system dependencies supplied by the package manager.

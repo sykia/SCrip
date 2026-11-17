@@ -1,4 +1,4 @@
-name: Проверка установщика Windows
+name: Sange Windows release verification
 on:
   workflow_dispatch:
     inputs:

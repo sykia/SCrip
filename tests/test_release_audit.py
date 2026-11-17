@@ -59,7 +59,7 @@ class PartialReleaseTests(unittest.TestCase):
         descriptor = self.root / 'descriptor'
         descriptor.mkdir()
         (descriptor / 'release.json').write_text(json.dumps({
-            'base_materials': {'url': 'https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz',
+            'base_materials': {'url': 'https://github.com/sykia/sange/releases/download/v1.4.0/compliance.tar.gz',
                                'sha256': '0' * 64}, 'platforms': ['Android']}))
         bundle = self.root / 'base.tar.gz'
         bundle.write_bytes(b'wrong archive')
@@ -91,7 +91,7 @@ class PartialReleaseTests(unittest.TestCase):
             archive.add(self.materials / 'Android/source.tar', arcname='source.tar')
         sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
         info = {'base_materials': {
-            'url': 'https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz',
+            'url': 'https://github.com/sykia/sange/releases/download/v1.4.0/compliance.tar.gz',
             'sha256': sha(bundle)}, 'platforms': ['Android'],
             'materials_overlay': {'name': overlay.name, 'sha256': sha(overlay)}}
         (descriptor / 'release.json').write_text(json.dumps(info))

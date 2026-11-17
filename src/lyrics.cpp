@@ -158,7 +158,7 @@ void Lyrics::fetch(const QUrl &url, std::function<void(const QByteArray &)> cons
         QTimer::singleShot(0, this, [done] { done({}); }); return;
     }
     QNetworkRequest req(url);
-    req.setRawHeader("User-Agent", ("SCrip/" + QCoreApplication::applicationVersion() + " (https://github.com/sykia/SCrip)").toUtf8());
+    req.setRawHeader("User-Agent", ("Sange/" + QCoreApplication::applicationVersion() + " (https://github.com/sykia/sange)").toUtf8());
     req.setRawHeader("Accept", url.host() == "genius.com" ? "application/json, text/html" : "application/json");
     if (url.host() == "c.y.qq.com") req.setRawHeader("Referer", "https://y.qq.com/");
     if (url.host() == "music.163.com") req.setRawHeader("Referer", "https://music.163.com/");

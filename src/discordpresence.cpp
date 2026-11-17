@@ -18,8 +18,8 @@ Q_LOGGING_CATEGORY(discordPresenceLog, "scrip.discord", QtWarningMsg)
 namespace {
 // Shared project application, retained from v0.5.0 shared/constants.js.
 constexpr auto defaultApplicationId = "1555593977367887893";
-constexpr auto projectUrl = "https://github.com/sykia/SCrip";
-constexpr auto projectIcon = "https://raw.githubusercontent.com/sykia/SCrip/main/packaging/linux/scrip.png";
+constexpr auto projectUrl = "https://github.com/sykia/sange";
+constexpr auto projectIcon = "https://raw.githubusercontent.com/sykia/sange/main/packaging/linux/scrip.png";
 QString playbackTime(qint64 milliseconds)
 {
     const auto seconds = milliseconds / 1000;
@@ -290,7 +290,7 @@ QJsonValue DiscordPresence::activity(const QVariantMap &state, qint64 nowSeconds
     result.insert("assets", assets);
     QJsonArray buttons;
     if (hasTrackLink) buttons.append(QJsonObject{{"label", "Слушать в SoundCloud"}, {"url", link}});
-    buttons.append(QJsonObject{{"label", "Скачать Sange · GitHub"}, {"url", "https://github.com/sykia/SCrip/releases/latest"}});
+    buttons.append(QJsonObject{{"label", "Скачать Sange · GitHub"}, {"url", "https://github.com/sykia/sange/releases/latest"}});
     result.insert("buttons", buttons);
     return result;
 }

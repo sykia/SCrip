@@ -2819,7 +2819,7 @@ void SoundCloud::createPlaylist(const QString &title, bool includeCurrent) {
 void SoundCloud::openExternal(const QString &value) {
     QUrl url(value);
     const bool soundcloud = url.host() == "soundcloud.com" || url.host().endsWith(".soundcloud.com");
-    const bool updates = url.host() == "github.com" && url.path() == "/sykia/SCrip/releases/latest";
+    const bool updates = url.host() == "github.com" && url.path() == "/sykia/sange/releases/latest";
     if (url.scheme() == "https" && (soundcloud || updates)) QDesktopServices::openUrl(url);
 }
 void SoundCloud::copyText(const QString &text) { QGuiApplication::clipboard()->setText(text); }
@@ -2828,9 +2828,9 @@ void SoundCloud::checkForUpdates(bool manual) {
     if (m_state.value("updateChecking").toBool() || m_state.value("updateDownloading").toBool() || m_state.value("updateInstalling").toBool()) return;
     set("updateError", ""); set("updateManual", manual); set("updateChecking", true);
     set("updateAvailable", false); set("updateResult", "Проверяем обновления…");
-    QNetworkRequest req(QUrl("https://api.github.com/repos/sykia/SCrip/releases/latest"));
+    QNetworkRequest req(QUrl("https://api.github.com/repos/sykia/sange/releases/latest"));
     req.setRawHeader("Accept", "application/vnd.github+json"); req.setRawHeader("X-GitHub-Api-Version", "2022-11-28");
-    req.setRawHeader("User-Agent", "SCrip-update-checker"); req.setTransferTimeout(15000);
+    req.setRawHeader("User-Agent", "Sange-update-checker"); req.setTransferTimeout(15000);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     auto *reply = m_network->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, manual] {
@@ -2860,7 +2860,7 @@ void SoundCloud::checkForUpdates(bool manual) {
             m_updateVersion = remote; m_updateDigest = m_updateReadyDigest;
         }
         set("latestVersion", remote); set("updateAvailable", newerThanCurrent);
-        set("updateUrl", "https://github.com/sykia/SCrip/releases/latest");
+        set("updateUrl", "https://github.com/sykia/sange/releases/latest");
         if (QVersionNumber::compare(latest, current) <= 0) { set("updateResult", "Установлена последняя версия"); return; }
         QString suffix;
 #ifdef Q_OS_ANDROID
@@ -2887,7 +2887,7 @@ void SoundCloud::checkForUpdates(bool manual) {
                 !lowerDigest.startsWith("sha256:") || lowerDigest.size() != 71 ||
                 !QRegularExpression("^sha256:[0-9a-f]{64}$").match(lowerDigest).hasMatch() ||
                 url.scheme() != "https" || url.host() != "github.com" || url.port() != -1 || !url.userInfo().isEmpty() ||
-                !url.path().startsWith("/sykia/SCrip/releases/download/")) continue;
+                !url.path().startsWith("/sykia/sange/releases/download/")) continue;
             if (sameReadyRelease && (m_updateReadyName != name || m_updateReadyDigest != lowerDigest || m_updateExpectedSize != qint64(size))) {
                 m_updatePath.clear(); m_updateReadyVersion.clear(); m_updateReadyName.clear(); m_updateReadyDigest.clear();
                 set("updateReady", false); sameReadyRelease = false;
@@ -2908,7 +2908,7 @@ void SoundCloud::checkForUpdates(bool manual) {
 void SoundCloud::downloadUpdate() {
     if (!m_state.value("updateAvailable").toBool() || m_updateReply || m_state.value("updateDownloading").toBool() || m_state.value("updateInstalling").toBool() || m_updateAsset.isEmpty()) return;
     const QUrl url(m_updateAsset.value("browser_download_url").toString());
-    if (url.scheme() != "https" || url.host() != "github.com" || url.port() != -1 || !url.userInfo().isEmpty() || !url.path().startsWith("/sykia/SCrip/releases/download/") || m_updateVersion != m_state.value("latestVersion").toString()) { set("updateError", "Источник или версия файла обновления не разрешены."); return; }
+    if (url.scheme() != "https" || url.host() != "github.com" || url.port() != -1 || !url.userInfo().isEmpty() || !url.path().startsWith("/sykia/sange/releases/download/") || m_updateVersion != m_state.value("latestVersion").toString()) { set("updateError", "Источник или версия файла обновления не разрешены."); return; }
     const QString dir = QStandardPaths::writableLocation(
 #ifdef Q_OS_ANDROID
         QStandardPaths::AppDataLocation

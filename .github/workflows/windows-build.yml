@@ -1,4 +1,4 @@
-name: Сборка Windows
+name: Sange Windows build
 on:
   workflow_dispatch:
     inputs:

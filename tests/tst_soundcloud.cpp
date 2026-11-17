@@ -2918,7 +2918,7 @@ private slots:
         QCoreApplication::setApplicationVersion("1.0.0");
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')}, {"size", 4},
-            {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+            {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
         const auto before = net.requests.size(); sc.checkForUpdates(true);
         QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
@@ -2934,7 +2934,7 @@ private slots:
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')}, {"size", 4},
-            {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+            {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         net.responses = {{200, "abcd"}}; sc.downloadUpdate();
@@ -2950,7 +2950,7 @@ private slots:
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         const QByteArray payload("abcd");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex())}, {"size", 4},
-            {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+            {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         net.responses = {{200, payload, 1000}}; sc.downloadUpdate();
@@ -2968,7 +2968,7 @@ private slots:
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         const QByteArray payload("abcd");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
-        QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         const QByteArray metadata = QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson();
         net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         net.responses = {{200, payload}}; sc.downloadUpdate(); QTRY_VERIFY(sc.state()["updateReady"].toBool());
@@ -2982,7 +2982,7 @@ private slots:
         QCOMPARE(sc.state()["updateResult"].toString(), QString("Обновление для этой системы пока недоступно"));
         QVERIFY(QFileInfo::exists(verifiedPath));
         const QString nextName = QFileInfo::exists("/etc/arch-release") ? "scrip-1000.0-x86_64.pkg.tar.zst" : "SCrip-1000.0-amd64.deb";
-        const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v1000.0/" + nextName}};
+        const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v1000.0/" + nextName}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v1000.0"}, {"assets", QJsonArray{nextAsset}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
         QVERIFY(!sc.state()["updateReady"].toBool()); QVERIFY(sc.state()["updateAvailable"].toBool());
@@ -2993,7 +2993,7 @@ private slots:
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         const QByteArray payload("multi-block-payload");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
-        const QJsonObject asset{{"name", name}, {"digest", digest}, {"size", payload.size()}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        const QJsonObject asset{{"name", name}, {"digest", digest}, {"size", payload.size()}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         const QByteArray metadata = QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson();
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         net.responses = {{200, metadata}}; sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
@@ -3030,7 +3030,7 @@ private slots:
         const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
         const QByteArray payload("abcd");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
-        QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/SCrip/releases/download/v999.0/" + name}};
+        QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         const QByteArray metadata = QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson();
         for (const auto &response : QList<Response>{{403, "denied"}, {404, "missing"}, {500, "server error"}, {200, "abc"}, {200, "", 0, QNetworkReply::TimeoutError}}) {
             Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);

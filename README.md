@@ -7,16 +7,23 @@
 <p align="center">Your SoundCloud music, in a dedicated player for Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
 
 <p align="center">
-  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/Sange-2.0.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/Sange-2.0.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/scrip-2.0.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
-  <a href="https://github.com/sykia/SCrip/releases/download/v2.0.0/Sange-2.0.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/scrip-2.0.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
 </p>
 
 <p align="center">
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="https://github.com/sykia/SCrip/releases/tag/v2.0.0">Release files &amp; SHA-256</a> ·
+  <a href="https://github.com/sykia/sange/releases/tag/v2.0.0">Release files &amp; SHA-256</a> ·
   <a href="docs/plugins.md">Plugins</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/sykia/sange/releases/latest"><img src="https://img.shields.io/github/v/release/sykia/sange?label=Sange&amp;color=3D8C68" alt="Latest Sange release"></a>
+  <a href="https://github.com/sykia/sange/actions/workflows/linux-cpp.yml"><img src="https://github.com/sykia/sange/actions/workflows/linux-cpp.yml/badge.svg" alt="Linux build and tests"></a>
+  <a href="https://github.com/sykia/sange/actions/workflows/licenses.yml"><img src="https://github.com/sykia/sange/actions/workflows/licenses.yml/badge.svg" alt="Licensing and release checks"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--only-414650" alt="License: GPL-3.0-only"></a>
 </p>
 
 ## Get started
@@ -24,6 +31,8 @@
 Install the package for your platform and sign in through the official SoundCloud page in your browser. Sange uses the official SoundCloud API.
 
 Version **2.0.0** renames SCrip to **Sange**. Install over the existing application to preserve sign-in, settings, plugins and playback data. The package and storage identities remain compatible with SCrip. Android updates require the same signing certificate as the installed release.
+
+The project now lives at [sykia/sange](https://github.com/sykia/sange). If an older build cannot download an update after the repository rename, download the package above and install it over your existing installation. Keep application data and do not uninstall first.
 
 See the [2.0.0 release notes](release-notes/2.0.0.md) for sign-in recovery and upgrade details.
 

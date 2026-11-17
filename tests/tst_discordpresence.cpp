@@ -56,9 +56,9 @@ private slots:
         QCOMPARE(activity["timestamps"].toObject()["start"].toInteger(), 958);
         QCOMPARE(activity["timestamps"].toObject()["end"].toInteger(), 1138);
         QCOMPARE(activity["details_url"].toString(), "https://soundcloud.com/artist/track");
-        QCOMPARE(activity["assets"].toObject()["small_url"].toString(), "https://github.com/sykia/SCrip");
+        QCOMPARE(activity["assets"].toObject()["small_url"].toString(), "https://github.com/sykia/sange");
         QVERIFY(activity["assets"].toObject()["large_text"].toString().contains("3:00"));
-        QCOMPARE(activity["buttons"].toArray().at(1).toObject()["url"].toString(), "https://github.com/sykia/SCrip/releases/latest");
+        QCOMPARE(activity["buttons"].toArray().at(1).toObject()["url"].toString(), "https://github.com/sykia/sange/releases/latest");
         QCOMPARE(activity["assets"].toObject()["large_image"].toString(), "https://i1.sndcdn.com/art-t500x500.jpg");
         QCOMPARE(activity["buttons"].toArray().size(), 2);
         state["position"] = 90000;
@@ -118,7 +118,7 @@ private slots:
         const auto activity = DiscordPresence::activity(state, 1000).toObject();
         QVERIFY(!activity.contains("details_url"));
         const auto assets = activity["assets"].toObject();
-        QCOMPARE(assets["large_url"].toString(), "https://github.com/sykia/SCrip");
+        QCOMPARE(assets["large_url"].toString(), "https://github.com/sykia/sange");
         QVERIFY(assets["large_image"].toString().startsWith("https://"));
         QCOMPARE(activity["buttons"].toArray().size(), 1);
         QVERIFY(activity["details"].toString().toUtf8().size() <= 128);

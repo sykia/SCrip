@@ -8,7 +8,7 @@
   ],
   "application_code_commit": "6c4ff55ab3db6b4ecf1272e1d2a321c03f890e01",
   "base_materials": {
-    "url": "https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz",
+    "url": "https://github.com/sykia/sange/releases/download/v1.4.0/compliance.tar.gz",
     "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
   },
   "materials_overlay": {

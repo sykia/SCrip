@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Embed editable QML into an installable SCrip JSON manifest (stdlib only)."""
+"""Embed editable QML into an installable Sange JSON manifest (stdlib only)."""
 import argparse
 import json
 from pathlib import Path

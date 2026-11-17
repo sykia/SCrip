@@ -5,7 +5,7 @@ license=('GPL-3.0-only')
 pkgdesc='Настольный плеер для SoundCloud'
 # Для каждого выпуска обновляйте версию и SHA-256 архива исходников.
 arch=('x86_64')
-url='https://github.com/sykia/SCrip'
+url='https://github.com/sykia/sange'
 depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
 makedepends=('cmake' 'ninja')
 source=("$url/releases/download/v$pkgver/Sange-$pkgver-source.tar.gz")

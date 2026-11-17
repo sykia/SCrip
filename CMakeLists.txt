@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(SCrip VERSION 2.0.0 LANGUAGES CXX)
+project(Sange VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
     message(FATAL_ERROR "macOS не поддерживается")

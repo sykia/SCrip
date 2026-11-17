@@ -1,4 +1,4 @@
-"""Упаковать каталог релизной сборки после windeployqt в установщик SCrip."""
+"""Упаковать каталог релизной сборки после windeployqt в установщик Sange."""
 import argparse
 from pathlib import Path, PureWindowsPath
 import re

@@ -11,7 +11,7 @@
     "sha256": "0651fc5dcbfe96dfaf73465f1e29749903c67953fefdc40db062416a86233b64"
   },
   "base_materials": {
-    "url": "https://github.com/sykia/SCrip/releases/download/v1.4.0/compliance.tar.gz",
+    "url": "https://github.com/sykia/sange/releases/download/v1.4.0/compliance.tar.gz",
     "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
   }
 }

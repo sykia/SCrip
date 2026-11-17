@@ -15,7 +15,7 @@ def prepare(release_dir, output, bundle, assets=None):
     if output.exists() and any(output.iterdir()):
         raise ValueError('Каталог материалов должен быть пустым')
     base = info['base_materials']
-    if not base['url'].startswith('https://github.com/sykia/SCrip/releases/download/'):
+    if not base['url'].startswith('https://github.com/sykia/sange/releases/download/'):
         raise ValueError('Неизвестный адрес базовых материалов')
     bundle.parent.mkdir(parents=True, exist_ok=True)
     if not bundle.exists():

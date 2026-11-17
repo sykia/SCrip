@@ -1,4 +1,4 @@
-name: Cloudflare Worker tests
+name: Sange authentication service tests
 
 on:
   push:
