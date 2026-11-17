@@ -197,6 +197,28 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             } catch (Exception error) { throw new RuntimeException(error); }
         });
     }
+    private void checkSystemBarTheme(boolean dark) throws Exception {
+        runOnMainSync(() -> {
+            try { activity.getClass().getMethod("setDarkTheme", boolean.class).invoke(activity, dark); }
+            catch (Exception error) { throw new RuntimeException(error); }
+        });
+        final boolean[] lightBars = {dark};
+        for (int attempt = 0; attempt < 100; ++attempt) {
+            SystemClock.sleep(20);
+            runOnMainSync(() -> {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    android.view.WindowInsetsController controller = activity.getWindow().getInsetsController();
+                    lightBars[0] = controller != null && (controller.getSystemBarsAppearance()
+                        & android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS) != 0;
+                } else {
+                    lightBars[0] = (activity.getWindow().getDecorView().getSystemUiVisibility()
+                        & android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) != 0;
+                }
+            });
+            if (lightBars[0] == !dark) return;
+        }
+        require(false, "System bar icons do not match the requested theme");
+    }
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); testArguments = arguments; start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
@@ -211,19 +233,8 @@ public final class PlaybackLifecycleTest extends Instrumentation {
             testDeferredPlay();
             testSavedTrackSnapshot();
             testPluginContentRead(ctx);
-            SystemClock.sleep(2000);
-            final boolean[] darkStatusIcons = {false};
-            runOnMainSync(() -> {
-                if (Build.VERSION.SDK_INT >= 30) {
-                    android.view.WindowInsetsController controller = activity.getWindow().getInsetsController();
-                    darkStatusIcons[0] = controller != null && (controller.getSystemBarsAppearance()
-                            & android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS) != 0;
-                } else {
-                    darkStatusIcons[0] = (activity.getWindow().getDecorView().getSystemUiVisibility()
-                            & android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) != 0;
-                }
-            });
-            require(darkStatusIcons[0], "Значки строки состояния должны быть тёмными");
+            checkSystemBarTheme(false);
+            checkSystemBarTheme(true);
             bridge.getMethod("preparePlayback").invoke(null);
             snapshot(true, true, false, true);
             check(true, true, PlaybackState.STATE_PLAYING);

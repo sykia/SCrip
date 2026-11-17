@@ -171,7 +171,8 @@ public final class MediaBridge {
             JSONObject track = savedTrack.optJSONObject("track");
             if (track != null) { currentUrn = track.optString("urn"); currentArtworkUrl = track.optString("artwork_url"); }
         }
-        hasTrack = !title.isEmpty() && !title.equals("Sange");
+        hasTrack = !currentUrn.isEmpty();
+        if (!hasTrack && title.equals("SCrip")) title = "Sange";
         artwork = p.getString("artwork", "");
         if (!artwork.isEmpty()) {
             final String key = artwork;

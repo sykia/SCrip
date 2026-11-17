@@ -28,7 +28,7 @@ VIProductVersion "2.0.0.0"
 VIAddVersionKey /LANG=1049 "ProductName" "Sange"
 VIAddVersionKey /LANG=1049 "FileDescription" "Установка Sange"
 VIAddVersionKey /LANG=1049 "FileVersion" "2.0.0"
-VIAddVersionKey /LANG=1049 "LegalCopyright" "SCrip"
+VIAddVersionKey /LANG=1049 "LegalCopyright" "Copyright (c) 2026 sykia"
 !define MUI_ICON "app.ico"
 !define MUI_UNICON "app.ico"
 !define MUI_WELCOMEFINISHPAGE_BITMAP "welcome.bmp"
@@ -48,7 +48,7 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "SCrip"
 
 Function .onInit
   ${IfNot} ${RunningX64}
-    MessageBox MB_OK|MB_ICONSTOP "Для SCrip требуется 64-разрядная Windows."
+    MessageBox MB_OK|MB_ICONSTOP "Для Sange требуется 64-разрядная Windows."
     Abort
   ${EndIf}
 FunctionEnd
@@ -68,7 +68,7 @@ FunctionEnd
   StrCmp $0 "0" check_closed_done check_closed_prompt
   check_closed_prompt:
   IfSilent check_closed_abort
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Закройте SCrip, затем нажмите «Повторить»." IDRETRY check_closed_retry
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Закройте Sange, затем нажмите «Повторить»." IDRETRY check_closed_retry
   check_closed_abort:
   SetErrorLevel 2
   Quit
@@ -130,7 +130,7 @@ Function RecoverInterruptedUpdate
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
-  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:SCrip"
+  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:Sange"
   WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
   WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
   WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
@@ -139,7 +139,7 @@ Function RecoverInterruptedUpdate
   recovery_failed:
   !insertmacro TestTrace "recover_failed"
   SetErrorLevel 3
-  MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию SCrip. Файлы восстановления сохранены в $BackupDir."
+  MessageBox MB_OK|MB_ICONSTOP "Не удалось восстановить предыдущую версию приложения. Файлы восстановления сохранены в $BackupDir."
   Abort
   recovery_done:
 FunctionEnd
@@ -175,7 +175,7 @@ Function RestorePrevious
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
-  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:SCrip"
+  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:Sange"
   WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
   WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
   WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
@@ -334,7 +334,7 @@ Section
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
-  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:SCrip"
+  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:Sange"
   WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
   WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
   WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
