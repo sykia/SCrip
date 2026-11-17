@@ -118,6 +118,11 @@ Function RecoverInterruptedUpdate
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
+  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:SCrip"
+  WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
+  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
+
   Goto recovery_done
   recovery_failed:
   !insertmacro TestTrace "recover_failed"
@@ -154,6 +159,11 @@ Function RestorePrevious
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
+  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:SCrip"
+  WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
+  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
+
   Goto restore_done
   restore_cleanup_pending:
   RMDir /r "$StageDir"
@@ -301,6 +311,11 @@ Section
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
+  WriteRegStr HKCU "Software\Classes\scrip" "" "URL:SCrip"
+  WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
+  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
+
 SectionEnd
 
 Section "Uninstall"
@@ -308,6 +323,7 @@ Section "Uninstall"
   !include "${FILELIST}"
   Delete "$DESKTOP\SCrip.lnk"
   Delete "$SMPROGRAMS\SCrip.lnk"
+  DeleteRegKey HKCU "Software\Classes\scrip"
   DeleteRegKey HKCU "${UNKEY}"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"

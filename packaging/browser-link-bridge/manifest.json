@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "SCrip · SoundCloud links",
+  "version": "1.0.0",
+  "description": "Open SoundCloud links in the SCrip desktop application.",
+  "permissions": ["activeTab"],
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["links.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }],
+  "action": {
+    "default_title": "Открыть в SCrip",
+    "default_popup": "popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {"id": "soundcloud-links@scrip.app", "strict_min_version": "109.0"}
+  }
+}

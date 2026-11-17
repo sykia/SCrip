@@ -96,21 +96,21 @@ Window {
     property int category: 0
     property int settingGroup: 0
     property string query: ""
-    property string collectionQuery: ""
-    readonly property var filteredCollection: {
-        const needle = collectionQuery.trim().toLocaleLowerCase()
-        const tracks = api.tracks || []
-        return needle ? tracks.filter(track => [track.title, track.user?.username, track.username]
-            .some(value => (value || "").toLocaleLowerCase().includes(needle))) : tracks
-    }
+    readonly property string collectionQuery: collectionTools.query
+    readonly property var filteredCollection: collectionTools.rows
+    TrackSelection { id: trackSelection; rows: app.filteredCollection; context: (collectionTools.transformed ? collectionTools.sourceRows.length : "") + ":" + collectionTools.sortKey + ":" + collectionTools.descending + ":" + app.scrollKey + ":" + app.collectionQuery + ":" + (app.api.profile?.urn || "") + ":" + sc.signedIn }
+    Shortcut { sequence: "Escape"; enabled: trackSelection.active && !playlistView.visible; onActivated: selectionBar.back() }
     readonly property var playableCollection: filteredCollection.filter(track => (track.urn || "").startsWith("soundcloud:tracks:"))
     property string libraryPage: "likes"
+    property string playlistLibrary: "playlists"
+    property string repostLibrary: "reposts"
     property int profileTab: 0
+    property string profileLikes: "likes"
     property var guest: null
     readonly property var displayedProfile: guest ? (api.visitedProfile?.urn === guest.urn ? api.visitedProfile : guest) : api.profile
     function openTrack(track, followCurrent = false) {
         if (!track || !(track.urn || track.id)) return
-        if (track.kind === "playlist" || (track.urn || "").startsWith("soundcloud:playlists:")) { playlistView.begin(track); return }
+        if (track.kind === "playlist" || ((track.urn || "").startsWith("soundcloud:playlists:") || (track.urn || "").startsWith("soundcloud:system-playlists:"))) { playlistView.begin(track); return }
         trackPage.changingSelection = true
         trackPage.followCurrent = followCurrent
         trackPage.selectedTrack = track
@@ -126,12 +126,12 @@ Window {
         section = 3
         if (reload) refreshPage()
     }
-    readonly property string scrollKey: section + ":" + (section === 1 ? libraryPage : section === 0 ? category + ":" + query : section === 3 ? profileTab + ":" + (guest?.urn || "me") : "")
+    readonly property string scrollKey: section + ":" + (section === 1 ? libraryPage : section === 0 ? category + ":" + query + ":" + (category === 0 ? trackFilters.summary : "") : section === 3 ? profileTab + ":" + profileLikes + ":" + repostLibrary + ":" + (guest?.urn || "me") : "")
     property var scrollPositions: ({})
     property string activeScrollKey: scrollKey
     property bool restoringScroll: false
     function restorePageScroll() {
-        contentScroll.wheelTarget = 0
+        contentWheel.motion.stop()
         const saved = scrollPositions[activeScrollKey] || { outer: 0, inner: 0 }
         Qt.callLater(function() {
             contentScroll.contentY = saved.outer
@@ -141,7 +141,7 @@ Window {
         })
     }
     onScrollKeyChanged: {
-        collectionQuery = ""
+        sc.cancelCollectionSearch()
         restoringScroll = true
         activeScrollKey = scrollKey
         restorePageScroll()
@@ -156,6 +156,20 @@ Window {
     readonly property var pages: ["Поиск", "Любимые треки", "Плейлисты", "Профиль", "Настройки", "Главная"]
     readonly property bool compact: width < 1000
 
+    function openEngagementPeople(item, kind) { peoplePopup.begin(item, kind) }
+    PeoplePopup {
+        id: peoplePopup
+        host: app; mobile: false
+        onProfileRequested: function(user) { playlistView.close(); app.openProfile(user) }
+    }
+    Connections {
+        target: sc
+        function onResourceResolved(item) {
+            if ((item.urn || "").startsWith("soundcloud:users:")) app.openProfile(item)
+            else if (item.preview_type === "station" || (item.urn || "").startsWith("soundcloud:playlists:") || (item.urn || "").startsWith("soundcloud:system-playlists:")) playlistView.begin(item)
+            else app.openTrack(item)
+        }
+    }
     PlaylistPopup {
         id: playlistView
         parent: Overlay.overlay
@@ -163,6 +177,9 @@ Window {
     }
     Settings { id: prefs; objectName: "uiPreferences"; category: "appleInterface"; property bool gridView: true; property real volume: 0.7; property bool motion: true
         property string hiddenMixTracks: "{}"
+        property bool showComments: true
+        property bool commentsLeft: false
+        property bool timedComments: false
         property int spectrumStyle: 0
         property bool darkMode: true
         property string savedThemes: "[]"
@@ -179,16 +196,19 @@ Window {
         property bool autoLoad: true
 
     }
+    readonly property string commentsTrack: sc.signedIn && (trackPage.opened || prefs.showComments) ? String((trackPage.opened ? trackPage.track : api.current).urn || "") : ""
+    onCommentsTrackChanged: sc.loadComments(commentsTrack)
     function time(ms) { const s = Math.max(0, Math.floor((ms || 0) / 1000)); return Math.floor(s / 60) + ":" + (s % 60).toString().padStart(2, "0") }
     function refreshPage(force = false) {
         if (!sc.signedIn) return
         if (section === 0) sc.browse(["tracks", "sets", "users"][category], query, force)
         else if (section === 1) sc.browse(libraryPage, "", force)
-        else if (section === 2) sc.browse("playlists", "", force)
-        else if (section === 3) sc.browse(guest ? ["userTracks", "userSets"][profileTab] : ["mine", "playlists", "likes", "reposts"][profileTab], guest?.urn || "", force)
+        else if (section === 2) sc.browse(playlistLibrary, "", force)
+        else if (section === 3) sc.browse(guest ? ["userTracks", "userSets", {likes: "userLikes", likedPlaylists: "userLikedPlaylists", likedStations: "userLikedStations"}[profileLikes], repostLibrary === "reposts" ? "userReposts" : "userRepostedPlaylists"][profileTab] : ["mine", "playlists", profileLikes, repostLibrary][profileTab], guest?.urn || "", force)
         else if (section === 5) sc.loadHome(force)
     }
-    function searchNow() { query = searchField.text; if (section !== 0) section = 0; else refreshPage() }
+    function searchNow() { if (/^(https?:\/\/|scrip:|soundcloud:)/i.test(searchField.text.trim())) { sc.openLink(searchField.text); return } if (category === 0) trackFilters.apply(); else commitSearch() }
+    function commitSearch() { if (/^(https?:\/\/|scrip:|soundcloud:)/i.test(searchField.text.trim())) { sc.openLink(searchField.text); return } query = searchField.text; if (section !== 0) section = 0; else refreshPage() }
     function selectLibrary(page) { libraryPage = page; if (section !== 1) section = 1; else refreshPage() }
     function imageUrl(url) {
         if (!url) return ""
@@ -240,6 +260,11 @@ Window {
             case "grid": for(let y=4;y<20;y+=9) for(let x=4;x<20;x+=9) c.rect(x,y,6,6); break
             case "list": for(let y=6;y<21;y+=6) { c.moveTo(8,y); c.lineTo(21,y); c.moveTo(3,y); c.lineTo(3.2,y) } break
             case "clock": c.arc(12,12,9,0,Math.PI*2); c.moveTo(12,6); c.lineTo(12,12); c.lineTo(16,14); break
+            case "follow": case "following":
+                c.arc(9,7,3,0,Math.PI*2); c.moveTo(3,20); c.bezierCurveTo(3,12,15,12,15,20);
+                if (name === "following") { c.moveTo(16,13); c.lineTo(18,15); c.lineTo(22,10) }
+                else { c.moveTo(19,10); c.lineTo(19,16); c.moveTo(16,13); c.lineTo(22,13) }
+                break
             case "profile": c.arc(12,8,3.5,0,Math.PI*2); c.moveTo(4,21); c.bezierCurveTo(4,12,20,12,20,21); break
             case "settings": for(let y=5;y<22;y+=7) { const x=y===12?15:8; c.moveTo(3,y); c.lineTo(x-2,y); c.moveTo(x+2,y); c.lineTo(21,y); c.moveTo(x+2,y); c.arc(x,y,2,0,Math.PI*2) } break
             case "play": c.moveTo(8,4); c.lineTo(20,12); c.lineTo(8,20); c.closePath(); c.fill(); return
@@ -247,10 +272,14 @@ Window {
             case "next": c.moveTo(4,5); c.lineTo(14,12); c.lineTo(4,19); c.closePath(); c.fill(); c.moveTo(16,5); c.lineTo(16,19); break
             case "previous": c.moveTo(20,5); c.lineTo(10,12); c.lineTo(20,19); c.closePath(); c.fill(); c.moveTo(8,5); c.lineTo(8,19); break
             case "menu": for (let y = 6; y <= 18; y += 6) { c.moveTo(4,y); c.lineTo(20,y) } break
+            case "comment": c.moveTo(4,4); c.lineTo(20,4); c.lineTo(20,16); c.lineTo(10,16); c.lineTo(5,21); c.lineTo(5,16); c.lineTo(4,16); c.closePath(); break
             case "plus": c.moveTo(12,5); c.lineTo(12,19); c.moveTo(5,12); c.lineTo(19,12); break
             case "close": c.moveTo(6,6); c.lineTo(18,18); c.moveTo(6,18); c.lineTo(18,6); break
             case "volume": c.moveTo(4,9); c.lineTo(8,9); c.lineTo(13,5); c.lineTo(13,19); c.lineTo(8,15); c.lineTo(4,15); c.closePath(); c.moveTo(17,8); c.quadraticCurveTo(22,12,17,16); break
-            case "repeat": c.moveTo(5,9); c.lineTo(5,6); c.lineTo(19,6); c.lineTo(19,10); c.moveTo(16,7); c.lineTo(19,10); c.lineTo(22,7); c.moveTo(19,15); c.lineTo(19,18); c.lineTo(5,18); c.lineTo(5,14); c.moveTo(2,17); c.lineTo(5,14); c.lineTo(8,17); break
+            case "repeatOne": case "repeatOff": case "repeat":
+                if (name === "repeatOne") { c.moveTo(10,11); c.lineTo(12,9); c.lineTo(12,15); c.moveTo(10,15); c.lineTo(14,15) }
+                if (name === "repeatOff") { c.moveTo(3,3); c.lineTo(21,21) }
+                c.moveTo(5,9); c.lineTo(5,6); c.lineTo(19,6); c.lineTo(19,10); c.moveTo(16,7); c.lineTo(19,10); c.lineTo(22,7); c.moveTo(19,15); c.lineTo(19,18); c.lineTo(5,18); c.lineTo(5,14); c.moveTo(2,17); c.lineTo(5,14); c.lineTo(8,17); break
             case "shuffle": c.moveTo(3,6); c.bezierCurveTo(12,6,12,18,21,18); c.moveTo(18,15); c.lineTo(21,18); c.lineTo(18,21); c.moveTo(3,18); c.bezierCurveTo(12,18,12,6,21,6); c.moveTo(18,3); c.lineTo(21,6); c.lineTo(18,9); break
             case "cloud": c.moveTo(6,18); c.bezierCurveTo(-1,18,0,10,6,10); c.bezierCurveTo(6,1,19,1,19,10); c.bezierCurveTo(25,10,25,18,19,18); c.closePath(); break
             case "back": c.translate(24,0); c.scale(-1,1);
@@ -287,14 +316,36 @@ Window {
             Txt { id: toolLabel; visible: !tool.symbol; anchors.centerIn: parent; width: Math.min(implicitWidth, tool.width - 16); text: tool.text; color: tool.primary ? app.foreground(app.accent) : app.ink; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter }
         }
     }
-    component LikeButton: Tool {
+    component FollowButton: Tool {
+        id: followButton
+        property var user: ({})
+        property bool compact: false
+        readonly property string userUrn: user?.urn || ""
+        readonly property bool followed: !!app.api.followings?.[userUrn]
+        readonly property bool pending: !!app.api.followingPending?.[userUrn]
+        visible: !!userUrn && userUrn !== (app.api.profile?.urn || "")
+        enabled: !app.api.signedIn || (!app.api.followingsLoading && !pending)
+        text: pending ? "Сохранение…" : app.api.followingsLoading ? "Загрузка…" : app.api.signedIn && !app.api.followingsReady ? "Повторить" : followed ? "Вы подписаны" : "Подписаться"
+        Accessible.name: (followed ? "Отписаться от " : "Подписаться на ") + (user?.username || "исполнителя")
+        onUserUrnChanged: if (visible) Qt.callLater(sc.loadFollowings)
+        Connections {
+            target: sc
+            function onSignedInChanged() { if (followButton.visible) sc.loadFollowings() }
+        }
+        Component.onCompleted: if (visible) Qt.callLater(sc.loadFollowings)
+        onClicked: sc.toggleFollow(user || {})
+        active: followed
+        symbol: compact ? (followed ? "following" : "follow") : ""
+        ToolTip.visible: hovered
+        ToolTip.text: text + " · " + (user?.username || "")
+    }
+
+    component LikeButton: EngagementAction {
         required property var track
-        active: !!track.user_favorite
-        symbol: active ? "liked" : "heart"
-        text: active ? "Лайк поставлен · Убрать" : "Поставить лайк"
-        Accessible.checkable: true
-        Accessible.checked: active
-        onClicked: sc.like(track)
+        property bool round: false
+        id: likeAction
+        host: app
+        item: track
     }
     component Field: TextField {
         height: 34; color: app.ink; font.pixelSize: 13; selectByMouse: true
@@ -450,7 +501,7 @@ Window {
                     Basic.TextField {
                         id: searchField; verticalAlignment: TextInput.AlignVCenter; x: 29; width: parent.width - 36; height: parent.height
                         background: null; leftPadding: 0; topPadding: 0; bottomPadding: 0; font.pixelSize: 12
-                        color: app.ink; placeholderText: "Поиск в SoundCloud"; placeholderTextColor: (app.dark ? "#aaaaaa" : "#99949a"); selectByMouse: true
+                        color: app.ink; placeholderText: "Поиск или ссылка SoundCloud"; placeholderTextColor: (app.dark ? "#aaaaaa" : "#99949a"); selectByMouse: true
                         text: app.query; onAccepted: app.searchNow()
                     }
                 }
@@ -466,6 +517,66 @@ Window {
             border.color: (app.dark ? "#252525" : "#eeecef")
 
             Inspector { anchors.fill: parent; anchors.margins: app.gutter; anchors.topMargin: 20; onDismiss: app.inspectorOpen = false }
+        }
+        CommentsPane {
+            id: floatingComments
+            host: app; preferences: prefs
+            onProfileRequested: function(user) { app.openProfile(user) }
+            onComposeRequested: function(mention) { app.openTrack(track, track.urn === app.api.current.urn); Qt.callLater(function() { detailsComments.setDraft(mention) }) }
+            objectName: "floatingCommentsPane"
+            z: 15
+            readonly property bool leftDock: prefs.commentsLeft && app.width >= 1100 && app.height >= 780
+            visible: sc.signedIn && !!app.api.current.urn && !trackPage.visible && prefs.showComments
+            track: app.api.current; compact: true; movable: true
+            property var customGeometry: null
+            readonly property real minimumPanelWidth: Math.min(240, shell.width)
+            readonly property real minimumPanelHeight: Math.min(280, shell.height)
+            width: customGeometry ? Math.min(customGeometry.width, shell.width) : leftDock ? sidebar.width - 16 : Math.min(300, musicArea.width - 40)
+            height: customGeometry ? Math.min(customGeometry.height, shell.height) : leftDock ? shell.height - player.height - 540 : Math.min(330, Math.max(260, shell.height - 500))
+            x: customGeometry ? Math.max(0, Math.min(customGeometry.x, shell.width - width)) : leftDock ? sidebar.x + 8 : musicArea.x + musicArea.width - width - app.gutter
+            y: customGeometry ? Math.max(0, Math.min(customGeometry.y, shell.height - height)) : leftDock ? 510 : shell.height - player.height - height - 30
+            onPanelMoveRequested: function(dx, dy) {
+                customGeometry = Qt.rect(Math.max(0, Math.min(x + dx, shell.width - width)), Math.max(0, Math.min(y + dy, shell.height - height)), width, height)
+            }
+            Connections {
+                target: prefs
+                function onCommentsLeftChanged() { floatingComments.customGeometry = null }
+            }
+            Repeater {
+                model: ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+                delegate: MouseArea {
+                    required property string modelData
+                    readonly property bool west: modelData.includes("w")
+                    readonly property bool east: modelData.includes("e")
+                    readonly property bool north: modelData.includes("n")
+                    readonly property bool south: modelData.includes("s")
+                    readonly property bool corner: modelData.length === 2
+                    z: 20
+                    width: corner || west || east ? 8 : floatingComments.width - 16
+                    height: corner || north || south ? 8 : floatingComments.height - 16
+                    x: west ? 0 : east ? floatingComments.width - width : 8
+                    y: north ? 0 : south ? floatingComments.height - height : 8
+                    cursorShape: corner ? (west === north ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor) : west || east ? Qt.SizeHorCursor : Qt.SizeVerCursor
+                    property point startPosition
+                    property rect startGeometry
+                    onPressed: function(mouse) {
+                        startPosition = mapToItem(shell, mouse.x, mouse.y)
+                        startGeometry = Qt.rect(floatingComments.x, floatingComments.y, floatingComments.width, floatingComments.height)
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!pressed) return
+                        const position = mapToItem(shell, mouse.x, mouse.y)
+                        const dx = position.x - startPosition.x, dy = position.y - startPosition.y
+                        let left = startGeometry.x, top = startGeometry.y
+                        let right = left + startGeometry.width, bottom = top + startGeometry.height
+                        if (west) left = Math.max(0, Math.min(left + dx, right - floatingComments.minimumPanelWidth))
+                        if (east) right = Math.min(shell.width, Math.max(right + dx, left + floatingComments.minimumPanelWidth))
+                        if (north) top = Math.max(0, Math.min(top + dy, bottom - floatingComments.minimumPanelHeight))
+                        if (south) bottom = Math.min(shell.height, Math.max(bottom + dy, top + floatingComments.minimumPanelHeight))
+                        floatingComments.customGeometry = Qt.rect(left, top, right - left, bottom - top)
+                    }
+                }
+            }
         }
         Item {
             id: musicArea
@@ -483,10 +594,10 @@ Window {
                 flickDeceleration: 1500; maximumFlickVelocity: 3600
                 property bool virtualCollectionHovered: false
                 function maybeLoad() {
-                    if (prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
+                    if (!app.collectionQuery.trim() && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && contentY + height >= contentHeight - 240) sc.more()
                 }
                 function maybeLoadVirtual(position, viewportSize, totalSize) {
-                    if (totalSize > viewportSize && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && position + viewportSize >= totalSize - 240) sc.more()
+                    if (totalSize > viewportSize && !app.collectionQuery.trim() && prefs.autoLoad && app.section < 4 && app.api.hasMore && !app.api.busy && !app.api.error && position + viewportSize >= totalSize - 240) sc.more()
                 }
                 onContentYChanged: {
                     autoLoadTimer.restart()
@@ -498,9 +609,10 @@ Window {
                 onContentHeightChanged: autoLoadTimer.restart()
                 onHeightChanged: autoLoadTimer.restart()
                 Timer { id: autoLoadTimer; interval: 160; onTriggered: contentScroll.maybeLoad() }
-                readonly property bool paginationReady: app.api.hasMore && !app.api.busy && !app.api.error && prefs.autoLoad
+                readonly property bool paginationReady: !app.collectionQuery.trim() && app.api.hasMore && !app.api.busy && !app.api.error && prefs.autoLoad
                 onPaginationReadyChanged: autoLoadTimer.restart()
                 SmoothWheel {
+                    id: contentWheel
                     flickable: contentScroll
                     duration: prefs.motion ? Math.min(220, app.motion) : 0
                     enabled: !contentScroll.virtualCollectionHovered
@@ -526,6 +638,19 @@ Window {
                         Txt { visible: app.section !== 4; width: parent.width; color: app.muted; text: app.section === 5 ? "Музыка из ваших подписок и новые открытия" : app.section === 0 ? (app.query ? "Результаты поиска · " + app.query : "Музыка и исполнители SoundCloud") : app.api.tracks.length + " в подборке"; font.pixelSize: 12 }
                     }
                     }
+                    TrackSearchFilters {
+                        id: trackFilters; width: parent.width
+                        visible: app.section === 0 && app.category === 0
+                        host: app; backend: sc
+                        onSearchRequested: app.commitSearch()
+                    }
+                    Flow {
+                        width: parent.width; spacing: 8; visible: app.section === 2
+                        Repeater {
+                            model: [{label: "Мои плейлисты", key: "playlists"}, {label: "Любимые плейлисты", key: "likedPlaylists"}, {label: "Станции", key: "likedStations"}]
+                            SurfaceButton { required property var modelData; host: app; text: modelData.label; primary: app.playlistLibrary === modelData.key; onClicked: { app.playlistLibrary = modelData.key; app.refreshPage() } }
+                        }
+                    }
                     Loader { width: parent.width; active: app.section === 3; visible: active; sourceComponent: profileHeader }
                     Rectangle {
                         visible: !!app.api.error; width: parent.width; height: errorLabel.implicitHeight + 24
@@ -538,21 +663,12 @@ Window {
                         visible: app.section >= 0 && app.section <= 3
                         padding: 12
                         contentItem: RowLayout {
-                        width: parent.width; spacing: 8
+                        objectName: "collectionToolbar"; spacing: 8
                         Tool { visible: app.section === 0; text: "Треки"; active: app.category === 0; onClicked: app.category = 0 }
                         Tool { visible: app.section === 0; text: "Плейлисты"; active: app.category === 1; onClicked: app.category = 1 }
                         Tool { visible: app.section === 0; text: "Профили"; active: app.category === 2; onClicked: app.category = 2 }
                         Tool { visible: app.section === 2; text: "Создать плейлист"; onClicked: playlistDialog.open() }
-                        Field {
-                            visible: app.section !== 0
-                            Layout.fillWidth: true
-                            Layout.minimumWidth: 80
-                            Layout.preferredWidth: 280
-                            placeholderText: app.section === 2 || (app.section === 3 && app.profileTab === 1) ? "Поиск плейлистов" : "Поиск по названию или исполнителю"
-                            Accessible.name: placeholderText
-                            text: app.collectionQuery
-                            onTextEdited: app.collectionQuery = text
-                        }
+
                         Tool {
                             visible: app.section === 1 || (app.section === 3 && app.profileTab !== 1)
                             symbol: "shuffle"; text: "Перемешать"
@@ -562,9 +678,21 @@ Window {
                                 sc.playMix(app.playableCollection, Math.floor(Math.random() * app.playableCollection.length))
                             }
                         }
+                        CollectionTools {
+                            id: collectionTools; Layout.fillWidth: true; Layout.minimumWidth: 80; host: app; backend: sc
+                            visible: app.section >= 0 && app.section <= 3
+                            catalogue: app.section === 0
+                            contextKey: app.scrollKey
+                            catalogueQuery: app.query
+                            catalogueKind: String(app.category)
+                            filters: app.category === 0 ? trackFilters.applied : ({})
+                            onPresetApplied: (query, filters) => { if (catalogue) { searchField.text = query; if (app.category === 0) trackFilters.restore(filters); else app.commitSearch() } }
+                        }
+                        Tool { text: "Выбрать"; Accessible.name: "Выбрать треки"; visible: !trackSelection.active && !(app.section === 0 && app.category === 2); enabled: app.playableCollection.length > 0; onClicked: trackSelection.active = true }
                         Tool { text: "Обновить"; onClicked: app.refreshPage(true) }
                     }
                     }
+
                     Loader { width: parent.width; active: app.section === 4; visible: active; sourceComponent: app.settingGroup === 1 ? pluginsPage : settingsPage }
                     PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted;
 
@@ -575,10 +703,11 @@ Window {
                     }
                     Label { width: pageBody.width; text: app.pluginMessage; textFormat: Text.PlainText; visible: !!text; wrapMode: Text.Wrap }
                     Loader { width: parent.width; active: app.section === 5; visible: active; sourceComponent: homePage }
+                    SelectionBar { id: selectionBar; width: parent.width; host: app; showEntry: false; selection: trackSelection; visible: (trackSelection.active || !!trackSelection.message) && app.section !== 4 && app.section !== 5 && !(app.section === 0 && app.category === 2) }
                     Loader { id: collectionLoader; width: parent.width; active: (app.section !== 4 && app.section !== 5); visible: active; sourceComponent: app.section === 0 && app.category === 2 ? userResults : prefs.gridView ? coverGrid : trackList }
                     Txt {
                         visible: app.section >= 1 && app.section <= 3 && app.api.tracks.length > 0 && app.filteredCollection.length === 0
-                        width: parent.width; text: "Ничего не найдено"; color: app.muted
+                        width: parent.width; text: app.api.hasMore || app.api.busy || app.api.collectionSearchStatus === "error" || app.api.collectionSearchStatus === "limit" ? "В загруженной части совпадений нет" : "Ничего не найдено"; color: app.muted
                         horizontalAlignment: Text.AlignHCenter
                     }
                     BusyIndicator { visible: app.api.busy && (app.section !== 4 && app.section !== 5); running: visible; width: 32; height: 32; anchors.horizontalCenter: parent.horizontalCenter }
@@ -586,10 +715,10 @@ Window {
                         visible: (app.section !== 4 && app.section !== 5) && !app.api.busy && app.api.tracks.length === 0
                         width: parent.width; topPadding: 90; spacing: 12
                         Glyph { name: app.section === 0 ? "search" : app.section === 2 ? "grid" : "music"; width: 42; height: 42; ink: (app.dark ? "#777777" : "#c5c0c5"); anchors.horizontalCenter: parent.horizontalCenter }
-                        Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 19; font.weight: Font.DemiBold; text: app.section === 0 ? "Найдите любимую музыку" : app.section === 2 ? "Ваши плейлисты" : "Пока нет треков" }
-                        Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: app.muted; text: app.section === 0 ? "Введите название трека или исполнителя в поиске." : app.section === 2 ? "Создайте первый плейлист — он появится и в SoundCloud." : "Здесь появится музыка из вашей коллекции SoundCloud."; wrapMode: Text.WordWrap }
+                        Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 19; font.weight: Font.DemiBold; text: app.api.collectionStatus === "unavailable" ? "Раздел недоступен" : app.api.collectionStatus === "error" ? "Не удалось загрузить раздел" : app.section === 0 ? "Найдите любимую музыку" : app.section === 3 ? "В этом разделе пока пусто" : app.section === 2 ? "Ваши плейлисты" : "Пока нет треков" }
+                        Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: app.muted; visible: app.section !== 3 && app.api.collectionStatus !== "error" && app.api.collectionStatus !== "unavailable"; text: app.section === 0 ? "Введите название трека или исполнителя в поиске." : app.section === 2 ? "Создайте первый плейлист — он появится и в SoundCloud." : "Здесь появится музыка из вашей коллекции SoundCloud."; wrapMode: Text.WordWrap }
                     }
-                    Tool { visible: app.api.hasMore && app.section < 4 && (!prefs.autoLoad || !!app.api.error); text: app.api.error ? "Повторить загрузку" : "Загрузить ещё"; enabled: !app.api.busy; anchors.horizontalCenter: parent.horizontalCenter; onClicked: { sc.clearError(); sc.more() } }
+                    Tool { visible: app.api.hasMore && app.section < 4 && (!prefs.autoLoad || !!app.collectionQuery.trim() || !!app.api.error); text: app.api.error ? "Повторить загрузку" : "Загрузить ещё"; enabled: !app.api.busy; anchors.horizontalCenter: parent.horizontalCenter; onClicked: { sc.clearError(); sc.more() } }
                 }
             }
             Rectangle {
@@ -623,7 +752,7 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true; Layout.preferredWidth: 175; Layout.minimumWidth: 52; spacing: 3
                         Txt { objectName: "dockTrackTitle"; Layout.fillWidth: true; text: app.api.current.title || "Выберите трек"; font.pixelSize: 14; font.weight: Font.DemiBold; TapHandler { enabled: player.hasTrack; onTapped: app.openTrack(app.api.current, true) } }
-                        Txt { Layout.fillWidth: true; visible: !!text; text: app.api.buffering ? "Загрузка…" : app.api.current.user?.username || ""; font.pixelSize: 12; color: app.muted }
+                        Txt { Layout.fillWidth: true; visible: !!text; text: app.api.buffering ? "Загрузка…" : sc.displayArtist(app.api.current) || ""; font.pixelSize: 12; color: app.muted }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true; Layout.preferredWidth: 310; Layout.maximumWidth: 460; spacing: 0
@@ -639,7 +768,7 @@ Window {
                                 BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: !!app.api.buffering; visible: running }
                             }
                             Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: "Следующий трек"; enabled: !!app.api.queue?.length; onClicked: sc.next() }
-                            Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "repeat"; active: app.api.repeat; text: "Повтор трека"; onClicked: sc.setRepeat(!app.api.repeat) }
+                            Tool { ToolTip.visible: hovered; ToolTip.text: text; anchors.verticalCenter: parent.verticalCenter; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; text: ["Повтор выключен", "Повтор трека", "Повтор очереди"][app.api.repeatMode || 0]; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
                         }
                         RowLayout {
                             visible: player.hasTrack; Layout.fillWidth: true; spacing: 8
@@ -660,6 +789,7 @@ Window {
                         }
                     }
                     Item { Layout.fillWidth: true; Layout.preferredWidth: player.narrow ? 0 : 48 }
+                    FollowButton { user: app.api.current.user || ({}); compact: true }
                     LikeButton { visible: player.hasTrack; track: app.api.current }
                     RowLayout {
                         Layout.fillWidth: false
@@ -667,6 +797,7 @@ Window {
                         Layout.maximumWidth: implicitWidth
                         spacing: 12
                         Tool { text: "Дополнения"; visible: !!app.extensions && app.extensions.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
+                        Tool { symbol: "comment"; text: "Комментарии к треку"; active: prefs.showComments; onClicked: prefs.showComments = !prefs.showComments }
                         Tool { symbol: "list"; text: "Очередь воспроизведения"; active: app.dockedInspector || queuePopup.opened; onClicked: app.toggleInspector() }
                         Glyph { visible: !player.narrow; name: "volume"; Layout.preferredWidth: 18; Layout.preferredHeight: 18; ink: app.muted }
                         VolumeSlider { visible: !player.narrow; Layout.minimumWidth: 96; Layout.preferredWidth: 96; Layout.maximumWidth: 96 }
@@ -695,6 +826,7 @@ Window {
                 enabled: !app.api.authBusy; onClicked: sc.login()
             }
             Txt { visible: app.api.authStep === "browser"; width: parent.width; text: "Завершите вход в отдельном окне.\nSCrip откроет медиатеку автоматически."; horizontalAlignment: Text.AlignHCenter; color: app.muted; wrapMode: Text.WordWrap; lineHeight: 1.4 }
+            Tool { visible: app.api.disconnectStatus === "unconfirmed"; text: "Настройки SoundCloud"; anchors.horizontalCenter: parent.horizontalCenter; onClicked: sc.openExternal("https://soundcloud.com/settings") }
             Txt { visible: !!app.api.error; width: parent.width; text: app.api.error || ""; color: "#bc3b4a"; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 12 }
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
@@ -721,7 +853,9 @@ Window {
         readonly property bool isCurrent: !!app.api.current.urn && (followCurrent || selectedTrack.urn === app.api.current.urn)
         readonly property var track: followCurrent || isCurrent ? app.api.current : selectedTrack
         readonly property string trackKey: String(track.urn || track.id || "")
-        onTrackKeyChanged: if (opened && !changingSelection) loadLyrics()
+        readonly property string lyricMetadataKey: JSON.stringify([trackKey, track.title, sc.displayArtist(track)])
+        onLyricMetadataKeyChanged: if (opened && !changingSelection) loadLyrics()
+
         readonly property var lyrics: typeof lyricsBackend !== "undefined" ? lyricsBackend : null
         readonly property var lyricState: lyrics ? lyrics.state : ({})
         property bool showDescription: false
@@ -741,7 +875,7 @@ Window {
             detailsScroll.contentY = 0
             showDescription = false; followLyrics = true
             customLyrics.close()
-            if (lyrics) lyrics.lookup(track.title || "", track.user?.username || "", track.duration || 0, trackKey)
+            if (lyrics) lyrics.lookup(track.title || "", sc.displayArtist(track) || "", track.duration || 0, trackKey)
         }
         function playLyric(time) {
             if (!lyricState.synced || time < 0) return
@@ -824,10 +958,10 @@ Window {
                             GridLayout {
                                 id: hero
                                 x: 24; y: 24; width: parent.width - 48
-                                columns: width >= 760 ? 2 : 1
+                                columns: width >= 400 ? 2 : 1
                                 columnSpacing: 32; rowSpacing: 24
                                 Item {
-                                    Layout.preferredWidth: hero.columns === 2 ? Math.min(380, hero.width * 0.44) : Math.min(320, hero.width * 0.82)
+                                    Layout.preferredWidth: hero.columns === 2 ? Math.min(240, hero.width * 0.42) : Math.min(220, hero.width * 0.7)
                                     Layout.preferredHeight: width + 10
                                     Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
                                     Rectangle { x: 10; y: 10; width: parent.width - 20; height: width; radius: 22; color: Qt.alpha(app.ink, 0.06) }
@@ -848,17 +982,25 @@ Window {
                                     Txt {
                                         objectName: "trackDetailsTitle"
                                         Layout.fillWidth: true; Layout.minimumWidth: 0; text: trackPage.track.title || "Без названия"
-                                        font.pixelSize: hero.width > 850 ? 36 : 28; font.weight: Font.Bold
+                                        font.pixelSize: hero.width > 850 ? 28 : 24; font.weight: Font.Bold
                                         horizontalAlignment: hero.columns === 1 ? Text.AlignHCenter : Text.AlignLeft
                                         wrapMode: Text.Wrap; elide: Text.ElideNone; lineHeight: 1.1
                                     }
                                     AbstractButton {
                                         InteractionFeedback {}
                                         Layout.fillWidth: true
-                                        Accessible.name: "Открыть исполнителя"
+                                        Accessible.name: "Открыть загрузивший аккаунт"
                                         onClicked: { trackPage.close(); app.openProfile(trackPage.track.user) }
+                                        enabled: !!trackPage.track.user?.urn && !sc.hasSeparateArtist(trackPage.track)
+                                        contentItem: Txt { text: sc.displayArtist(trackPage.track) || "SoundCloud"; color: app.muted; font.pixelSize: 15; wrapMode: Text.Wrap; horizontalAlignment: hero.columns === 1 ? Text.AlignHCenter : Text.AlignLeft }
+                                    }
+                                    AbstractButton {
+                                        Layout.fillWidth: true
+                                        visible: sc.hasSeparateArtist(trackPage.track)
                                         enabled: !!trackPage.track.user?.urn
-                                        contentItem: Txt { text: trackPage.track.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 15; wrapMode: Text.Wrap; horizontalAlignment: hero.columns === 1 ? Text.AlignHCenter : Text.AlignLeft }
+                                        Accessible.name: "Открыть загрузивший аккаунт"
+                                        onClicked: { trackPage.close(); app.openProfile(trackPage.track.user) }
+                                        contentItem: Txt { text: "Загрузил: " + (trackPage.track.user?.username || "SoundCloud"); color: app.muted; font.pixelSize: 12; elide: Text.ElideRight; horizontalAlignment: hero.columns === 1 ? Text.AlignHCenter : Text.AlignLeft }
                                     }
                                     Txt {
                                         Layout.fillWidth: true; wrapMode: Text.WordWrap
@@ -876,8 +1018,8 @@ Window {
                                             text: trackPage.isCurrent && app.api.playing ? "Пауза" : "Слушать"
                                             onClicked: { if (trackPage.isCurrent) sc.togglePlayback(); else sc.play(trackPage.track) }
                                         }
-                                        LikeButton { track: trackPage.track; height: 42; width: hero.width < 500 ? 32 : 42 }
-                                        Tool { symbol: "menu"; height: 42; width: hero.width < 500 ? 32 : 42; text: "Действия с треком"; onClicked: app.openTrackActions(trackPage.track) }
+                                        LikeButton { track: trackPage.track; height: 42; width: implicitWidth }
+                                        Tool { symbol: "menu"; height: 42; width: implicitWidth; text: "Действия с треком"; onClicked: app.openTrackActions(trackPage.track) }
                                     }
                                 }
                                 ColumnLayout {
@@ -976,16 +1118,40 @@ Window {
                                 }
                             }
                         }
+                        TrackProgress {
+                            width: parent.width
+                            source: trackPage.opened ? (trackPage.track.waveform_url || "") : ""
+                            selectionKey: trackPage.trackKey
+                            duration: trackPage.isCurrent && sc.duration > 0 ? sc.duration : (typeof trackPage.track.duration === "number" ? trackPage.track.duration : 0)
+                            position: trackPage.isCurrent ? sc.position : 0
+                            ink: Qt.alpha(app.muted, 0.4); accent: app.accent
+                            onSeekRequested: milliseconds => {
+                                const target = trackPage.track
+                                if (!trackPage.isCurrent) sc.play(target)
+                                sc.seek(milliseconds)
+                            }
+                        }
                         RowLayout {
                             width: parent.width
-                            Tool { visible: !!trackPage.track.description; text: trackPage.showDescription ? "Скрыть описание" : "О треке"; onClicked: trackPage.showDescription = !trackPage.showDescription }
+                            Tool { visible: sc.trackDescription(trackPage.track).length > 0 || sc.trackInfo(trackPage.track).length > 0; text: trackPage.showDescription ? "Скрыть сведения" : "О треке"; onClicked: trackPage.showDescription = !trackPage.showDescription }
                             Item { Layout.fillWidth: true }
                             Tool { visible: !!trackPage.track.permalink_url; text: "SoundCloud ↗"; onClicked: sc.openExternal(trackPage.track.permalink_url) }
                         }
                         CapsuleSection {
-                            width: parent.width; visible: trackPage.showDescription && !!trackPage.track.description
-                            Txt { width: parent.width; text: trackPage.track.description || ""; wrapMode: Text.Wrap; elide: Text.ElideNone; lineHeight: 1.5; color: app.muted }
+                            width: parent.width; visible: trackPage.showDescription
+                            TrackInformation { width: parent.width; track: trackPage.track; host: app; onProfileRequested: user => { trackPage.close(); app.openProfile(user) } }
                         }
+                    }
+                    CommentsPane {
+                        id: detailsComments
+                        host: app; preferences: prefs
+                        onProfileRequested: function(user) { trackPage.close(); app.openProfile(user) }
+                        objectName: "trackCommentsPane"
+                        track: trackPage.track
+                        Layout.preferredWidth: trackDetails.columns === 2 ? (trackDetails.width - trackDetails.columnSpacing) * 0.34 : trackDetails.width
+                        Layout.fillWidth: true; Layout.minimumWidth: 0
+                        Layout.alignment: Qt.AlignTop
+                        Layout.preferredHeight: Math.min(480, Math.max(360, detailsScroll.height - 24))
                     }
                     CapsuleSection {
                         id: lyricsPane
@@ -993,7 +1159,8 @@ Window {
                         Layout.preferredWidth: trackDetails.columns === 2 ? (trackDetails.width - trackDetails.columnSpacing) * 0.34 : trackDetails.width
                         Layout.fillWidth: true; Layout.minimumWidth: 0
                         Layout.alignment: Qt.AlignTop
-                        Layout.minimumHeight: trackDetails.columns === 2 ? trackHero.height : 400
+                        Layout.columnSpan: trackDetails.columns
+                        Layout.minimumHeight: 340
                         padding: width < 360 ? 20 : 28
                         Column {
                             id: lyricsHeading
@@ -1016,7 +1183,7 @@ Window {
                         }
                         Item {
                             width: parent.width
-                            height: visible ? Math.max(260, trackHero.height - lyricsHeading.height - 96) : 0
+                            height: visible ? 240 : 0
                             visible: !lyricList.count
                             Column {
                                 anchors.centerIn: parent; width: parent.width; spacing: 16
@@ -1041,7 +1208,7 @@ Window {
                         }
                         ListView {
                             id: lyricList; objectName: "lyricsList"
-                            width: parent.width; height: visible ? (trackDetails.columns === 2 ? Math.max(280, detailsScroll.height - 230) : 320) : 0
+                            width: parent.width; height: visible ? 320 : 0
                             visible: count > 0
                             model: trackPage.lyricState.lines || []
                             currentIndex: trackPage.lyricIndex
@@ -1150,6 +1317,7 @@ Window {
         id: homePage
         Column {
             width: parent.width; spacing: app.gutter
+            id: homeContent
             readonly property var mixes: app.api.home.filter(s => s.mix)
             WavePanel {
                 width: parent.width
@@ -1167,10 +1335,11 @@ Window {
                 contentItem: Txt { text: "Ваши миксы"; font.pixelSize: 21; font.weight: Font.DemiBold }
             }
             Repeater {
-                model: parent.mixes
+                model: homeContent.mixes.length
                 delegate: CapsuleSection {
                     id: mix
-                    required property var modelData
+                    required property int index
+                    readonly property var modelData: homeContent.mixes[index] || ({tracks: []})
                     readonly property string storageKey: (app.api.profile.urn || "") + "/" + modelData.title
                     readonly property var hidden: JSON.parse(prefs.hiddenMixTracks)[storageKey] || []
                     readonly property var songs: modelData.tracks.filter(t => !hidden.includes(t.urn))
@@ -1191,12 +1360,12 @@ Window {
                         ListView {
                             id: mixList
                             Layout.fillWidth: true; Layout.preferredHeight: Math.min(5, count) * 42
-                            clip: true; model: mix.songs
+                            clip: true; model: mix.songs.length
                             ScrollBar.vertical: ScrollBar { id: mixBar }
                             delegate: RowLayout {
                                 id: song
-                                required property var modelData
                                 required property int index
+                                readonly property var modelData: mix.songs[index] || ({})
                                 width: mixList.width - mixBar.implicitWidth; height: 42; spacing: 2
                                 AbstractButton {
                                     InteractionFeedback {}
@@ -1205,7 +1374,7 @@ Window {
                                     onClicked: app.openTrack(song.modelData)
                                     contentItem: Column {
                                         Txt { width: parent.width; text: song.modelData.title || "Трек"; font.weight: Font.Medium }
-                                        Txt { width: parent.width; text: song.modelData.user?.username || ""; color: app.muted; font.pixelSize: 11 }
+                                        Txt { width: parent.width; text: sc.displayArtist(song.modelData) || ""; color: app.muted; font.pixelSize: 11 }
                                     }
                                 }
                                 Tool { symbol: "play"; text: "Слушать"; onClicked: sc.playMix(mix.songs, song.index) }
@@ -1228,7 +1397,9 @@ Window {
                 }
             }
             Repeater {
-                model: {
+                id: homeShelves
+                model: shelves.length
+                readonly property var shelves: {
                     const shelves = app.api.home
                     const artists = new Set()
                     const seeds = []
@@ -1236,11 +1407,12 @@ Window {
                         const id = track.user?.urn
                         if (id && !artists.has(id) && seeds.length < 16) { artists.add(id); seeds.push(track) }
                     }
-                    return (seeds.length ? [{title: "Станции исполнителей", station: true, tracks: seeds}] : []).concat(shelves.filter(s => !s.mix))
+                    return (seeds.length ? [{title: "По вашим исполнителям", station: true, tracks: seeds}] : []).concat(shelves.filter(s => !s.mix))
                 }
                 delegate: CapsuleSection {
                     id: shelf
-                    required property var modelData
+                    required property int index
+                    readonly property var modelData: homeShelves.shelves[index] || ({tracks: []})
                     width: parent.width
                     contentItem: Column {
                         spacing: 12
@@ -1272,14 +1444,14 @@ Window {
                         readonly property int cardWidth: Math.floor((width - (slots - 1) * spacing) / slots)
                         readonly property int slots: Math.max(2, Math.floor((width + spacing) / 170))
                         orientation: ListView.Horizontal; spacing: 16; clip: true
-                        model: shelf.modelData.tracks
+                        model: shelf.modelData.tracks.length
                         ScrollBar.horizontal: ScrollBar { id: shelfBar }
                         delegate: AbstractButton {
                             InteractionFeedback {}
                             id: card
                             objectName: shelf.modelData.station ? "artistStationCard" + index : "homeTrackCard" + index
-                            required property var modelData
                             required property int index
+                            readonly property var modelData: shelf.modelData.tracks[index] || ({})
                             width: cards.cardWidth; height: cards.cardHeight
                             Accessible.name: modelData.title || "Слушать"
                             onClicked: shelf.modelData.station ? playlistView.beginStation(modelData) : app.openTrack(modelData)
@@ -1288,7 +1460,7 @@ Window {
                                 spacing: 4
                                 Artwork { width: card.width; height: width; radius: shelf.modelData.station ? width / 2 : app.artworkRadius; source: shelf.modelData.station ? app.imageUrl(card.modelData.user?.avatar_url) || app.cover(card.modelData) : app.cover(card.modelData) }
                                 Txt { width: card.width; text: shelf.modelData.station ? card.modelData.user.username : card.modelData.title || "Без названия"; font.weight: Font.Medium }
-                                Txt { width: card.width; text: shelf.modelData.station ? "Станция исполнителя" : card.modelData.user?.username || ""; color: app.muted; font.pixelSize: 12 }
+                                Txt { width: card.width; text: shelf.modelData.station ? (card.modelData.user?.station_urn ? "Станция исполнителя" : "Подборка SCrip") : sc.displayArtist(card.modelData) || ""; color: app.muted; font.pixelSize: 12 }
                             }
                             scale: pressed && prefs.motion ? 0.975 : 1
                             Behavior on scale { NumberAnimation { duration: app.motion / 2; easing.type: Easing.OutCubic } }
@@ -1339,12 +1511,12 @@ Window {
             property real tileHeight: tileWidth + 48
             cellWidth: width / columns
             cellHeight: tileHeight + 24
-            height: Math.min(count > 0 ? Math.ceil(count / columns) * cellHeight - 24 : 0, Math.max(58, contentScroll.height - y - 110))
+            height: Math.min(count > 0 ? Math.ceil(count / columns) * cellHeight - 24 : 0, Math.max(58, contentScroll.height - Math.min(collectionLoader.y, contentScroll.height - 180) - 24))
             clip: true
             cacheBuffer: Math.max(cellHeight * 2, height / 2)
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
-            model: app.collectionQuery.trim() ? app.filteredCollection : sc.trackModel
+            model: collectionTools.transformed ? app.filteredCollection : sc.trackModel
             property int activeDelegateCount: 0
             function trackTitleAt(index) {
                 const item = itemAtIndex(index)
@@ -1365,11 +1537,12 @@ Window {
                 id: tile
                 required property var modelData
                 required property int index
-                readonly property bool playlist: (modelData.urn || "").indexOf("soundcloud:playlists:") === 0
+                readonly property bool playlist: ((modelData.urn || "").startsWith("soundcloud:playlists:") || (modelData.urn || "").startsWith("soundcloud:system-playlists:"))
                 width: virtualCoverGrid.tileWidth
                 height: virtualCoverGrid.tileHeight
-                function playTrack() { if (playlist) playlistView.begin(modelData); else sc.play(modelData) }
+                function playTrack() { if (playlist) playlistView.begin(modelData); else sc.playMix(app.filteredCollection, index) }
                 function enqueueTrack() { sc.enqueue(modelData) }
+                SelectionInput { anchors.fill: parent; z: 20; selection: trackSelection; rowIndex: tile.index; host: app }
                 Component.onCompleted: virtualCoverGrid.activeDelegateCount++
                 Component.onDestruction: virtualCoverGrid.activeDelegateCount--
                 HoverHandler { id: tileHover }
@@ -1387,8 +1560,8 @@ Window {
                     Rectangle {
                         visible: !tile.playlist
                         anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 8
-                        width: 30; height: 30; radius: 15; color: app.dark ? "#262626" : "white"
-                        LikeButton { anchors.fill: parent; round: true; track: tile.modelData }
+                        width: tileLike.implicitWidth; height: tileLike.implicitHeight; radius: 15; color: app.dark ? "#262626" : "white"
+                        LikeButton { id: tileLike; anchors.fill: parent; round: true; track: tile.modelData }
                     }
                     Rectangle {
                         opacity: tileHover.hovered || Qt.platform.os === "android" ? 1 : 0
@@ -1407,7 +1580,7 @@ Window {
                     }
                 }
                 Txt { x: 8; y: artwork.y + artwork.height + 8; width: parent.width - 16; text: tile.modelData.title || "Без названия"; font.pixelSize: 13; TapHandler { onTapped: app.openTrack(tile.modelData) } }
-                Txt { x: 8; y: artwork.y + artwork.height + 25; width: parent.width - 16; text: tile.modelData.user?.username || (tile.playlist ? (tile.modelData.track_count || 0) + " треков" : "SoundCloud"); color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!tile.modelData.user?.urn; onTapped: app.openProfile(tile.modelData.user) } }
+                Txt { x: 8; y: artwork.y + artwork.height + 25; width: parent.width - 16; text: sc.displayArtist(tile.modelData) || (tile.playlist ? (tile.modelData.track_count || 0) + " треков" : "SoundCloud"); color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!tile.modelData.user?.urn && !sc.hasSeparateArtist(tile.modelData); onTapped: app.openProfile(tile.modelData.user) } }
             }
         }
     }
@@ -1417,7 +1590,7 @@ Window {
             id: virtualTrackList
             objectName: "trackListView"
             width: parent.width
-            height: Math.min(count * 58, Math.max(58, contentScroll.height - y - 110))
+            height: Math.min(count * 58, Math.max(58, contentScroll.height - Math.min(collectionLoader.y, contentScroll.height - 180) - 24))
             clip: true
             spacing: 0
             Rectangle {
@@ -1432,7 +1605,7 @@ Window {
             cacheBuffer: Math.max(58 * 4, height / 2)
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
-            model: app.collectionQuery.trim() ? app.filteredCollection : sc.trackModel
+            model: collectionTools.transformed ? app.filteredCollection : sc.trackModel
             property int activeDelegateCount: 0
             function lastTrackTitle() {
                 const item = count > 0 ? itemAtIndex(count - 1) : null
@@ -1458,6 +1631,7 @@ Window {
                 required property int index
                 readonly property bool currentTrack: !!modelData.urn && app.api.current.urn === modelData.urn
                 width: virtualTrackList.width; height: 58; radius: 12
+                SelectionInput { anchors.fill: parent; z: 20; selection: trackSelection; rowIndex: row.index; host: app }
                 Component.onCompleted: virtualTrackList.activeDelegateCount++
                 Component.onDestruction: virtualTrackList.activeDelegateCount--
                 color: "transparent"
@@ -1483,14 +1657,14 @@ Window {
                         text: row.currentTrack && app.api.playing ? "Пауза" : "Слушать"
                         active: row.currentTrack
                         round: true
-                        onClicked: { if (row.currentTrack) sc.togglePlayback(); else if ((row.modelData.urn || "").startsWith("soundcloud:playlists:")) playlistView.begin(row.modelData); else sc.play(row.modelData) }
+                        onClicked: { if (row.currentTrack && app.filteredCollection.filter(t => t.urn === row.modelData.urn).length === 1) sc.togglePlayback(); else if (((row.modelData.urn || "").startsWith("soundcloud:playlists:") || (row.modelData.urn || "").startsWith("soundcloud:system-playlists:"))) playlistView.begin(row.modelData); else sc.playMix(app.filteredCollection, row.index) }
                         implicitWidth: 28
                     }
                     Artwork { radius: app.artworkRadius; width: 40; height: 40; source: app.cover(row.modelData); TapHandler { onTapped: app.openTrack(row.modelData) } }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
                         Txt { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; font.pixelSize: 12; font.weight: row.currentTrack ? Font.DemiBold : Font.Medium; TapHandler { onTapped: app.openTrack(row.modelData) } }
-                        Txt { Layout.fillWidth: true; text: row.modelData.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn; onTapped: app.openProfile(row.modelData.user) } }
+                        Txt { Layout.fillWidth: true; text: sc.displayArtist(row.modelData) || "SoundCloud"; color: app.muted; font.pixelSize: 11; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
                     }
                     LikeButton { visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); track: row.modelData }
                     Tool { visible: (row.modelData.urn || "").indexOf("soundcloud:tracks:") === 0; symbol: "menu"; text: "Действия с треком"; onClicked: app.openTrackActions(row.modelData) }
@@ -1561,10 +1735,22 @@ Window {
             }
             Tool { text: "Плагины…"; onClicked: { app.pluginMessage = ""; app.settingGroup = 1 } }
             FormBlock {
-                width: parent.width; heading: "Интерфейс"
+                width: parent.width; heading: "Воспроизведение"
                 Row { spacing: 12; Txt { text: "Вид медиатеки"; anchors.verticalCenter: parent.verticalCenter } Tool { text: "Обложки"; active: prefs.gridView; onClicked: prefs.gridView = true } Tool { text: "Список"; active: !prefs.gridView; onClicked: prefs.gridView = false } }
                 Row { spacing: 12; Txt { text: "Громкость"; anchors.verticalCenter: parent.verticalCenter } VolumeSlider { width: 180 } }
-                CheckBox { InteractionFeedback {} text: "Плавный переход между треками (3 секунды)"; checked: !!app.api.crossfade; onToggled: sc.setCrossfade(checked) }
+
+                Tool { text: "Исключения рекомендаций · " + (app.api.recommendationExclusions || []).length; onClicked: recommendationSettings.open() }
+                Txt { text: "Качество воспроизведения" }
+                PlaybackQuality {
+                    width: Math.min(parent.width, 360)
+                    objectName: "playbackQualityControl"
+                    value: app.api.playbackQuality || 0; onEdited: value => sc.setPlaybackQuality(value)
+                    ink: app.ink; surface: app.raised; accent: app.accent; selectedInk: app.foreground(app.accent); motion: app.motion
+                }
+                CheckBox { width: parent.width; objectName: "preloadControl"; Accessible.name: "Предзагрузка"; text: "Предзагрузка"; checked: !!app.api.preloadEnabled; onToggled: sc.setPreloadEnabled(checked) }
+                Txt { width: parent.width; wrapMode: Text.Wrap; text: "Заранее загружать следующий трек и сегменты текущего. Качество применяется со следующей загрузки."; color: app.muted }
+                CheckBox { InteractionFeedback {} text: "Плавный переход (3 секунды)"; enabled: !!app.api.preloadEnabled; checked: !!app.api.crossfade; onToggled: sc.setCrossfade(checked) }
+                Txt { visible: !app.api.preloadEnabled; text: "Для плавного перехода нужна предзагрузка."; width: parent.width; wrapMode: Text.Wrap; color: app.muted }
             }
             FormBlock {
                 width: parent.width; heading: "Форма и движение"
@@ -1631,6 +1817,19 @@ Window {
         fillMode: Image.PreserveAspectFit
         mipmap: true
     }
+    QueueActions { id: queueActionsMenu; host: app }
+    Sheet {
+        id: queueOptions
+        width: Math.min(360, app.width - 48)
+        padding: 12
+        contentItem: ColumnLayout {
+            spacing: 2
+            TrackAction { symbol: "plus"; text: "Сохранить как плейлист"; enabled: sc.signedIn && app.api.queue.length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
+            TrackAction { text: "Отменить изменение очереди"; enabled: !!app.api.queueUndoAvailable; onClicked: { sc.undoQueueEdit(); queueOptions.close() } }
+                TrackAction { symbol: "list"; text: "Убрать повторы"; enabled: { const queue = app.api.queue; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
+            TrackAction { symbol: "close"; text: "Очистить после текущего"; enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < app.api.queue.length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
+        }
+    }
     component Sheet: Popup {
         id: sheet
         opacity: 0; scale: 0.985
@@ -1647,8 +1846,9 @@ Window {
     component TrackAction: AbstractButton {
         id: action
         property string symbol: "music"
+        property bool multiline: false
         Layout.fillWidth: true
-        implicitHeight: 42
+        implicitHeight: multiline ? Math.max(44, contentItem.implicitHeight + 16) : 42
         leftPadding: 12; rightPadding: 12
         hoverEnabled: true
         Accessible.name: text
@@ -1657,7 +1857,7 @@ Window {
         contentItem: RowLayout {
             spacing: 14
             Glyph { name: action.symbol; ink: app.muted; Layout.preferredWidth: 20; Layout.preferredHeight: 20 }
-            Txt { text: action.text; Layout.fillWidth: true; font.pixelSize: 13 }
+            Txt { text: action.text; Layout.fillWidth: true; font.pixelSize: 13; wrapMode: action.multiline ? Text.Wrap : Text.NoWrap; elide: action.multiline ? Text.ElideNone : Text.ElideRight }
         }
     }
     Sheet {
@@ -1680,18 +1880,21 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
                         Txt { text: trackActions.track.title || "Без названия"; Layout.fillWidth: true; font.weight: Font.DemiBold }
-                        Txt { text: trackActions.track.user?.username || "SoundCloud"; Layout.fillWidth: true; color: app.muted; font.pixelSize: 12 }
+                        Txt { text: sc.displayArtist(trackActions.track) || "SoundCloud"; Layout.fillWidth: true; color: app.muted; font.pixelSize: 12 }
                     }
                     Tool { symbol: "close"; text: "Закрыть меню"; onClicked: trackActions.close() }
                 }
                 Rectangle { Layout.fillWidth: true; Layout.bottomMargin: 8; height: 1; color: app.line }
-                TrackAction { symbol: "heart"; text: trackActions.track.user_favorite ? "Убрать из любимых" : "Добавить в любимые"; onClicked: { sc.like(trackActions.track); trackActions.close() } }
+                EngagementAction { host: app; Layout.fillWidth: true; item: trackActions.track; repost: true }
+                EngagementAction { host: app; Layout.fillWidth: true; item: trackActions.track }
+                TrackAction { symbol: "close"; text: "Не предлагать этот трек"; enabled: !!trackActions.track.urn; onClicked: { sc.excludeRecommendation(trackActions.track, false); trackActions.close() } }
+                TrackAction { multiline: true; symbol: "close"; text: "Не предлагать треки этого аккаунта: " + (trackActions.track.user?.username || trackActions.track.user?.urn || "SoundCloud"); enabled: !!trackActions.track.user?.urn; onClicked: { sc.excludeRecommendation(trackActions.track, true); trackActions.close() } }
                 TrackAction { symbol: "plus"; text: "Добавить в очередь"; onClicked: { sc.enqueue(trackActions.track); trackActions.close() } }
                 TrackAction { symbol: "music"; text: "Сохранить в плейлист"; onClicked: { trackActions.close(); albumPicker.begin(trackActions.track) } }
-                TrackAction { symbol: "profile"; text: "Профиль исполнителя"; enabled: !!trackActions.track.user?.urn; onClicked: { trackActions.close(); playlistView.close(); app.openProfile(trackActions.track.user) } }
-                TrackAction { symbol: "play"; text: "Станция по треку"; onClicked: { trackActions.close(); playlistView.beginStation(trackActions.track, false) } }
+                TrackAction { symbol: "profile"; text: sc.hasSeparateArtist(trackActions.track) ? "Загрузил: " + (trackActions.track.user?.username || "SoundCloud") : "Профиль исполнителя"; enabled: !!trackActions.track.user?.urn; onClicked: { trackActions.close(); playlistView.close(); app.openProfile(trackActions.track.user) } }
+                TrackAction { symbol: "play"; text: trackActions.track.station_urn ? "Станция по треку" : "Похожие треки"; onClicked: { trackActions.close(); playlistView.beginStation(trackActions.track, false) } }
                 TrackAction { symbol: "cloud"; text: "Открыть в SoundCloud"; enabled: !!trackActions.track.permalink_url; onClicked: { sc.openExternal(trackActions.track.permalink_url); trackActions.close() } }
-                TrackAction { symbol: "list"; text: "Копировать название и исполнителя"; onClicked: { sc.copyText((trackActions.track.title || "Без названия") + " — " + (trackActions.track.user?.username || "SoundCloud")); trackActions.close() } }
+                TrackAction { symbol: "list"; text: "Копировать название и исполнителя"; onClicked: { sc.copyText((trackActions.track.title || "Без названия") + " — " + (sc.displayArtist(trackActions.track) || "SoundCloud")); trackActions.close() } }
                 TrackAction { symbol: "arrow"; text: "Копировать ссылку"; enabled: !!trackActions.track.permalink_url; onClicked: { sc.copyText(trackActions.track.permalink_url); trackActions.close() } }
             }
         }
@@ -1784,7 +1987,9 @@ Window {
         Column {
             spacing: 24
             Rectangle {
-                width: parent.width; height: 196; radius: 22; color: (app.dark ? "#242424" : "#f3f3f5");
+                id: desktopProfileCard
+                readonly property bool narrow: width < 620
+                width: parent.width; height: narrow && !!app.guest ? 244 : 196; radius: 22; color: (app.dark ? "#242424" : "#f3f3f5");
                 readonly property bool creator: app.displayedProfile.urn === "soundcloud:users:1675018934"
                 border.width: creator ? 2 : 0; border.color: app.accent
                 Rectangle {
@@ -1822,29 +2027,30 @@ Window {
                     x: 24; y: 148; spacing: 28
                     Repeater {
                         model: [{value:app.displayedProfile.followers_count || 0, caption:"подписчиков"}, {value:app.displayedProfile.followings_count || 0, caption:"подписок"}, {value:app.displayedProfile.track_count || 0, caption:"треков"}]
-                        Column { required property var modelData; spacing: 3; Txt { text: modelData.value; font.pixelSize: 17; font.weight: Font.DemiBold } Txt { text: modelData.caption; font.pixelSize: 11; color: app.muted } }
+                        ProfileStat {
+                            required property var modelData
+                            required property int index
+                            host: app; value: modelData.value; caption: modelData.caption
+                            onClicked: { if (index < 2) peoplePopup.begin(app.displayedProfile, index === 0 ? "followers" : "followings"); else app.profileTab = 0 }
+                        }
                     }
                 }
-                Tool { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 20; symbol: "arrow"; text: "Открыть на SoundCloud"; onClicked: sc.openExternal(app.displayedProfile.permalink_url || "https://soundcloud.com") }
+                FollowButton { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 20; user: app.displayedProfile || ({}) }
+                Tool { anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 20; visible: !parent.creator && !parent.narrow; symbol: "arrow"; text: "Открыть на SoundCloud"; onClicked: sc.openExternal(app.displayedProfile.permalink_url || "https://soundcloud.com") }
             }
+            ProfileExtras { host: app; user: app.displayedProfile || ({}); width: parent.width; onRelatedRequested: peoplePopup.begin(app.displayedProfile, "related") }
             CapsuleSection {
                 width: parent.width; visible: !!app.displayedProfile.description
                 contentItem: Txt { text: app.displayedProfile.description || ""; wrapMode: Text.WordWrap; maximumLineCount: 5; lineHeight: 1.5; color: app.muted }
             }
-            Row {
-                width: parent.width; spacing: 24
-                Repeater {
-                    model: app.guest ? ["Треки", "Плейлисты"] : ["Треки", "Плейлисты", "Избранное", "Репосты"]
-                    AbstractButton {
-                        InteractionFeedback {}
-                        id: profileLink
-                        required property string modelData
-                        required property int index
-                        width: profileTabLabel.implicitWidth; height: 36
-                        onClicked: app.profileTab = index
-                        contentItem: Txt { id: profileTabLabel; text: profileLink.modelData; color: app.profileTab === profileLink.index ? app.accent : app.muted; font.weight: Font.Medium }
-                        background: Item { Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 2; radius: 1; color: app.accent; opacity: app.profileTab === profileLink.index ? 1 : 0; Behavior on opacity { NumberAnimation { duration: app.motion } } } }
-                    }
+            ProfileNavigation {
+                width: parent.width
+                host: app; section: app.profileTab; likes: app.profileLikes; reposts: app.repostLibrary
+                onNavigate: (section, collection) => {
+                    if (section === 2) app.profileLikes = collection
+                    if (section === 3) app.repostLibrary = collection
+                    if (app.profileTab === section) { app.refreshPage(); app.animatePage() }
+                    else app.profileTab = section
                 }
             }
         }
@@ -1870,7 +2076,7 @@ Window {
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 6
                 Txt { Layout.fillWidth: true; text: app.api.current.title || ""; wrapMode: Text.WordWrap; maximumLineCount: 2; font.pixelSize: 18; font.weight: Font.DemiBold; lineHeight: 1.2; TapHandler { onTapped: app.openTrack(app.api.current, true) } }
-                Txt { Layout.fillWidth: true; text: app.api.current.user?.username || "SoundCloud"; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!app.api.current.user?.urn; onTapped: app.openProfile(app.api.current.user) } }
+                Txt { Layout.fillWidth: true; text: sc.displayArtist(app.api.current) || "SoundCloud"; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!app.api.current.user?.urn && !sc.hasSeparateArtist(app.api.current); onTapped: app.openProfile(app.api.current.user) } }
             }
             LikeButton { track: app.api.current }
         }
@@ -1883,7 +2089,7 @@ Window {
 Здесь появятся обложка и очередь."; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; color: app.muted; font.pixelSize: 12; lineHeight: 1.4 }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: (app.dark ? "#323232" : "#eaeaec") }
-        RowLayout { Layout.fillWidth: true; Txt { text: "Очередь"; font.weight: Font.DemiBold; Layout.fillWidth: true } Txt { text: app.api.queue.length; color: app.muted; font.pixelSize: 11 } }
+        RowLayout { Layout.fillWidth: true; Txt { text: "Очередь"; font.weight: Font.DemiBold; Layout.fillWidth: true } Txt { text: app.api.queue.length; color: app.muted; font.pixelSize: 11 } Tool { symbol: "menu"; text: "Действия с очередью"; implicitHeight: 44; implicitWidth: 44; onClicked: queueOptions.open() } }
         Txt { visible: app.api.queue.length === 0; text: "Добавляйте треки кнопкой +"; color: app.muted; font.pixelSize: 12 }
         ListView {
             id: queueList
@@ -1895,13 +2101,13 @@ Window {
             property var dragTrack: ({})
             onDragFromChanged: dragTo = dragFrom
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 64
-            clip: true; model: app.api.queue; spacing: 4
+            clip: true; model: app.api.queue.length; spacing: 4
             currentIndex: app.api.queueIndex || 0
             onCurrentIndexChanged: { if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain) }
             delegate: Rectangle {
                 id: queuedTrack
-                required property var modelData
                 required property int index
+                readonly property var modelData: app.api.queue[index] || ({})
                 width: Math.max(0, queueList.width - queueBar.implicitWidth - 4); height: 52; radius: 6
                 color: index === app.api.queueIndex ? app.raised : queueHover.hovered ? app.panel : "transparent"
 
@@ -1929,7 +2135,7 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
                         Txt { Layout.fillWidth: true; text: queuedTrack.modelData.title || "Трек"; font.pixelSize: 12; TapHandler { onTapped: app.openTrack(queuedTrack.modelData) } }
-                        Txt { Layout.fillWidth: true; text: queuedTrack.modelData.user?.username || ""; color: app.muted; font.pixelSize: 10 }
+                        Txt { Layout.fillWidth: true; text: sc.displayArtist(queuedTrack.modelData) || ""; color: app.muted; font.pixelSize: 10 }
                     }
                     Item {
                         id: queueActions
@@ -2009,7 +2215,7 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
                         Txt { Layout.fillWidth: true; text: queueList.dragTrack.title || "Трек"; font.pixelSize: 12 }
-                        Txt { Layout.fillWidth: true; text: queueList.dragTrack.user?.username || ""; color: app.muted; font.pixelSize: 10 }
+                        Txt { Layout.fillWidth: true; text: sc.displayArtist(queueList.dragTrack) || ""; color: app.muted; font.pixelSize: 10 }
                     }
                     Glyph { Layout.preferredWidth: 24; Layout.preferredHeight: 16; name: "list"; ink: app.ink }
                 }
@@ -2044,4 +2250,11 @@ Window {
             onPressed: app.startSystemResize(modelData)
         }
     }
+    RecommendationPreferences {
+        id: recommendationSettings
+        backend: sc
+        ink: app.ink; surface: app.raised; accent: app.accent; selectedInk: app.foreground(app.accent)
+    }
+    RecommendationNotice { backend: sc; ink: app.ink; surface: app.raised }
+
 }

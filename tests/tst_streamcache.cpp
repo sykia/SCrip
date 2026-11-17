@@ -12,6 +12,44 @@
 class StreamCacheTest : public QObject {
     Q_OBJECT
 private slots:
+    void disabledBackgroundStillServesDemand() {
+        QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
+        int requests = 0;
+        connect(&upstream, &QTcpServer::newConnection, this, [&] {
+            auto *socket = upstream.nextPendingConnection();
+            connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                socket->readAll(); ++requests;
+                socket->write("HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ndata"); socket->disconnectFromHost();
+            });
+        });
+        StreamCache cache;
+        QUrl remote(QString("http://127.0.0.1:%1/part").arg(upstream.serverPort()));
+        const auto local = cache.source(remote);
+        cache.playlist("#EXTM3U\n#EXTINF:5,\npart\n#EXT-X-ENDLIST\n", {remote, remote.toString(QUrl::FullyEncoded)});
+        cache.setBackgroundEnabled(false); cache.warm(local); cache.next();
+        QVERIFY(!cache.m_timer.isActive()); QVERIFY(!cache.m_background); QCOMPARE(requests, 0);
+        QNetworkAccessManager client; auto *reply = client.get(QNetworkRequest(local));
+        QSignalSpy done(reply, &QNetworkReply::finished); QVERIFY(done.wait());
+        QCOMPARE(reply->readAll(), QByteArray("data")); QCOMPARE(requests, 1);
+        cache.warm(local); cache.next(); QTest::qWait(50); QCOMPARE(requests, 1);
+        cache.discard(local); QVERIFY(cache.m_resources.isEmpty());
+        reply->deleteLater();
+    }
+    void disablingAbortsActiveBackground() {
+        QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
+        StreamCache cache;
+        const QUrl remote(QString("http://127.0.0.1:%1/list").arg(upstream.serverPort()));
+        const auto local = cache.source(remote);
+        cache.playlist("#EXTM3U\n#EXTINF:5,\npart\n#EXT-X-ENDLIST\n", {remote, remote.toString(QUrl::FullyEncoded)});
+        cache.warm(local); cache.next(); QVERIFY(cache.m_background);
+        QPointer<QNetworkReply> reply = cache.m_background;
+        cache.setBackgroundEnabled(false);
+        QVERIFY(!cache.m_background); QVERIFY(!cache.m_timer.isActive());
+        if (reply) QCOMPARE(reply->error(), QNetworkReply::OperationCanceledError);
+        cache.next(); QVERIFY(!cache.m_background);
+    }
+
     void playlistAndRanges() {
         StreamCache cache;
         const QUrl remote("https://cdn.example/track/list.m3u8?signature=secret");

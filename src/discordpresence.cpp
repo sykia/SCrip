@@ -1,3 +1,4 @@
+#include "trackmetadata.h"
 #include "discordpresence.h"
 
 #include <QCoreApplication>
@@ -242,7 +243,7 @@ QJsonValue DiscordPresence::activity(const QVariantMap &state, qint64 nowSeconds
     if (track.isEmpty()) return QJsonValue::Null;
     const bool buffering = state.value("buffering").toBool();
     const bool playing = state.value("playing").toBool() && !buffering;
-    auto artist = track.value("user").toMap().value("username").toString().trimmed();
+    auto artist = TrackMetadata::displayArtist(track);
     if (artist.isEmpty()) artist = "Неизвестный исполнитель";
     auto title = track.value("title").toString().trimmed();
     if (title.isEmpty()) title = "Без названия";
@@ -306,7 +307,7 @@ void DiscordPresence::publish()
     auto next = activity(m_player, QDateTime::currentSecsSinceEpoch());
     const auto track = m_player.value("current").toMap();
     const auto trackKey = track.value("urn", track.value("id", track.value("permalink_url",
-        track.value("title").toString() + " / " + track.value("user").toMap().value("username").toString()))).toString();
+        track.value("title").toString() + " / " + TrackMetadata::displayArtist(track)))).toString();
     if (trackKey == m_lastTrackKey && next.isObject() && m_lastActivity.isObject()) {
         auto object = next.toObject();
         const auto previous = m_lastActivity.toObject().value("timestamps").toObject();

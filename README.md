@@ -37,6 +37,9 @@ Browse your favorites by artwork and open an artist's profile from their name. D
 
 ![SCrip library with favorite tracks](docs/screenshots/library.png)
 
+Queue menu actions: save the full queue as a playlist, remove duplicates, or clear
+entries after the current track, with undo from the same menu. See [queue actions](docs/queue-actions.md).
+
 ## Share what you are listening to
 
 Desktop settings include optional [Discord Rich Presence](docs/discord-presence.md): clickable track title, artist, cover, elapsed / total track progress, a SCrip badge, and buttons to open the track or download SCrip on GitHub. It requires the Discord desktop client; the shared project Application ID is already configured.
@@ -64,7 +67,7 @@ Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. Build ou
 
 `tests/` contains regression checks, `worker/` contains the SoundCloud authentication service, and `.github/workflows/` contains automated checks and Windows build workflows. Packaging files are in `packaging/`; reusable example plugins are in `examples/plugins/`. Editor settings and local caches are excluded from Git.
 
-See [SoundCloud integration and secure storage](docs/soundcloud-security.md), the [plugin guide](docs/plugins.md), the [Plugin API reference](docs/plugin-api-v2-reference.md), the [trusted QML plugin SDK](docs/plugin-runtime.md) and [Android playback diagnostics](docs/android-playback-diagnostics.md) for technical details. For installer issues, see [Windows troubleshooting](docs/windows-install.md).
+See [public profile collections and artist credits](docs/public-collections-and-artists.md), [track selection and batch additions](docs/track-selection.md), [profiles, collections, playlist editing and link opening](docs/social-and-playlists.md), [track comments](docs/comments.md), [SoundCloud integration and secure storage](docs/soundcloud-security.md), the [plugin guide](docs/plugins.md), the [Plugin API reference](docs/plugin-api-v2-reference.md), the [trusted QML plugin SDK](docs/plugin-runtime.md) and [Android playback diagnostics](docs/android-playback-diagnostics.md) for technical details. For installer issues, see [Windows troubleshooting](docs/windows-install.md).
 
 ## License
 
@@ -98,4 +101,14 @@ lightweight RMS envelope and a 160 Hz low-pass envelope drive expansion and ligh
 Bass onsets use an adaptive baseline with a 180 ms refractory interval; this is an
 onset heuristic, not BPM tracking. Analysis is downsampled to <=12 kHz, emits
 separate visual signals at ~30 Hz and detaches when the wave visual is inactive.
-Other backends and older Qt retain ambient motion without fabricated beat data. Wave sessions are not restored after restarting the app.
+Other backends and older Qt retain ambient motion without fabricated beat data. Wave queues and positions are saved per mode and restored for the same signed-in account; playback resumes on user action.
+
+Collection filtering, exhaustive search, sorting and saved searches: [library tools](docs/library-tools.md).
+
+Advanced track search and API parameter details: [track search](docs/track-search.md).
+
+Desktop system media integration and playback quality/preload preferences:
+[System media and streaming preferences](docs/system-media-and-streaming.md).
+
+Track metadata, release-date precision and safe waveform navigation:
+[Track information and waveform](docs/track-information.md).

@@ -61,7 +61,25 @@ void StreamCache::suspend() {
     m_timer.stop(); m_root.clear(); m_pending.clear();
     if (m_background) { auto reply = m_background; m_background.clear(); reply->abort(); }
 }
+void StreamCache::setBackgroundEnabled(bool enabled) {
+    m_backgroundEnabled = enabled;
+    if (!enabled) suspend();
+}
+void StreamCache::discard(const QUrl &local) {
+    const auto root = m_resources.value(local.path().mid(1)).root;
+    if (root.isEmpty()) return;
+    if (m_root == root) suspend();
+    for (auto *reply : m_network.findChildren<QNetworkReply *>())
+        if (reply->property("sourceRoot").toString() == root) reply->abort();
+    for (auto it = m_resources.begin(); it != m_resources.end();) {
+        if (it->root != root) { ++it; continue; }
+        m_keys.remove(root + '\n' + it->remote.toString(QUrl::FullyEncoded));
+        m_cache.remove(it.key()); it = m_resources.erase(it);
+    }
+    m_children.remove(root); m_roots.removeAll(root);
+}
 void StreamCache::warm(const QUrl &local) {
+    if (!m_backgroundEnabled) return;
     const auto resource = m_resources.value(local.path().mid(1));
     if (resource.root.isEmpty()) return;
     if (m_root == resource.root) return;
@@ -162,6 +180,7 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     if (!range.isEmpty()) request.setRawHeader("Range", range);
     auto *reply = head ? m_network.head(request) : m_network.get(request);
+    reply->setProperty("sourceRoot", m_resources.value(key).root);
     if (background) { m_background = reply; reply->setProperty("cacheKey", key); }
     else if (socket) connect(socket, &QTcpSocket::disconnected, reply, &QNetworkReply::abort);
     // HLS demuxers may treat a truncated segment as EOF and never recover after
@@ -228,7 +247,7 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     });
 }
 void StreamCache::next() {
-    if (m_root.isEmpty() || m_background) return;
+    if (!m_backgroundEnabled || m_root.isEmpty() || m_background) return;
     if (m_foreground > 0) { m_timer.start(500); return; }
     while (!m_pending.isEmpty()) {
         const QString key = m_pending.takeFirst();

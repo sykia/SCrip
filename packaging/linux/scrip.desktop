@@ -2,7 +2,8 @@
 Type=Application
 Name=SCrip
 Comment=Музыка из SoundCloud
-Exec=scrip
+Exec=scrip %u
 Icon=scrip
 Terminal=false
 Categories=AudioVideo;Audio;Player;
+MimeType=x-scheme-handler/scrip;x-scheme-handler/soundcloud;

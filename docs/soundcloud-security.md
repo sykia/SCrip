@@ -62,3 +62,14 @@ Source and configuration are in `worker/`. To redeploy, run `npx wrangler@4 depl
 `tests/run-secretstore-android.sh` runs `tests/android/SecretVaultCheck.java` instrumentation in a separate test app/UID: write/read, distinct IVs, no plaintext secrets in files, rejection of ciphertext tampering or key loss, deletion and path traversal prevention. It does not use installed SCrip data.
 
 For Android, set `ANDROID_HOME`, `JAVA_HOME` and, if necessary, `GRADLE_USER_HOME` and `SCRIP_GRADLE` (path to an existing Gradle/gradlew). Start a test emulator and run `tests/run-secretstore-android.sh`. The test APK builds offline from the existing cache. It is a separate `org.scrip.vaulttest` app, not SCrip.
+
+## Local sign-out and remote revocation
+
+Sign-out clears local authentication and account state immediately, independently
+of network access. A bounded `POST /disconnect` uses only the in-memory credential
+captured before clearing. Only the documented successful 204 response confirms remote access
+revocation. Failure reports that local sign-out completed and directs the user to
+SoundCloud's connected-app settings. Credentials are never persisted for a retry
+and the previous session is not restored. Late revocation responses cannot alter
+a new account session. Secure-store removal failures retain their existing storage
+error handling, including quarantine of stored authentication where possible.

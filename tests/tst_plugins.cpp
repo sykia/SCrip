@@ -8,6 +8,7 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlExpression>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QStandardPaths>
@@ -15,30 +16,57 @@
 #include <QUuid>
 #include <QtTest>
 #include <limits>
+#include "trackmetadata.h"
+#include "trackinfo.h"
 
 // Модель без сети для проверки геометрии настоящего Android Main.qml.
 class AndroidLayoutModel : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
-    Q_PROPERTY(QVariantMap catalogState READ state CONSTANT)
-    Q_PROPERTY(qint64 position READ position CONSTANT)
+    Q_PROPERTY(QVariantMap catalogState READ state NOTIFY catalogChanged)
+    Q_PROPERTY(QVariantMap commentsState READ commentsState CONSTANT)
+    Q_PROPERTY(qint64 position READ position NOTIFY positionChanged)
     Q_PROPERTY(qint64 duration READ position CONSTANT)
 public:
+    Q_INVOKABLE QVariantList trackInfo(const QVariantMap &track) const { return TrackInfo::rows(track); }
+    Q_INVOKABLE QString trackDescription(const QVariantMap &track) const { return TrackInfo::text(track.value("description")); }
+    Q_INVOKABLE QString displayArtist(const QVariantMap &track) const { return TrackMetadata::displayArtist(track); }
+    Q_INVOKABLE bool hasSeparateArtist(const QVariantMap &track) const { return TrackMetadata::hasSeparateArtist(track); }
+    int repeatMode = 0;
+    Q_INVOKABLE void setRepeatMode(int mode) { repeatMode = mode; emit catalogChanged(); }
+    QVariantMap commentsState() const { return {{"track", "soundcloud:tracks:1"}, {"items", QVariantList{QVariantMap{{"urn", "soundcloud:comments:1"}, {"body", "Этот момент хочется переслушивать"}, {"timestamp", 0}, {"user", QVariantMap{{"username", "anastasia"}}}}, QVariantMap{{"urn", "soundcloud:comments:2"}, {"body", "А здесь вступают ударные"}, {"timestamp", 10000}, {"user", QVariantMap{{"username", "slow motion"}}}}}}}; }
+    Q_INVOKABLE void cancelCollectionSearch() {}
+    Q_INVOKABLE void searchWholeCollection(bool = false) {}
+    Q_INVOKABLE void setCommentTrack(const QVariantMap &) {}
+    Q_INVOKABLE void loadComments(const QString &, bool = false, bool = false) {}
     bool signedIn() const { return true; }
-    qint64 position() const { return 0; }
+    qint64 playbackPosition = 0;
+    qint64 position() const { return playbackPosition; }
+    QString publishedBody;
+    qint64 publishedTimestamp = -2;
+    Q_INVOKABLE void postComment(const QString &, const QString &body, qint64 timestamp) { publishedBody = body; publishedTimestamp = timestamp; emit commentPosted("soundcloud:tracks:1"); }
+    Q_INVOKABLE void seek(qint64 timestamp) { playbackPosition = timestamp; emit positionChanged(); }
+    Q_INVOKABLE void resumePlayback() {}
+    Q_INVOKABLE void copyText(const QString &) {}
     QVariantMap state() const {
-        return {{"home", QVariantList{QVariantMap{{"title", "Микс любимых"},
+        return {{"preloadEnabled", true}, {"wifiPolicyAvailable", true}, {"repeatMode", repeatMode}, {"home", QVariantList{QVariantMap{{"title", "Микс любимых"}, {"subtitle", "Похоже на «Длинное название исходного трека» · SoundCloud"},
             {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}, {"urn", "soundcloud:tracks:seed"}, {"user", QVariantMap{{"urn", "soundcloud:users:artist"}, {"username", "Исполнитель"}}}}}}}}},
             {"playlistTracks", QVariantList{QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Первый трек"}, {"user", QVariantMap{{"username", "Исполнитель"}}}}, QVariantMap{{"urn", "soundcloud:tracks:2"}, {"title", "Второй трек"}}}},
             {"profile", QVariantMap{}}, {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}}}};
     }
+    Q_INVOKABLE bool queueHasDuplicates() const { return false; }
     Q_INVOKABLE void setWaveVisualActive(bool) {}
     Q_INVOKABLE void volume(double) {}
     QVariantMap lastPreview;
     Q_INVOKABLE void loadPlaylist(const QVariantMap &item, bool = false) { lastPreview = item; }
     Q_INVOKABLE void loadHome(bool = false) {}
-    Q_INVOKABLE void browse(const QString &, const QString & = {}, bool = false) {}
+    QString lastSection, lastUser;
+    Q_INVOKABLE void browse(const QString &section, const QString &user = {}, bool = false) { lastSection = section; lastUser = user; }
 signals:
+    void recommendationExclusionAdded();
+    void queuePlaylistSaved();
+    void positionChanged();
+    void commentPosted(const QString &track);
     void signedInChanged();
     void catalogChanged();
 };
@@ -874,7 +902,7 @@ Item {
         QFile mainFile(fixture + "/Main.qml");
         QVERIFY(mainFile.open(QIODevice::WriteOnly));
         mainFile.write(source.readAll()); mainFile.close();
-        for (auto name : {"PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
+        for (auto name : {"RecommendationPreferences.qml", "RecommendationNotice.qml", "TrackInformation.qml", "TrackProgress.qml", "PlaybackQuality.qml", "SelectionInput.qml", "SelectionBar.qml", "TrackSelection.qml", "QueueActions.qml", "CollectionTools.qml", "TrackSearchFilters.qml", "PeoplePopup.qml", "SurfaceButton.qml", "ProfileExtras.qml", "ProfileStat.qml", "ProfileNavigation.qml", "EngagementAction.qml", "PlaylistEditor.qml", "CommentsPane.qml", "PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
             const auto sourcePath = QString(SCRIP_SOURCE_DIR) + (QString(name) == "RoundedImage.qml" || QString(name) == "AndroidGlyph.qml" ? "/qml/android/" : "/qml/") + name;
             QFile::remove(fixture + "/" + name);
             QVERIFY(QFile::copy(sourcePath, fixture + "/" + name));
@@ -900,7 +928,143 @@ Item {
             const auto headerBottom = header->mapToScene(QPointF(0, header->height())).y();
             const auto bodyTop = body->mapToScene(QPointF(0, 0)).y();
             QVERIFY2(bodyTop >= headerBottom - 0.5, qPrintable(QString("Содержимое %1 перекрывает шапку %2").arg(bodyTop).arg(headerBottom)));
+            QVERIFY(window->grabWindow().save(QString("recommendations-home-android-%1.png").arg(size.width())));
+            std::function<QQuickItem *(QQuickItem *)> findCaption = [&](QQuickItem *item) -> QQuickItem * {
+                if (item->property("text").toString().startsWith("Похоже на «")) return item;
+                for (auto *child : item->childItems()) if (auto *found = findCaption(child)) return found;
+                return nullptr;
+            };
+            auto *caption = findCaption(window->contentItem()); QVERIFY(caption);
+            QVERIFY(caption->width() <= size.width() - 36);
+            auto *flick = caption->parentItem();
+            while (flick && flick->metaObject()->indexOfProperty("contentY") < 0) flick = flick->parentItem();
+            QVERIFY(flick);
+            const auto maximum = qMax(0.0, flick->property("contentHeight").toReal() - flick->height());
+            flick->setProperty("contentY", qBound(0.0, caption->mapToScene(QPointF()).y() - bodyTop - 40, maximum));
+            QTest::qWait(80);
+            QVERIFY(window->grabWindow().save(QString("recommendations-caption-android-%1.png").arg(size.width())));
+            flick->setProperty("contentY", 0);
         }
+        object->setProperty("page", 5);
+        QTest::qWait(80);
+        for (const auto size : {QSize(320,640), QSize(412,860)}) {
+            window->resize(size); QTest::qWait(50);
+            for (const auto name : {"playbackQualityControl", "preloadControl", "preloadWifiControl"}) {
+                auto *control = object->findChild<QQuickItem *>(QString::fromLatin1(name)); QVERIFY(control);
+                QVERIFY(control->isVisible());
+                const auto rect = control->mapRectToScene(control->boundingRect());
+                QVERIFY2(rect.left() >= 0 && rect.right() <= size.width(), qPrintable(QString("%1: left=%2 right=%3 window=%4").arg(name).arg(rect.left()).arg(rect.right()).arg(size.width())));
+                QVERIFY(!QQmlProperty(control, "Accessible.name", QQmlEngine::contextForObject(control)).read().toString().isEmpty());
+            }
+            auto *quality = object->findChild<QQuickItem *>("playbackQualityControl");
+            auto *scroll = quality->parentItem();
+            while (scroll && scroll->metaObject()->indexOfProperty("contentY") < 0) scroll = scroll->parentItem();
+            QVERIFY(scroll);
+            scroll->setProperty("contentY", qMax(0.0, quality->mapToItem(scroll, QPointF()).y() + scroll->property("contentY").toReal() - 90));
+            QTest::qWait(80);
+            QVERIFY(window->grabWindow().save(QString("playback-settings-android-%1.png").arg(size.width())));
+        }
+        object->setProperty("page", 0);
+        for (const auto size : {QSize(320,640), QSize(412,860)}) {
+            window->resize(size);
+            QQmlExpression menu(QQmlEngine::contextForObject(object.data()), object.data(), "queueOptions.open()");
+            menu.evaluate(); QVERIFY2(!menu.hasError(), qPrintable(menu.error().toString()));
+            QTest::qWait(450);
+            QQmlExpression geometry(QQmlEngine::contextForObject(object.data()), object.data(), "queueOptions.height");
+            QVERIFY(geometry.evaluate().toReal() >= 180);
+            QVERIFY(window->grabWindow().save(QString("queue-menu-android-%1.png").arg(size.width())));
+            QQmlExpression closeMenu(QQmlEngine::contextForObject(object.data()), object.data(), "queueOptions.close()");
+            closeMenu.evaluate(); QVERIFY(!closeMenu.hasError());
+        }
+        QTest::qWait(400);
+        QQmlExpression publicProfile(QQmlEngine::contextForObject(object.data()), object.data(),
+            "app.openProfile({urn: 'soundcloud:users:public', username: 'North Records'}); app.profileTab = 2; app.refresh()");
+        publicProfile.evaluate(); QVERIFY2(!publicProfile.hasError(), qPrintable(publicProfile.error().toString()));
+        for (const auto size : {QSize(320,640), QSize(412,860)}) {
+            window->resize(size); QTest::qWait(100);
+            auto *navigation = window->findChild<QQuickItem *>("profileNavigation"); QVERIFY(navigation);
+            QVERIFY(navigation->isVisible()); QVERIFY(navigation->width() <= size.width() - 36);
+            std::function<QQuickItem *(QQuickItem *, const QString &)> findTab = [&](QQuickItem *item, const QString &name) -> QQuickItem * {
+                if (item->objectName() == name) return item;
+                for (auto *child : item->childItems()) if (auto *found = findTab(child, name)) return found;
+                return nullptr;
+            };
+            qreal previousRight = 0;
+            for (int i = 0; i < 4; ++i) {
+                auto *tab = findTab(navigation, QString("profileSection%1").arg(i)); QVERIFY(tab);
+                QVERIFY(tab->x() >= previousRight - 1); previousRight = tab->x() + tab->width();
+                QCOMPARE(tab->height(), 44.0);
+                QVERIFY(tab->width() >= 35);
+            }
+            QTest::qWait(400);
+            QQmlExpression listExpression(QQmlEngine::contextForObject(object.data()), object.data(), "tracks");
+            auto *profileList = qobject_cast<QQuickItem *>(listExpression.evaluate().value<QObject *>()); QVERIFY(profileList);
+            const auto offset = navigation->mapToScene(QPointF()).y() - body->mapToScene(QPointF()).y() - 28;
+            profileList->setProperty("contentY", profileList->property("contentY").toReal() + offset);
+            QTest::qWait(100);
+            QCOMPARE(navigation->property("section").toInt(), 2);
+            auto *indicator = navigation->findChild<QQuickItem *>("profileSectionIndicator"); QVERIFY(indicator);
+            QVERIFY(indicator->width() > 0); QVERIFY(indicator->x() > 0);
+            auto *tabViewport = navigation->findChild<QQuickItem *>("profileTabsViewport"); QVERIFY(tabViewport);
+            QVERIFY(tabViewport->property("contentX").toReal() >= 0);
+            QVERIFY(tabViewport->property("contentX").toReal() <= qMax(0.0, tabViewport->property("contentWidth").toReal() - tabViewport->width()) + 1);
+            QCOMPARE(sc.lastSection, "userLikes"); QCOMPARE(sc.lastUser, "soundcloud:users:public");
+            QVERIFY(window->grabWindow().save(QString("public-profile-android-%1.png").arg(size.width())));
+            auto *likes = findTab(navigation, "profileSection2"); QVERIFY(likes);
+            QVERIFY(QMetaObject::invokeMethod(likes, "clicked")); QTest::qWait(100);
+            QVERIFY(window->grabWindow().save(QString("public-profile-android-menu-%1.png").arg(size.width())));
+            auto *menu = navigation->findChild<QObject *>("profileLikesMenu"); QVERIFY(menu);
+            QVERIFY(QMetaObject::invokeMethod(menu, "close")); QTest::qWait(150);
+        }
+        for (const auto &pair : QList<QPair<QString, QString>>{{"likes", "userLikes"}, {"likedPlaylists", "userLikedPlaylists"}, {"likedStations", "userLikedStations"}}) {
+            object->setProperty("profileLikes", pair.first);
+            QQmlExpression refresh(QQmlEngine::contextForObject(object.data()), object.data(), "app.refresh()"); refresh.evaluate();
+            QCOMPARE(sc.lastSection, pair.second);
+        }
+        QQmlExpression publicReposts(QQmlEngine::contextForObject(object.data()), object.data(), "app.profileTab = 3; app.repostLibrary = 'repostedPlaylists'; app.refresh()");
+        publicReposts.evaluate(); QCOMPARE(sc.lastSection, "userRepostedPlaylists");
+        QQmlExpression showFilters(QQmlEngine::contextForObject(object.data()), object.data(), "app.page = 2; trackFilters.expanded = true; trackFilters");
+        auto *filters = qobject_cast<QQuickItem *>(showFilters.evaluate().value<QObject *>());
+        QVERIFY2(filters, qPrintable(showFilters.error().toString()));
+        for (const auto size : {QSize(320,640), QSize(412,860)}) {
+            window->resize(size); QTest::qWait(80);
+            QVERIFY(filters->isVisible());
+            QVERIFY(filters->width() <= size.width() - 39);
+            auto *viewport = filters->parentItem();
+            QVERIFY(viewport);
+            // The Flickable content item carries the full panel; its parent is the viewport.
+            auto *flick = viewport->parentItem();
+            QVERIFY(flick);
+            QVERIFY(flick->height() <= window->height() * 0.42 + 1);
+            QVERIFY(window->grabWindow().save(QString("android-search-%1.png").arg(size.width())));
+        }
+        QQmlExpression openRepeatPlayer(QQmlEngine::contextForObject(object.data()), object.data(), "player.open()");
+        openRepeatPlayer.evaluate(); QVERIFY(!openRepeatPlayer.hasError());
+        std::function<QQuickItem *(QQuickItem *)> findRepeat = [&](QQuickItem *item) -> QQuickItem * {
+            if (item->objectName() == "repeatModeButton") return item;
+            for (auto *child : item->childItems()) if (auto *found = findRepeat(child)) return found;
+            return nullptr;
+        };
+        for (int width : {320, 412}) {
+            window->resize(width, 860);
+            for (int mode = 0; mode < 3; ++mode) {
+                sc.setRepeatMode(mode); QTest::qWait(400);
+                auto *button = findRepeat(window->contentItem()); QVERIFY(button); QVERIFY(button->isVisible());
+                QCOMPARE(button->property("symbol").toString(), QStringList({"repeatOff", "repeatOne", "repeat"})[mode]);
+                QCOMPARE(QQmlProperty(button, "Accessible.name", QQmlEngine::contextForObject(button)).read().toString(), QStringList({"Повтор выключен", "Повтор трека", "Повтор очереди"})[mode]);
+                const auto rect = button->mapRectToScene(button->boundingRect());
+                QVERIFY(rect.left() >= 0); QVERIFY(rect.right() <= width);
+                QVERIFY(rect.top() >= 0); QVERIFY(rect.bottom() <= window->height());
+                QVERIFY(QMetaObject::invokeMethod(button, "clicked"));
+                QCOMPARE(sc.repeatMode, (mode + 1) % 3);
+                sc.setRepeatMode(mode); QTest::qWait(20);
+                QVERIFY(window->grabWindow().save(QString("repeat-android-%1-%2.png").arg(width).arg(mode)));
+            }
+        }
+        QQmlExpression closePlayer(QQmlEngine::contextForObject(object.data()), object.data(), "player.close()");
+        closePlayer.evaluate(); QVERIFY(!closePlayer.hasError());
+        QQmlExpression restorePage(QQmlEngine::contextForObject(object.data()), object.data(), "app.page = 0");
+        restorePage.evaluate();
         QTest::qWait(950);
         window->resize(412,860); QTest::qWait(40);
         QVERIFY(window->grabWindow().save("android-header.png"));
@@ -952,9 +1116,27 @@ Item {
         QVERIFY(window->grabWindow().save("android-track-actions.png"));
         QVERIFY(QMetaObject::invokeMethod(actionMenu, "close"));
         QTRY_VERIFY(!actionMenu->property("visible").toBool());
+        QQmlExpression infoFixture(QQmlEngine::contextForObject(object.data()), object.data(),
+            "trackInfoSheet.track = {urn: 'soundcloud:tracks:selected', title: 'Selected track with a very long title that must wrap on a small screen', metadata_artist: 'Credited artist', user: {urn: 'soundcloud:users:uploader', username: 'Uploader'}, duration: 123000, description: ('Long description with multiple paragraphs.\\n').repeat(60), bpm: 125, release_year: 2024, release_month: 2, tag_list: 'rock \"hip hop\"', license: 'cc-by-nc-sa'}; trackInfoSheet.open(); trackInfoSheet");
+        auto *info = infoFixture.evaluate().value<QObject *>();
+        QVERIFY2(!infoFixture.hasError(), qPrintable(infoFixture.error().toString())); QVERIFY(info);
+        QTRY_VERIFY(info->property("opened").toBool());
+        for (auto size : {QSize(320,640), QSize(412,860), QSize(860,412)}) {
+            window->resize(size); QTest::qWait(50);
+            QVERIFY(info->property("height").toReal() <= window->height());
+            QCOMPARE(info->property("track").toMap().value("urn").toString(), "soundcloud:tracks:selected");
+            QVERIFY(window->grabWindow().save(QString("track-info-android-%1.png").arg(size.width())));
+        }
+        QQmlExpression infoBack(QQmlEngine::contextForObject(object.data()), object.data(), "goBack()");
+        QVERIFY(infoBack.evaluate().toBool()); QTRY_VERIFY(!info->property("visible").toBool());
         window->resize(320, 640);
-        QTest::qWait(100);
+        QTest::qWait(350);
+        auto *previewList = window->findChild<QQuickItem *>("previewTrackList"); QVERIFY(previewList);
+        QVERIFY(previewList->height() >= 72);
         QVERIFY(window->grabWindow().save("android-playlist-compact.png"));
+        window->resize(860, 412); QTest::qWait(350);
+        QVERIFY(previewList->height() >= 72);
+        QVERIFY(window->grabWindow().save("android-playlist-landscape.png"));
         QQmlExpression dismissPreview(QQmlEngine::contextForObject(object.data()), object.data(), "playlistView.close()");
         dismissPreview.evaluate();
         window->resize(412, 860);
@@ -970,6 +1152,34 @@ Item {
         QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, start - QPoint(0, 100));
         QTRY_VERIFY_WITH_TIMEOUT(playerVisible.evaluate().toBool(), 1500);
         QTest::qWait(500);
+        auto *commentPreview = window->findChild<QQuickItem *>("playingCommentPreview"); QVERIFY(commentPreview);
+        QVERIFY(commentPreview->isVisible());
+        QTRY_COMPARE(commentPreview->property("displayedComment").toMap()["timestamp"].toInt(), 0);
+        QVERIFY(window->grabWindow().save("android-playing-comment.png"));
+        sc.seek(11000);
+        QTRY_COMPARE(commentPreview->property("displayedComment").toMap()["timestamp"].toInt(), 10000);
+        QTest::qWait(400);
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, commentPreview->mapToScene(QPointF(commentPreview->width() / 2, commentPreview->height() / 2)).toPoint());
+        auto *commentsSheet = window->findChild<QObject *>("commentsSheet"); QVERIFY(commentsSheet);
+        QTRY_VERIFY(commentsSheet->property("opened").toBool());
+        auto *commentPane = window->findChild<QQuickItem *>("mobileCommentsPane"); QVERIFY(commentPane);
+        QVERIFY(commentPane->isVisible());
+        auto *input = window->findChild<QObject *>("trackCommentInput"); QVERIFY(input);
+        auto *timestamp = window->findChild<QObject *>("commentTimestampInput"); QVERIFY(timestamp);
+        input->setProperty("text", "Очень красивый переход"); timestamp->setProperty("text", "0:12");
+        auto *sendComment = window->findChild<QObject *>("postCommentButton"); QVERIFY(sendComment);
+        QVERIFY(sendComment->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(sendComment, "clicked"));
+        QCOMPARE(sc.publishedBody, QString("Очень красивый переход")); QCOMPARE(sc.publishedTimestamp, 12000);
+        QVERIFY(input->property("text").toString().isEmpty());
+        QTest::qWait(400);
+        QVERIFY(window->grabWindow().save("android-comments-sheet.png"));
+        window->resize(320,640); QTest::qWait(300);
+        QVERIFY(window->grabWindow().save("android-comments-compact.png"));
+        QVERIFY(commentPane->width() <= window->width());
+        QVERIFY(QMetaObject::invokeMethod(commentsSheet, "close"));
+        QTRY_VERIFY(!commentsSheet->property("visible").toBool());
+        window->resize(412,860); QTest::qWait(300);
         const QPoint playerStart(200, 100);
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, playerStart);
         for (int y = 10; y <= 50; y += 10) QTest::mouseMove(window, playerStart + QPoint(0, y), 5);
@@ -1020,7 +1230,7 @@ Item {
         host.updatePlayer({{"signedIn", true}, {"access_token", "private-token"},
             {"profile", QVariantMap{{"email", "private-email"}}},
             {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Трек"},
-                {"stream_url", "private-url"}, {"user", QVariantMap{{"username", "Автор"}, {"email", "private-email"}}}}}});
+                {"stream_url", "private-url"}, {"waveform_url", "https://wave.sndcdn.com/a.png?private-token=secret"}, {"user", QVariantMap{{"username", "Автор"}, {"email", "private-email"}}}}}});
         const auto bytes = QJsonDocument::fromVariant(host.m_player).toJson();
         QVERIFY(!bytes.contains("private-"));
         QCOMPARE(host.m_player["current"].toMap()["title"].toString(), QString("Трек"));

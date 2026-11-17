@@ -72,6 +72,15 @@ private slots:
         QVERIFY(!DiscordPresence::activity(state, 1000).toObject().contains("timestamps"));
         QVERIFY(DiscordPresence::activity({}, 1000).isNull());
     }
+    void metadataArtistKeepsUploaderLink() {
+        auto state = player(); auto track = state["current"].toMap();
+        track["metadata_artist"] = "  Credited artist  "; state["current"] = track;
+        auto activity = DiscordPresence::activity(state, 1000).toObject();
+        QCOMPARE(activity["state"].toString(), "Credited artist · SCrip");
+        QCOMPARE(activity["details_url"].toString(), "https://soundcloud.com/artist/track");
+        track["metadata_artist"] = " "; state["current"] = track;
+        QCOMPARE(DiscordPresence::activity(state, 1000).toObject()["state"].toString(), "Artist · SCrip");
+    }
     void durationAndPositionBounds() {
         auto state = player();
         state["position"] = -900;

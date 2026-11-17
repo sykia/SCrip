@@ -1,3 +1,4 @@
+#include "trackmetadata.h"
 #include "androidmedia.h"
 #include "soundcloud.h"
 #include "artworknetwork.h"
@@ -33,6 +34,11 @@ void mediaAction(JNIEnv *, jclass, jint action, jlong position) {
         }
     }, Qt::QueuedConnection);
 }
+void openAndroidLink(JNIEnv *, jclass, jstring value) {
+    if (!qApp || QCoreApplication::closingDown() || !value) return;
+    const auto link = QJniObject(value).toString();
+    QMetaObject::invokeMethod(qApp, [link] { if (controller) controller->openLink(link); }, Qt::QueuedConnection);
+}
 void restoreTrack(JNIEnv *env, jclass, jstring json, jlong position) {
     if (!qApp || QCoreApplication::closingDown() || !json) return;
     const auto bytes = QJniObject(json).toString().toUtf8();
@@ -49,6 +55,8 @@ AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwor
     if (!env.registerNativeMethods("org/scrip/app/MediaBridge", {{"nativeAction", "(IJ)V", reinterpret_cast<void *>(mediaAction)},
         {"nativeRestore", "(Ljava/lang/String;J)V", reinterpret_cast<void *>(restoreTrack)}}))
         qWarning("Не удалось подключить системное управление музыкой");
+    if (env.registerNativeMethods("org/scrip/app/SCripActivity", {{"nativeOpenLink", "(Ljava/lang/String;)V", reinterpret_cast<void *>(openAndroidLink)}}))
+        QJniObject::callStaticMethod<void>("org/scrip/app/SCripActivity", "initializeLinks", "()V");
     QJniObject::callStaticMethod<void>("org/scrip/app/MediaBridge", "initialize", "(Landroid/content/Context;)V",
         QNativeInterface::QAndroidApplication::context().object());
     // Позиция обновляется не чаще раза в секунду; кнопки и смена трека — сразу.
@@ -66,6 +74,7 @@ AndroidMedia::AndroidMedia(SoundCloud *soundcloud, ArtworkNetworkFactory *artwor
     });
     m_timer.setInterval(1000);
     connect(&m_timer, &QTimer::timeout, this, &AndroidMedia::publish);
+
     // Перемотка, в том числе на паузе, не должна ждать секундного опроса.
     connect(soundcloud, &SoundCloud::playbackSeeked, this, &AndroidMedia::publish);
     publish();
@@ -105,7 +114,7 @@ void AndroidMedia::publish() {
             });
         }
     }
-    const QJsonObject data{{"urn", track.value("urn").toString()}, {"title", track.value("title").toString()}, {"artist", user.value("username").toString()},
+    const QJsonObject data{{"urn", track.value("urn").toString()}, {"title", track.value("title").toString()}, {"artist", TrackMetadata::displayArtist(track)},
         {"artwork", m_artworkPath}, {"artworkUrl", m_artworkUrl}, {"playing", state.value("playing").toBool()},
         {"buffering", state.value("buffering").toBool()},
         {"seekable", m_soundcloud->seekable()},

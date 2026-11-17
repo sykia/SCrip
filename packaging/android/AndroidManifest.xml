@@ -20,6 +20,7 @@
         android:hardwareAccelerated="true"
         android:label="SCrip"
         android:icon="@mipmap/icon"
+        android:roundIcon="@mipmap/icon"
         android:allowBackup="true"
         android:fullBackupOnly="false"
         android:fullBackupContent="@xml/backup_rules"
@@ -29,12 +30,36 @@
             android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
             android:label="SCrip"
             android:theme="@style/SCripTheme"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:screenOrientation="unspecified"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="soundcloud.com" />
+                <data android:host="www.soundcloud.com" />
+                <data android:host="m.soundcloud.com" />
+                <data android:host="on.soundcloud.com" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="scrip" />
+                <data android:scheme="soundcloud" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
 
           <meta-data android:name="android.app.background_running" android:value="true" />

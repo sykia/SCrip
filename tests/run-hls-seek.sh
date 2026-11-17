@@ -7,4 +7,8 @@ mkdir -p "$fixture"
 ffmpeg -hide_banner -loglevel error -y -f lavfi -i sine=frequency=440:sample_rate=44100 \
     -t 90 -c:a aac -b:a 160k -f hls -hls_time 10 -hls_playlist_type vod \
     -hls_segment_type fmp4 "$fixture/test.m3u8"
+# CI generates the same fixture before running the complete CTest suite.
+if [[ "${1:-}" == "--generate-only" ]]; then
+    exit 0
+fi
 SCRIP_HLS_TEST_PLAYLIST="$fixture/test.m3u8" "${1:-$root/build/debug/scrip_hls_seek_tests}"

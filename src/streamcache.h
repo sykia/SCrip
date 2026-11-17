@@ -18,6 +18,8 @@ public:
     ~StreamCache() override;
     QUrl source(const QUrl &remote);
     void suspend();
+    void setBackgroundEnabled(bool enabled);
+    void discard(const QUrl &local);
     void warm(const QUrl &local);
 private:
     friend class StreamCacheTest;
@@ -46,6 +48,7 @@ private:
     QString m_root;
     QStringList m_roots;
     QStringList m_pending;
+    bool m_backgroundEnabled = true;
     int m_serial = 0;
     int m_foreground = 0;
 };

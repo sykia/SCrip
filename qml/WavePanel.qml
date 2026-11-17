@@ -12,8 +12,8 @@ Rectangle {
     property color inkColor: dark ? "#f1f1f1" : "#242426"
     property color waveColor: inkColor
     readonly property var api: backend.catalogState
-    readonly property bool discovery: selector.currentIndex === 1
-    readonly property string mode: discovery ? "discovery" : "library"
+    readonly property bool discovery: true
+    readonly property string mode: "discovery"
     readonly property bool selected: api.waveMode === mode
     readonly property bool playing: selected && !!api.playbackActive
     readonly property bool loading: selected && !!api.waveBusy && !api.current?.urn
@@ -25,59 +25,26 @@ Rectangle {
     color: panelColor
     onAnalysisActiveChanged: backend.setWaveVisualActive(analysisActive)
     Component.onCompleted: {
-        selector.currentIndex = api.waveMode === "discovery" ? 1 : 0
         backend.setWaveVisualActive(analysisActive)
     }
     Component.onDestruction: backend.setWaveVisualActive(false)
 
-    Rectangle {
+    PlaybackQuality {
         id: switchBackground
+        objectName: "wavePreferenceSelector"
         anchors.top: parent.top; anchors.topMargin: 18
         anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(parent.width - 28, 346); height: 42
-        radius: 21
-        color: Qt.alpha(root.inkColor, 0.055)
-        Rectangle {
-            x: selector.currentIndex * (parent.width / 2) + 3; y: 3
-            width: parent.width / 2 - 6; height: parent.height - 6
-            radius: height / 2
-            color: root.dark ? "#424242" : "#ffffff"
-            Behavior on x { NumberAnimation { duration: root.motion ? 220 : 0; easing.type: Easing.OutCubic } }
-        }
-        RowLayout {
-            id: selector
-            objectName: "waveModeSelector"
-            anchors.fill: parent
-            property int currentIndex: 0
-            spacing: 0
-            Repeater {
-                model: ["Моя музыка", "Может понравиться"]
-                AbstractButton {
-                    InteractionFeedback {}
-                    required property string modelData
-                    required property int index
-                    Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 1
-                    text: modelData
-                    checkable: true
-                    checked: selector.currentIndex === index
-                    Accessible.role: Accessible.PageTab
-                    Accessible.name: text
-                    contentItem: Text {
-                        text: parent.text; color: root.inkColor
-                        opacity: parent.checked ? 1 : 0.60
-                        font.pixelSize: root.width < 360 ? 11 : 12
-                        font.weight: parent.checked ? Font.DemiBold : Font.Normal
-                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                    }
-                    background: Item {}
-                    onClicked: {
-                        selector.currentIndex = index
-                        if (root.api.playbackActive && root.api.waveMode && root.api.waveMode !== root.mode)
-                            root.backend.startWave(root.mode)
-                    }
-                }
-            }
-        }
+        width: Math.min(parent.width - 28, 480)
+        height: stacked ? 152 : 52
+        stacked: width < 250
+        segments: ["Больше знакомого", "Баланс", "Больше открытий"]
+        Accessible.name: "Подбор музыки"
+        value: root.api.recommendationPreference === undefined ? 1 : root.api.recommendationPreference
+        ink: root.inkColor; surface: Qt.alpha(root.inkColor, 0.055); accent: root.waveColor
+        selectedInk: root.waveColor.hslLightness > 0.6 ? "#242426" : "white"
+        motion: root.motion ? 150 : 0
+        onEdited: value => root.backend.chooseWavePreference(value)
+        Accessible.description: "Изменить подбор и включить другой трек"
     }
     AbstractButton {
         InteractionFeedback {}
@@ -89,9 +56,9 @@ Rectangle {
         hoverEnabled: true
         enabled: !root.loading
         Accessible.name: root.failed ? "Повторить загрузку волны" : root.playing ? "Приостановить волну" : "Слушать волну"
-        Accessible.description: root.failed ? root.api.waveError : (root.discovery ? "Может понравиться" : "Моя музыка")
-        ToolTip.visible: hovered && root.failed
-        ToolTip.text: root.api.waveError || ""
+        Accessible.description: root.failed ? root.api.waveError : root.discovery && root.api.current?.recommendationSource ? "Похоже на «" + root.api.current.recommendationSource + "» · SoundCloud" : (root.discovery ? "Больше открытий" : "Больше знакомого")
+        ToolTip.visible: hovered && (root.failed || (root.discovery && !!root.api.current?.recommendationSource))
+        ToolTip.text: Accessible.description
         background: Item {}
         onClicked: {
             if (root.failed) root.backend.retryWave()

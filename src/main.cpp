@@ -1,8 +1,21 @@
 #include "pluginruntime.h"
 #include "plugins.h"
+#include "playercommand.h"
 #include "discordpresence.h"
 #include "lyrics.h"
 #include "soundcloud.h"
+#ifndef Q_OS_ANDROID
+#include "desktopmedia.h"
+#endif
+#include "linkrouter.h"
+#include <QLocalServer>
+#include <QLockFile>
+#include <QDir>
+#include <QLocalSocket>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QCryptographicHash>
+#include <QTimer>
 #include "artworknetwork.h"
 #include <QQuickWindow>
 #include <QQmlContext>
@@ -48,7 +61,42 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Qsae");
     QCoreApplication::setApplicationName("SCrip");
     QCoreApplication::setApplicationVersion(SCRIP_VERSION);
+    QString incomingLink;
+    for (const auto &argument : app.arguments().mid(1)) {
+        const QUrl candidate(argument);
+        if (candidate.scheme() == "https" || candidate.scheme() == "http" || candidate.scheme() == "scrip" || candidate.scheme() == "soundcloud") { incomingLink = argument; break; }
+    }
+#ifndef Q_OS_ANDROID
+    const auto socketName = "SCrip-" + QString::fromLatin1(QCryptographicHash::hash(QStandardPaths::writableLocation(QStandardPaths::HomeLocation).toUtf8(), QCryptographicHash::Sha256).toHex().left(20));
+    QLocalSocket existing;
+    existing.connectToServer(socketName);
+    if (existing.waitForConnected(300)) {
+        existing.write(QJsonDocument(QJsonArray{incomingLink}).toJson(QJsonDocument::Compact) + '\n');
+        existing.waitForBytesWritten(1000);
+        return EXIT_SUCCESS;
+    }
+    QLockFile instanceLock(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath(socketName + ".lock"));
+    instanceLock.setStaleLockTime(0);
+    if (!instanceLock.tryLock()) {
+        existing.abort(); existing.connectToServer(socketName);
+        if (existing.waitForConnected(1000)) {
+            existing.write(QJsonDocument(QJsonArray{incomingLink}).toJson(QJsonDocument::Compact) + '\n');
+            existing.waitForBytesWritten(1000);
+            return EXIT_SUCCESS;
+        }
+        return EXIT_FAILURE;
+    }
+    QLocalServer linkServer;
+    linkServer.setSocketOptions(QLocalServer::UserAccessOption);
+    if (!linkServer.listen(socketName)) {
+        QLocalServer::removeServer(socketName);
+        if (!linkServer.listen(socketName)) return EXIT_FAILURE;
+    }
+#endif
     SoundCloud soundcloud;
+#ifndef Q_OS_ANDROID
+    LinkRouter linkRouter(&soundcloud);
+#endif
     QObject::connect(&soundcloud, &SoundCloud::authorizationRequested, &app, [&soundcloud](const QUrl &url) {
         bool opened = false;
 #ifndef Q_OS_ANDROID
@@ -76,36 +124,7 @@ int main(int argc, char *argv[])
     updateDiscord();
     Lyrics lyrics;
     Plugins plugins;
-    plugins.setPlayerCommand([&soundcloud](const QString &command, const QJsonObject &args) -> QString {
-        const auto state = soundcloud.state();
-        const auto track = state.value("current").toMap();
-        if (command == "player.repeat") { soundcloud.setRepeat(args["enabled"].toBool()); return {}; }
-        if (command == "player.shuffle") { soundcloud.setShuffle(args["enabled"].toBool()); return {}; }
-        if (command == "player.volume") { soundcloud.volume(args["value"].toDouble()); return {}; }
-        if (command == "player.seekRelative") {
-            qint64 target = 0;
-            if (!Plugins::relativeSeekTarget(soundcloud.position(), soundcloud.duration(),
-                                             args["offsetMs"].toInteger(), soundcloud.seekable(), &target))
-                return "Перемотка недоступна или позиция трека некорректна.";
-            soundcloud.seek(target);
-            return {};
-        }
-        if (track.isEmpty()) return "Нет текущего трека.";
-        if (command == "player.pause") soundcloud.pausePlayback();
-        else if (command == "player.resume") soundcloud.resumePlayback();
-        else if (command == "player.next") {
-            if (state.value("queue").toList().size() < 2 || (!state.value("shuffle").toBool() && state.value("queueIndex").toInt() + 1 >= state.value("queue").toList().size())) return "Нет следующего трека.";
-            soundcloud.next();
-        } else if (command == "player.previous") {
-            if (soundcloud.position() <= 3000 && state.value("queueIndex").toInt() <= 0) return "Нет предыдущего трека.";
-            soundcloud.previous();
-        }
-        else if (command == "player.seek") {
-            if (!soundcloud.seekable() || soundcloud.duration() <= 0) return "Перемотка недоступна.";
-            soundcloud.seek(qMin(args["positionMs"].toInteger(), soundcloud.duration()));
-        } else return "Неизвестная команда плеера.";
-        return {};
-    });
+    plugins.setPlayerCommand(playerCommandHandler(soundcloud));
     plugins.updatePlayer(soundcloud.state());
     QObject::connect(&soundcloud, &SoundCloud::catalogChanged, &plugins, [&] { plugins.updatePlayer(soundcloud.state()); });
     // Получаем свежий прогресс только при наличии подписок, не на каждом тике backend.
@@ -134,9 +153,34 @@ int main(int argc, char *argv[])
         quickWindow->setPersistentSceneGraph(false);
         quickWindow->setPersistentGraphics(false);
     }
+    if (!incomingLink.isEmpty()) QTimer::singleShot(0, &soundcloud, [&soundcloud, incomingLink] { soundcloud.openLink(incomingLink); });
+#ifndef Q_OS_ANDROID
+    QObject::connect(&linkServer, &QLocalServer::newConnection, &app, [&] {
+        while (auto *socket = linkServer.nextPendingConnection()) {
+            socket->setParent(&linkServer);
+            auto read = [socket, &soundcloud, &engine] {
+                if (socket->bytesAvailable() > 16384) { socket->disconnectFromServer(); return; }
+                if (!socket->canReadLine()) return;
+                const auto array = QJsonDocument::fromJson(socket->readLine(16385)).array();
+                if (array.size() != 1 || !array.first().isString()) { socket->disconnectFromServer(); return; }
+                if (auto *window = qobject_cast<QWindow *>(engine.rootObjects().first())) {
+                    window->showNormal(); window->raise(); window->requestActivate();
+                }
+                const auto link = array.first().toString();
+                if (!link.isEmpty()) soundcloud.openLink(link);
+                socket->disconnectFromServer();
+            };
+            QObject::connect(socket, &QLocalSocket::readyRead, &app, read);
+            QObject::connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
+            QTimer::singleShot(5000, socket, [socket] { socket->disconnectFromServer(); });
+            read();
+        }
+    });
+#endif
     PluginRuntime pluginRuntime(&engine, qobject_cast<QQuickWindow *>(engine.rootObjects().first()), &soundcloud, &plugins);
 #ifndef Q_OS_ANDROID
     auto *window = qobject_cast<QWindow *>(engine.rootObjects().first());
+    DesktopMedia desktopMedia(&soundcloud, window);
     QIcon icon(":/qt/qml/SCrip/assets/blob.png");
     app.setWindowIcon(icon);
     QMenu menu;
