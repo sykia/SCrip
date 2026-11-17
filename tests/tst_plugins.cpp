@@ -55,18 +55,21 @@ public:
     Q_INVOKABLE void seek(qint64 timestamp) { playbackPosition = timestamp; emit positionChanged(); }
     Q_INVOKABLE void resumePlayback() {}
     Q_INVOKABLE void copyText(const QString &) {}
+    QVariantMap profileSnapshot;
     QVariantMap state() const {
         return {{"preloadEnabled", true}, {"wifiPolicyAvailable", true}, {"repeatMode", repeatMode}, {"home", QVariantList{QVariantMap{{"title", "Микс любимых"}, {"subtitle", "Похоже на «Длинное название исходного трека» · SoundCloud"},
             {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}, {"urn", "soundcloud:tracks:seed"}, {"user", QVariantMap{{"urn", "soundcloud:users:artist"}, {"username", "Исполнитель"}}}}}}}}},
             {"playlistTracks", QVariantList{QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Первый трек"}, {"user", QVariantMap{{"username", "Исполнитель"}}}}, QVariantMap{{"urn", "soundcloud:tracks:2"}, {"title", "Второй трек"}}}},
-            {"profile", QVariantMap{}}, {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}}}};
+            {"profile", profileSnapshot}, {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}}}};
     }
     Q_INVOKABLE bool queueHasDuplicates() const { return false; }
     Q_INVOKABLE void setWaveVisualActive(bool) {}
     Q_INVOKABLE void volume(double) {}
     QVariantMap lastPreview;
     Q_INVOKABLE void loadPlaylist(const QVariantMap &item, bool = false) { lastPreview = item; }
-    Q_INVOKABLE void loadHome(bool = false) {}
+    int homeRequests = 0;
+    bool forcedHome = false;
+    Q_INVOKABLE void loadHome(bool force = false) { ++homeRequests; forcedHome = force; }
     QString lastSection, lastUser;
     Q_INVOKABLE void browse(const QString &section, const QString &user = {}, bool = false) { lastSection = section; lastUser = user; }
 signals:
@@ -928,6 +931,12 @@ Item {
         QQmlExpression closeStartup(QQmlEngine::contextForObject(object.data()), object.data(), "startup.close()");
         closeStartup.evaluate();
         QVERIFY2(!closeStartup.hasError(), qPrintable(closeStartup.error().toString()));
+        const int initialHomeRequests = sc.homeRequests;
+        sc.profileSnapshot = {{"urn", "soundcloud:users:profile-ready"}, {"username", "Profile fixture"}};
+        emit sc.catalogChanged();
+        QTRY_VERIFY(sc.homeRequests > initialHomeRequests);
+        QVERIFY(sc.forcedHome);
+        QCOMPARE(object->property("page").toInt(), 0);
         for (const auto size : {QSize(412,860), QSize(320,640), QSize(860,412)}) {
             window->resize(size);
             QTest::qWait(40);
@@ -952,6 +961,16 @@ Item {
             QVERIFY(window->grabWindow().save(QString("recommendations-caption-android-%1.png").arg(size.width())));
             flick->setProperty("contentY", 0);
         }
+        object->setProperty("page", 4);
+        QTest::qWait(80);
+        auto *collectionTools = object->findChild<QQuickItem *>("collectionTools");
+        auto *selectionBar = object->findChild<QQuickItem *>("collectionSelectionBar");
+        QVERIFY(collectionTools && selectionBar);
+        QVERIFY(!collectionTools->isVisible()); QVERIFY(!selectionBar->isVisible());
+        QVERIFY(window->grabWindow().save("android-profile-no-tools.png"));
+        object->setProperty("page", 1);
+        QTest::qWait(40);
+        QVERIFY(collectionTools->isVisible()); QVERIFY(selectionBar->isVisible());
         object->setProperty("page", 5);
         QTest::qWait(80);
         for (const auto size : {QSize(320,640), QSize(412,860)}) {

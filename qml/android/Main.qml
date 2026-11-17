@@ -25,6 +25,11 @@ ApplicationWindow {
     palette.highlight: app.accent
     palette.highlightedText: app.foreground(app.accent)
     readonly property var api: sc.uiState
+    readonly property string homeAccount: sc.signedIn ? String(api.profile?.urn || "") : ""
+    onHomeAccountChanged: if (homeAccount) Qt.callLater(function() {
+        // Profile readiness invalidates recommendations started during session restoration.
+        if (sc.signedIn && app.homeAccount) sc.loadHome(true)
+    })
     readonly property bool dark: prefs.darkMode
     onDarkChanged: if (androidMedia) androidMedia.setDarkTheme(dark)
     property bool requestedDark: prefs.darkMode
@@ -370,9 +375,9 @@ ApplicationWindow {
         
         id: row
         required property var modelData
-        onPressAndHold: if (!queued && selectionIndex >= 0) trackSelection.choose(selectionIndex)
+        onPressAndHold: if (app.page !== 4 && !queued && selectionIndex >= 0) trackSelection.choose(selectionIndex)
         property int selectionIndex: -1
-        SelectionInput { anchors.fill: parent; z: 20; mobile: true; selection: trackSelection; rowIndex: row.selectionIndex; host: app }
+        SelectionInput { anchors.fill: parent; z: 20; mobile: true; visible: app.page !== 4 && eligible; enabled: app.page !== 4; selection: trackSelection; rowIndex: row.selectionIndex; host: app }
         property bool queued: false
         property int queueIndex: -1
         width: ListView.view.width
@@ -620,7 +625,7 @@ ApplicationWindow {
                         }
                     }
                 }
-                Label { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy ? "Собираем твою музыку…" : app.api.homeError || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
+                Label { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy || (!app.homeAccount && !app.api.error) ? "Собираем твою музыку…" : app.api.homeError || app.api.error || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
                 PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted; x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: navigationFooter.height + 16 }
             }
@@ -695,9 +700,9 @@ ApplicationWindow {
             }
         }
         CollectionTools {
-            id: collectionTools; host: app; backend: sc; mobile: true
+            id: collectionTools; objectName: "collectionTools"; host: app; backend: sc; mobile: true
             Layout.fillWidth: true; Layout.leftMargin: 20; Layout.rightMargin: 20
-            visible: sc.signedIn && app.page > 0 && app.page < 5 && app.page !== 2
+            visible: sc.signedIn && app.page > 0 && app.page < 4 && app.page !== 2
             catalogue: app.page === 2
             contextKey: app.scrollKey
             catalogueQuery: search.text
@@ -705,7 +710,7 @@ ApplicationWindow {
             filters: app.searchKind === "tracks" ? trackFilters.applied : ({})
             onPresetApplied: (query, filters) => { if (catalogue) { search.text = query; if (app.searchKind === "tracks") trackFilters.restore(filters); else app.refresh() } }
         }
-        SelectionBar { id: selectionBar; Layout.fillWidth: true; Layout.leftMargin: 12; Layout.rightMargin: 12; host: app; mobile: true; selection: trackSelection; visible: sc.signedIn && app.page > 0 && app.page < 5 && !(app.page === 2 && app.searchKind === "users") }
+        SelectionBar { id: selectionBar; objectName: "collectionSelectionBar"; Layout.fillWidth: true; Layout.leftMargin: 12; Layout.rightMargin: 12; host: app; mobile: true; selection: trackSelection; visible: sc.signedIn && app.page > 0 && app.page < 4 && !(app.page === 2 && app.searchKind === "users") }
         ListView {
             id: tracks
             bottomMargin: navigationFooter.height
