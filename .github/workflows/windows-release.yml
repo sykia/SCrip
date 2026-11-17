@@ -1,6 +1,13 @@
 name: Проверка установщика Windows
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to verify (drafts are supported)
+        required: false
+      previous_tag:
+        description: Optional previous release to install before upgrading
+        required: false
   release:
     types: [published]
 permissions:
@@ -10,10 +17,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
-      - name: Скачать релиз, проверить SHA-256 и запустить SCrip
+      - name: Verify the package, upgrade and launch Sange
         shell: pwsh
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
           $selector = @(if ($env:TAG) { $env:TAG })
@@ -36,17 +44,32 @@ jobs:
           Get-MpComputerStatus | Select-Object AntivirusSignatureVersion, AntivirusSignatureLastUpdated | Format-List
           & $scanner -Scan -ScanType 3 -File $exe -DisableRemediation
           if ($LASTEXITCODE -ne 0) { throw "Defender не подтвердил чистую проверку (код $LASTEXITCODE). Установка остановлена." }
+          $sentinel = Join-Path $env:LOCALAPPDATA 'SCrip\upgrade-test-sentinel.txt'
+          if ($env:PREVIOUS_TAG) {
+            $previousDir = Join-Path $env:RUNNER_TEMP 'previous'
+            New-Item -ItemType Directory -Path $previousDir -Force | Out-Null
+            gh release download $env:PREVIOUS_TAG --repo $env:GITHUB_REPOSITORY --pattern '*-Windows-x64.exe' --dir $previousDir
+            if ($LASTEXITCODE -ne 0) { throw 'Previous installer download failed' }
+            $previous = @(Get-ChildItem $previousDir -Filter '*.exe')
+            if ($previous.Count -ne 1) { throw 'Expected one previous installer' }
+            $oldSetup = Start-Process -FilePath $previous[0].FullName -ArgumentList '/S' -PassThru -Wait
+            if ($oldSetup.ExitCode -ne 0) { throw 'Previous installer failed' }
+            New-Item -ItemType Directory -Path (Split-Path $sentinel) -Force | Out-Null
+            Set-Content -LiteralPath $sentinel -Value 'upgrade-preservation-fixture'
+          }
           $setup = Start-Process -FilePath $exe -ArgumentList '/S' -PassThru -Wait
+          if ($env:PREVIOUS_TAG -and (Get-Content -LiteralPath $sentinel -Raw).Trim() -ne 'upgrade-preservation-fixture') { throw 'Application data was lost during upgrade' }
+
           if ($setup.ExitCode -ne 0) { throw "Установщик завершился с кодом $($setup.ExitCode)" }
           $player = Start-Process "$env:LOCALAPPDATA\Programs\SCrip\SCrip.exe" -PassThru
           try {
             for ($i = 0; $i -lt 30; $i++) {
               $player.Refresh()
-              if ($player.HasExited) { throw "SCrip завершился с кодом $($player.ExitCode)" }
-              if ($player.MainWindowHandle -ne 0) { Write-Host 'Окно SCrip открыто'; return }
+              if ($player.HasExited) { throw "Sange завершился с кодом $($player.ExitCode)" }
+              if ($player.MainWindowHandle -ne 0) { Write-Host 'Окно Sange открыто'; return }
               Start-Sleep 1
             }
-            throw 'Окно SCrip не появилось'
+            throw 'Окно Sange не появилось'
           } finally {
             if (!$player.HasExited) { Stop-Process -Id $player.Id }
           }
