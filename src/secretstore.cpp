@@ -120,7 +120,7 @@ QString AuthStorage::errorMessage() {
     help = QStringLiteral("Запустите и разблокируйте Secret Service (например, GNOME Keyring или совместимый KWallet).");
 #endif
     return QStringLiteral("Защищённое хранилище авторизации недоступно или операция не завершена. ") + help
-        + QStringLiteral(" Затем перезапустите SCrip. Токены не сохраняются открытым текстом; старые файлы сохраняются до подтверждения переноса.");
+        + QStringLiteral(" Затем перезапустите Сендж. Токены не сохраняются открытым текстом; старые файлы сохраняются до подтверждения переноса.");
 }
 bool AuthStorage::save(const QString &key, const QJsonObject &value) {
     const auto bytes = QJsonDocument(value).toJson(QJsonDocument::Compact);

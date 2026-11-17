@@ -4561,6 +4561,58 @@ private slots:
         Network restoreNet; SoundCloud restored(nullptr, &restoreNet, secrets);
         QCOMPARE(restored.m_access, QString("old-access")); QVERIFY(restored.m_userSession);
     }
+    void oauthBrowserRetry_data() {
+        QTest::addColumn<bool>("denied");
+        QTest::newRow("denied") << true;
+        QTest::newRow("exchange-failed") << false;
+    }
+    void oauthBrowserRetry() {
+        QFETCH(bool, denied);
+        Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
+        QTRY_VERIFY(sc.state()["connected"].toBool());
+        QSignalSpy opened(&sc, &SoundCloud::authorizationRequested);
+        sc.login(); QCOMPARE(opened.size(), 1);
+        const QUrl first = opened.first().first().toUrl();
+        const QString state = QUrlQuery(first).queryItemValue("state");
+        if (!denied) net.responses = {{503, "{}"}};
+        QTcpSocket callback; callback.connectToHost(QHostAddress::LocalHost, callbackPort);
+        QVERIFY(callback.waitForConnected());
+        callback.write("GET /callback?" + QByteArray(denied ? "error=access_denied" : "code=failed")
+            + "&state=" + state.toUtf8() + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); callback.flush();
+        QTRY_VERIFY(callback.bytesAvailable() > 0);
+        const QByteArray page = callback.readAll();
+        QVERIFY(page.contains("Повторить вход"));
+        QVERIFY(!sc.state()["authBusy"].toBool());
+        QVERIFY(!sc.m_retryToken.isEmpty());
+        const QString capability = sc.m_retryToken;
+        QTcpSocket invalid; invalid.connectToHost(QHostAddress::LocalHost, callbackPort);
+        QVERIFY(invalid.waitForConnected());
+        invalid.write("GET /retry?token=invalid HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); invalid.flush();
+        QTRY_VERIFY(invalid.bytesAvailable() > 0);
+        QVERIFY(invalid.readAll().startsWith("HTTP/1.1 400"));
+        QCOMPARE(sc.m_retryToken, capability);
+        QTcpSocket retry; retry.connectToHost(QHostAddress::LocalHost, callbackPort);
+        QVERIFY(retry.waitForConnected());
+        retry.write("GET /retry?token=" + capability.toUtf8() + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); retry.flush();
+        QTRY_VERIFY(retry.bytesAvailable() > 0);
+        const QByteArray response = retry.readAll();
+        QVERIFY(response.startsWith("HTTP/1.1 303"));
+        QVERIFY(response.contains("Location: https://secure.soundcloud.com/authorize?"));
+        QVERIFY(sc.state()["authBusy"].toBool());
+        QVERIFY(sc.m_oauthState != state); QVERIFY(sc.m_retryToken.isEmpty());
+        QCOMPARE(opened.size(), 1); // Redirect in this tab; do not open another browser.
+        net.responses = {guest(), {200, "{\"username\":\"Retry account\"}"}, {200, "[]"}};
+        QTcpSocket success; success.connectToHost(QHostAddress::LocalHost, callbackPort);
+        QVERIFY(success.waitForConnected());
+        success.write("GET /callback?code=fresh&state=" + sc.m_oauthState.toUtf8()
+            + " HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"); success.flush();
+        QTRY_VERIFY(sc.signedIn());
+        QTRY_VERIFY(success.bytesAvailable() > 0);
+        QVERIFY(success.readAll().startsWith("HTTP/1.1 200"));
+        QVERIFY(!sc.state()["authBusy"].toBool());
+        QVERIFY(!sc.m_callback.isListening());
+        QVERIFY(sc.m_retryToken.isEmpty());
+    }
     void oauthCancellationBeforeCallbackAndDuringExchange() {
         AuthStorage storage(secrets);
         const QJsonObject oldSession{{"client_id", "test-client"}, {"access_token", "old-access"},

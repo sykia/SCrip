@@ -188,7 +188,7 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     // before any successful HTTP response reaches the player.
     const auto suffix = QFileInfo(reply->url().path()).suffix().toLower();
     const bool segment = !head && (suffix == "m4s" || suffix == "ts" || suffix == "mp4" || suffix == "aac" || suffix == "mp3");
-    struct Download { QByteArray body; bool headers = false; bool manifest = false; bool atomic = false; bool tooLarge = false; };
+    struct Download { QByteArray body; qint64 received = 0; bool headers = false; bool manifest = false; bool atomic = false; bool tooLarge = false; };
     auto state = std::make_shared<Download>();
     auto drain = [=] {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -205,6 +205,7 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
             socket->write(headers + "\r\n");
         }
         const QByteArray chunk = reply->readAll();
+        state->received += chunk.size();
         if (!state->manifest && !state->atomic && socket && !head) socket->write(chunk);
         if (!state->tooLarge) {
             state->body += chunk;
@@ -215,7 +216,13 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     connect(reply, &QNetworkReply::finished, this, [=, this] {
         drain();
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const bool ok = reply->error() == QNetworkReply::NoError && status >= 200 && status < 300 && (!(state->atomic || state->manifest) || !state->tooLarge);
+        bool lengthValid = true;
+        if (!head && reply->hasRawHeader("Content-Length") && !reply->hasRawHeader("Content-Encoding")) {
+            bool parsed = false;
+            const qint64 expected = reply->rawHeader("Content-Length").toLongLong(&parsed);
+            lengthValid = parsed && expected >= 0 && state->received == expected;
+        }
+        const bool ok = lengthValid && reply->error() == QNetworkReply::NoError && status >= 200 && status < 300 && (!(state->atomic || state->manifest) || !state->tooLarge);
         QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         if (ok && state->manifest && !state->tooLarge) { state->body = playlist(state->body, {reply->url(), m_resources.value(key).root}); type = "application/vnd.apple.mpegurl"; }
         if (ok && !head && range.isEmpty() && status == 200 && !state->tooLarge) {

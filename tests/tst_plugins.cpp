@@ -24,6 +24,10 @@ class AndroidLayoutModel : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(QVariantMap catalogState READ state NOTIFY catalogChanged)
+    Q_PROPERTY(QVariantMap uiState READ state NOTIFY catalogChanged)
+    Q_PROPERTY(QVariantList homeShelves READ home NOTIFY catalogChanged)
+    Q_PROPERTY(QVariantList playlistRows READ playlistTracks NOTIFY catalogChanged)
+    Q_PROPERTY(QVariantList queueTracks READ queue NOTIFY catalogChanged)
     Q_PROPERTY(QVariantMap commentsState READ commentsState CONSTANT)
     Q_PROPERTY(qint64 position READ position NOTIFY positionChanged)
     Q_PROPERTY(qint64 duration READ position CONSTANT)
@@ -32,6 +36,9 @@ public:
     Q_INVOKABLE QString trackDescription(const QVariantMap &track) const { return TrackInfo::text(track.value("description")); }
     Q_INVOKABLE QString displayArtist(const QVariantMap &track) const { return TrackMetadata::displayArtist(track); }
     Q_INVOKABLE bool hasSeparateArtist(const QVariantMap &track) const { return TrackMetadata::hasSeparateArtist(track); }
+    QVariantList home() const { return state().value("home").toList(); }
+    QVariantList playlistTracks() const { return state().value("playlistTracks").toList(); }
+    QVariantList queue() const { return {}; }
     int repeatMode = 0;
     Q_INVOKABLE void setRepeatMode(int mode) { repeatMode = mode; emit catalogChanged(); }
     QVariantMap commentsState() const { return {{"track", "soundcloud:tracks:1"}, {"items", QVariantList{QVariantMap{{"urn", "soundcloud:comments:1"}, {"body", "Этот момент хочется переслушивать"}, {"timestamp", 0}, {"user", QVariantMap{{"username", "anastasia"}}}}, QVariantMap{{"urn", "soundcloud:comments:2"}, {"body", "А здесь вступают ударные"}, {"timestamp", 10000}, {"user", QVariantMap{{"username", "slow motion"}}}}}}}; }

@@ -1,6 +1,6 @@
 # Plugin system architecture
 
-SCrip uses the API 2 manifest format with a declarative runtime and a [trusted executable QML runtime](plugin-runtime.md). The implementation and full contract are described in the [reference](plugin-api-v2-reference.md). This document defines architectural boundaries, rather than a separate runtime.
+Sendzh uses the API 2 manifest format with a declarative runtime and a [trusted executable QML runtime](plugin-runtime.md). The implementation and full contract are described in the [reference](plugin-api-v2-reference.md). This document defines architectural boundaries, rather than a separate runtime.
 
 ## Trust boundary
 

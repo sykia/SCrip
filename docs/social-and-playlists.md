@@ -38,7 +38,7 @@ Paste a SoundCloud URL into search to open its resource. An installed desktop pa
 
 Linux desktop packages advertise the `scrip` and `soundcloud` schemes. A source checkout does not register system handlers: install its desktop file/package first. Windows setup registers the `scrip` scheme for the current user. Neither package takes over the global HTTP(S) handler.
 
-Android handles VIEW intents for SoundCloud's main, `www`, `m` and `on` domains, custom protocol links, and text shared to SCrip. A native bridge delivers both cold-start and subsequent intents. On Android 12+, enable the domains under **Settings → Apps → SCrip → Open by default → Supported web addresses**. Labels vary by device. SCrip cannot verify a domain owned by SoundCloud; this requires the user's domain selection. See [Android's domain approval rules](https://developer.android.com/training/app-links/verify-applinks).
+Android handles VIEW intents for SoundCloud's main, `www`, `m` and `on` domains, custom protocol links, and text shared to Sendzh. A native bridge delivers both cold-start and subsequent intents. On Android 12+, enable the domains under **Settings → Apps → Sendzh → Open by default → Supported web addresses**. Labels vary by device. Sendzh cannot verify a domain owned by SoundCloud; this requires the user's domain selection. See [Android's domain approval rules](https://developer.android.com/training/app-links/verify-applinks).
 
 ### Optional desktop browser bridge
 
@@ -46,11 +46,11 @@ Android handles VIEW intents for SoundCloud's main, `www`, `m` and `on` domains,
 
 For Chromium browsers, open the extensions page, enable developer mode and use **Load unpacked** to select this directory. For a temporary Firefox development install, use **about:debugging → This Firefox → Load Temporary Add-on** and select `manifest.json`. Permanent Firefox distribution requires signing.
 
-The bridge runs on HTTP(S) pages to recognize clicked links. It does not fetch, transmit or store browsing data. Modified clicks, downloads, account/purchase flows and browser-internal pages retain their normal behavior. Typing a URL into the browser address bar is not intercepted; the extension button provides **Open in SCrip** for the current SoundCloud page. Browser external-application prompts still apply. This bridge is optional and is not installed automatically.
+The bridge runs on HTTP(S) pages to recognize clicked links. It does not fetch, transmit or store browsing data. Modified clicks, downloads, account/purchase flows and browser-internal pages retain their normal behavior. Typing a URL into the browser address bar is not intercepted; the extension button provides **Open in Sendzh** for the current SoundCloud page. Browser external-application prompts still apply. This bridge is optional and is not installed automatically.
 
 ## Verification
 
-Transport tests cover paginated lists, stale responses, safe profile links, playlist and station likes, reposts, serialized mutations, draft ordering with duplicates, ownership, incomplete track lists, remote conflicts, deletion, resolver redirects and station tracks. Isolated QML fixtures instantiate the shared surfaces at desktop and phone widths and capture editor/people layouts under `build/`. These fixtures do not launch the SCrip application or contact live accounts.
+Transport tests cover paginated lists, stale responses, safe profile links, playlist and station likes, reposts, serialized mutations, draft ordering with duplicates, ownership, incomplete track lists, remote conflicts, deletion, resolver redirects and station tracks. Isolated QML fixtures instantiate the shared surfaces at desktop and phone widths and capture editor/people layouts under `build/`. These fixtures do not launch the Sendzh application or contact live accounts.
 
 ## Engagement counters and people
 
@@ -82,7 +82,7 @@ confirmed count. Server counts never replace the confirmed own like/repost state
 
 Station navigation uses only `station_urn` returned on the API track/user object.
 It never constructs station identifiers from a track/user ID. Missing stations
-and failed station loads can open a clearly named SCrip selection using the
+and failed station loads can open a clearly named Sendzh selection using the
 seed track's documented related endpoint. Opening that selection does not start
 playback; its displayed rows can be played or added as usual. This fallback is
 not represented as a SoundCloud artist station.

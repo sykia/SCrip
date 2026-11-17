@@ -1,6 +1,6 @@
 # Track comments
 
-SCrip reads and publishes track comments through the official SoundCloud API:
+Sendzh reads and publishes track comments through the official SoundCloud API:
 `GET /tracks/{track_urn}/comments` and `POST /tracks/{track_urn}/comments`.
 Timestamps are in milliseconds. Untimed comments retain a separate `-1` sentinel.
 
@@ -32,7 +32,7 @@ selected track's official comments endpoint.
 
 Available actions are a timestamp seek, profile navigation, copying comment text,
 and a reply using an `@permalink` mention. The public API does not expose comment
-likes, deletion, or threaded replies, so SCrip does not present those actions.
+likes, deletion, or threaded replies, so Sendzh does not present those actions.
 No comment cache or draft is persisted to disk.
 
 Validation uses mocked API responses and rendered desktop/mobile QML fixtures.

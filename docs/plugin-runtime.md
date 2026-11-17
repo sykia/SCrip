@@ -2,7 +2,7 @@
 
 ## Design and implementation plan
 
-The goal is executable extensions which can introduce behavior and UI that the host did not anticipate. exteraGram's [SDK](https://plugins.exteragram.app/docs) and [method hooks](https://plugins.exteragram.app/docs/xposed-hooking) are the inspiration. SCrip uses its native Qt Quick/JavaScript engine instead of adding Python, Chaquopy or Java hooks.
+The goal is executable extensions which can introduce behavior and UI that the host did not anticipate. exteraGram's [SDK](https://plugins.exteragram.app/docs) and [method hooks](https://plugins.exteragram.app/docs/xposed-hooking) are the inspiration. Sendzh uses its native Qt Quick/JavaScript engine instead of adding Python, Chaquopy or Java hooks.
 
 Implementation stages delivered together:
 

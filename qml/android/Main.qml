@@ -14,7 +14,7 @@ ApplicationWindow {
     height: 860
     minimumWidth: 320
     minimumHeight: 480
-    title: "SCrip · Android"
+    title: "Сендж · Android"
     color: app.surface
     palette.window: app.surface
     palette.windowText: app.ink
@@ -439,7 +439,7 @@ ApplicationWindow {
                 RowLayout {
                     spacing: 5
                     Rectangle { Layout.preferredWidth: 22; Layout.preferredHeight: 22; radius: 7; color: app.accent; Image { anchors.fill: parent; anchors.margins: 3; source: "qrc:/qt/qml/SCrip/assets/blob.png"; fillMode: Image.PreserveAspectFit } }
-                    Caption { text: "SCrip  /  ТВОЙ РИТМ"; color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
+                    Caption { text: "Сендж  /  ТВОЙ РИТМ"; color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
                 }
                 Caption { text: ["Слушай своё", "На твоей волне", "Найди свой звук", "Твоя коллекция", "Профиль", "Настройки", "Плагины"][app.page]; font.pixelSize: 27; font.bold: true }
             }
@@ -481,7 +481,7 @@ ApplicationWindow {
             Item { Layout.fillHeight: true }
             Image { source: "qrc:/qt/qml/SCrip/assets/blob.png"; Layout.preferredWidth: 120; Layout.preferredHeight: 120; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit; Rectangle { anchors.fill: parent; anchors.margins: -8; radius: 32; color: app.accent; z: -1 } }
             Label { text: "Твоя музыка.\nВ твоём ритме."; font.pixelSize: 27; font.bold: true; color: app.ink; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
-            Label { text: app.api.authBusy ? "Заверши вход в браузере и вернись в SCrip" : "Любимые треки, новые находки и миксы SoundCloud"; color: app.muted; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
+            Label { text: app.api.authBusy ? "Заверши вход в браузере и вернись в Сендж" : "Любимые треки, новые находки и миксы SoundCloud"; color: app.muted; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
             Action { visible: app.api.disconnectStatus === "unconfirmed"; text: "Настройки SoundCloud"; Layout.fillWidth: true; onClicked: sc.openExternal("https://soundcloud.com/settings") }
             Action { text: app.api.authBusy ? "Отменить вход" : "Войти в SoundCloud"; primary: true; Layout.fillWidth: true; onClicked: app.api.authBusy ? sc.cancelLogin() : sc.login() }
             Item { Layout.fillHeight: true }
@@ -609,7 +609,7 @@ ApplicationWindow {
                                         RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: homeShelf.modelData.station ? modelData.user?.avatar_url || app.cover(modelData) : app.cover(modelData) }
                                     }
                                     Caption { width: 154; text: homeShelf.modelData.station ? sc.displayArtist(modelData) || "Исполнитель" : modelData.title || ""; font.bold: true; font.pixelSize: 13 }
-                                    Caption { width: 154; text: homeShelf.modelData.station ? (modelData.user?.station_urn ? "Станция исполнителя" : "Подборка SCrip") : sc.displayArtist(modelData) || ""; color: app.muted; font.pixelSize: 12 }
+                                    Caption { width: 154; text: homeShelf.modelData.station ? (modelData.user?.station_urn ? "Станция исполнителя" : "Подборка Сендж") : sc.displayArtist(modelData) || ""; color: app.muted; font.pixelSize: 12 }
                                 }
                                 onClicked: {
                                     if (homeShelf.modelData.station) playlistView.beginStation(modelData)
@@ -637,7 +637,7 @@ ApplicationWindow {
                 ColumnLayout {
                     visible: app.page === 5
                     Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.margins: 18; spacing: 14
-                    Caption { text: "SCrip"; font.bold: true; font.pixelSize: 19 }
+                    Caption { text: "Сендж"; font.bold: true; font.pixelSize: 19 }
                     Caption { text: "Версия " + Qt.application.version + (app.api.updateAvailable ? " · доступна " + app.api.latestVersion : ""); color: app.api.updateAvailable ? app.accent : app.muted; font.pixelSize: 13 }
                     Caption { text: app.api.updateError || app.api.updateResult || (app.api.updateChecking ? "Проверяем обновления…" : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     Caption { visible: !!app.api.updateDownloading; text: app.api.updateTotal > 0 ? (Number(app.api.updateDownloaded / 1048576).toFixed(1) + " МБ / " + Number(app.api.updateTotal / 1048576).toFixed(1) + " МБ · " + Math.floor(100 * app.api.updateDownloaded / app.api.updateTotal) + "%") : (app.api.updateDownloaded + " байт скачано"); color: app.muted; Layout.fillWidth: true }
@@ -684,7 +684,7 @@ ApplicationWindow {
                     Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
                     Caption { text: "Аккаунт"; font.bold: true; font.pixelSize: 19 }
                     Action { text: sc.signedIn ? "Выйти из SoundCloud" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: sc.signedIn ? sc.logout() : sc.login() }
-                    Caption { text: "SCrip " + Qt.application.version + " · Android"; color: app.muted; font.pixelSize: 12 }
+                    Caption { text: "Сендж " + Qt.application.version + " · Android"; color: app.muted; font.pixelSize: 12 }
                 }
                 ColumnLayout {
                     visible: app.page === 6
@@ -768,7 +768,7 @@ ApplicationWindow {
                                 visible: profileCard.creator
                                 anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10
                                 width: creatorBadge.implicitWidth + 20; height: 27; radius: 14; color: app.accent
-                                Text { id: creatorBadge; anchors.centerIn: parent; text: "✦ Создатель SCrip"; color: app.foreground(app.accent); font.pixelSize: 11; font.bold: true }
+                                Text { id: creatorBadge; anchors.centerIn: parent; text: "✦ Создатель Сендж"; color: app.foreground(app.accent); font.pixelSize: 11; font.bold: true }
                             }
                         }
                         FollowButton { anchors.horizontalCenter: parent.horizontalCenter; user: app.profile || ({}) }
@@ -1462,7 +1462,7 @@ ApplicationWindow {
         parent: Overlay.overlay; anchors.centerIn: parent; width: Math.min(parent.width - 40, 380); modal: true; padding: 24
         background: Rectangle { color: app.panel; radius: 24 }
         contentItem: ColumnLayout {
-            Caption { text: app.api.profile?.username || "SCrip"; font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
+            Caption { text: app.api.profile?.username || "Сендж"; font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
             Label { text: "SoundCloud для твоего ритма"; color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Action { text: sc.signedIn ? "Выйти из аккаунта" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.signedIn ? sc.logout() : sc.login(); account.close() } }
             Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: account.close() }
@@ -1501,7 +1501,7 @@ ApplicationWindow {
                     Rectangle { anchors.fill: parent; anchors.margins: -16; radius: 32; color: app.accent; z: -1 }
 
                 }
-                Caption { anchors.horizontalCenter: parent.horizontalCenter; text: "SCrip"; font.pixelSize: 25; font.bold: true }
+                Caption { anchors.horizontalCenter: parent.horizontalCenter; text: "Сендж"; font.pixelSize: 25; font.bold: true }
                 Caption { anchors.horizontalCenter: parent.horizontalCenter; text: "Твоя музыка рядом"; color: app.muted; font.pixelSize: 13 }
             }
         }

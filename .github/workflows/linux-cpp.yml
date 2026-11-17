@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            cmake ninja-build pkg-config libsecret-1-dev libgl1-mesa-dev ffmpeg dbus-daemon pulseaudio
+            cmake ninja-build pkg-config libsecret-1-dev libgl1-mesa-dev ffmpeg dbus-daemon pulseaudio gnome-keyring
 
       - name: Install Qt 6.12
         uses: jurplel/install-qt-action@v4
@@ -54,7 +54,15 @@ jobs:
         run: |
           export SCRIP_HLS_TEST_PLAYLIST="$GITHUB_WORKSPACE/build/hls-seek-fixture/test.m3u8"
           status=0
-          dbus-run-session -- ctest --test-dir build/ci --verbose > build/ci/ctest.log 2>&1 || status=$?
+          export XDG_DATA_HOME="$GITHUB_WORKSPACE/build/ci/keyring-data"
+          export XDG_RUNTIME_DIR="$GITHUB_WORKSPACE/build/ci/keyring-runtime"
+          export GNOME_KEYRING_CONTROL="$XDG_RUNTIME_DIR/control"
+          mkdir -p "$XDG_DATA_HOME" "$GNOME_KEYRING_CONTROL"
+          chmod 700 "$XDG_RUNTIME_DIR" "$GNOME_KEYRING_CONTROL"
+          dbus-run-session -- bash -eu -c '
+            printf "%s" "ci-fixture-password" | gnome-keyring-daemon --unlock --components=secrets --control-directory "$GNOME_KEYRING_CONTROL" >/dev/null
+            ctest --test-dir build/ci --verbose
+          ' > build/ci/ctest.log 2>&1 || status=$?
           cat build/ci/ctest.log
           # CTest can succeed when Qt Test skips individual methods. Require
           # explicit passes only for these integration checks.
@@ -75,3 +83,25 @@ jobs:
             build/ci/*.log
             build/ci/Testing/Temporary/
           if-no-files-found: ignore
+
+  debian-package:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    container: debian:13
+    timeout-minutes: 25
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y ca-certificates git cmake ninja-build g++ pkg-config libsecret-1-dev qt6-base-dev qt6-declarative-dev qt6-multimedia-dev qt6-shadertools-dev
+      - uses: actions/checkout@v4
+      - name: Build and package
+        run: |
+          cmake -S . -B build/debian -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build/debian --parallel 2
+          DESTDIR="$PWD/build/stage" cmake --install build/debian --prefix /usr --strip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Debian-native
+          path: build/debian/scrip
+          if-no-files-found: error

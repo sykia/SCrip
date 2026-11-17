@@ -18,7 +18,7 @@
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true"
-        android:label="SCrip"
+        android:label="Сендж"
         android:icon="@mipmap/icon"
         android:roundIcon="@mipmap/icon"
         android:allowBackup="true"
@@ -28,7 +28,7 @@
         <activity
             android:name="org.scrip.app.SCripActivity"
             android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
-            android:label="SCrip"
+            android:label="Сендж"
             android:theme="@style/SCripTheme"
             android:launchMode="singleTask"
             android:screenOrientation="unspecified"

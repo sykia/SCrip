@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "requiresHost": {
     "min": "1.4.1",
-    "maxExclusive": "2.0.0"
+    "maxExclusive": "3.0.0"
   },
   "settings": [],
   "contributions": [

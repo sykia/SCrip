@@ -1,6 +1,6 @@
 # Recommendations
 
-SCrip orders SoundCloud related-track results locally; it does not train a model
+Sendzh orders SoundCloud related-track results locally; it does not train a model
 or promise recommendation accuracy. The implementation uses only the documented
 `GET /tracks/{track_urn}/related` endpoint (`limit`, `linked_partitioning`).
 Sources checked on 2026-11-16:

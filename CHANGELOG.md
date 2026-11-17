@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0 — Sendzh (Сендж)
+
+- Rename the application while preserving package IDs, settings, secure-storage keys and link handlers for in-place upgrades.
+- Retry denied or failed SoundCloud sign-in in the same browser tab with fresh PKCE and state.
+- Clear the busy state after denied authorization and invalidate retry links after use, cancellation or timeout.
+- Unify desktop and Android versions at 2.0.0; increment Android version code to 20000.
+
 ## 1.6.1 — November 12, 2026
 
 - Fixed desktop update downloads when the HTTP response size is unknown.

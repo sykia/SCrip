@@ -20,7 +20,7 @@ class MprisRoot : public QDBusAbstractAdaptor {
 public:
     explicit MprisRoot(DesktopMedia *media) : QDBusAbstractAdaptor(media), m(media) {}
     bool no() const { return false; } bool yes() const { return true; }
-    QString identity() const { return "SCrip"; } QString desktop() const { return "scrip"; }
+    QString identity() const { return "Сендж"; } QString desktop() const { return "scrip"; }
     QStringList empty() const { return {}; }
 public slots:
     void Raise() { m->raise(); } void Quit() {}

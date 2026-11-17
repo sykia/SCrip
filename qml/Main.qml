@@ -13,7 +13,7 @@ Window {
     width: 1320; height: 820
     minimumWidth: 760; minimumHeight: 560
     visible: true
-    title: "SCrip"
+    title: "Сендж"
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
     palette.window: app.panel
@@ -488,7 +488,7 @@ Window {
             Txt {
                 x: sidebar.x + sidebar.width + app.gutter; anchors.verticalCenter: parent.verticalCenter; visible: sc.signedIn
                 width: Math.max(80, parent.width - x - app.inspectorWidth - 330)
-                text: "SCrip"
+                text: "Сендж"
                 color: app.muted
                 font.pixelSize: 14; font.weight: Font.DemiBold
             }
@@ -812,7 +812,7 @@ Window {
             anchors.centerIn: parent; width: Math.min(460, parent.width - 64); spacing: 16
             BrandMark { anchors.horizontalCenter: parent.horizontalCenter; width: 144; height: width }
             Txt {
-                width: parent.width; text: "Добро пожаловать в SCrip"
+                width: parent.width; text: "Добро пожаловать в Сендж"
                 horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; elide: Text.ElideNone
                 font.pixelSize: 30; font.weight: Font.DemiBold; font.letterSpacing: -0.9
             }
@@ -825,7 +825,7 @@ Window {
                 text: app.api.authStep === "exchange" ? "Завершаем вход…" : app.api.authBusy ? "Окно входа открыто" : "Войти в SoundCloud"
                 enabled: !app.api.authBusy; onClicked: sc.login()
             }
-            Txt { visible: app.api.authStep === "browser"; width: parent.width; text: "Завершите вход в отдельном окне.\nSCrip откроет медиатеку автоматически."; horizontalAlignment: Text.AlignHCenter; color: app.muted; wrapMode: Text.WordWrap; lineHeight: 1.4 }
+            Txt { visible: app.api.authStep === "browser"; width: parent.width; text: "Завершите вход в отдельном окне.\nСендж откроет медиатеку автоматически."; horizontalAlignment: Text.AlignHCenter; color: app.muted; wrapMode: Text.WordWrap; lineHeight: 1.4 }
             Tool { visible: app.api.disconnectStatus === "unconfirmed"; text: "Настройки SoundCloud"; anchors.horizontalCenter: parent.horizontalCenter; onClicked: sc.openExternal("https://soundcloud.com/settings") }
             Txt { visible: !!app.api.error; width: parent.width; text: app.api.error || ""; color: "#bc3b4a"; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 12 }
             Row {
@@ -1460,7 +1460,7 @@ Window {
                                 spacing: 4
                                 Artwork { width: card.width; height: width; radius: shelf.modelData.station ? width / 2 : app.artworkRadius; source: shelf.modelData.station ? app.imageUrl(card.modelData.user?.avatar_url) || app.cover(card.modelData) : app.cover(card.modelData) }
                                 Txt { width: card.width; text: shelf.modelData.station ? card.modelData.user.username : card.modelData.title || "Без названия"; font.weight: Font.Medium }
-                                Txt { width: card.width; text: shelf.modelData.station ? (card.modelData.user?.station_urn ? "Станция исполнителя" : "Подборка SCrip") : sc.displayArtist(card.modelData) || ""; color: app.muted; font.pixelSize: 12 }
+                                Txt { width: card.width; text: shelf.modelData.station ? (card.modelData.user?.station_urn ? "Станция исполнителя" : "Подборка Сендж") : sc.displayArtist(card.modelData) || ""; color: app.muted; font.pixelSize: 12 }
                             }
                             scale: pressed && prefs.motion ? 0.975 : 1
                             Behavior on scale { NumberAnimation { duration: app.motion / 2; easing.type: Easing.OutCubic } }
@@ -1796,7 +1796,7 @@ Window {
                     checked: typeof discordPresence !== "undefined" && discordPresence.enabled
                     onToggled: discordPresence.enabled = checked
                 }
-                Txt { width: parent.width; text: "Трек, исполнитель, обложка и время прослушивания в вашем профиле Discord. Кнопки: открыть трек и скачать SCrip."; color: app.muted; wrapMode: Text.WordWrap }
+                Txt { width: parent.width; text: "Трек, исполнитель, обложка и время прослушивания в вашем профиле Discord. Кнопки: открыть трек и скачать Сендж."; color: app.muted; wrapMode: Text.WordWrap }
                 Txt { width: parent.width; text: typeof discordPresence !== "undefined" ? discordPresence.status : ""; color: app.muted; wrapMode: Text.WordWrap }
                 Txt { text: "Свой Application ID Discord (необязательно)"; color: app.muted }
                 Field {
@@ -1819,7 +1819,7 @@ Window {
                 Tool { text: "Выйти из аккаунта"; onClicked: disconnectDialog.open() }
             }
             FormBlock {
-                width: parent.width; heading: "SCrip"
+                width: parent.width; heading: "Сендж"
                 Txt { text: "Версия " + Qt.application.version; color: app.muted }
                 Txt { text: app.api.updateError || app.api.updateResult || (app.api.updateAvailable ? "Доступна версия " + app.api.latestVersion : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.api.updateAvailable ? app.accent : app.muted; width: parent.width; wrapMode: Text.WordWrap }
                 Txt { visible: !!app.api.updateDownloading; text: app.api.updateTotal > 0 ? (Number(app.api.updateDownloaded / 1048576).toFixed(1) + " МБ / " + Number(app.api.updateTotal / 1048576).toFixed(1) + " МБ · " + Math.floor(100 * app.api.updateDownloaded / app.api.updateTotal) + "%") : (app.api.updateDownloaded + " байт скачано"); color: app.muted }
@@ -1999,7 +1999,7 @@ Window {
         contentItem: Column {
             spacing: 16
             Txt { text: "Выйти из SoundCloud?"; font.pixelSize: 19; font.weight: Font.DemiBold }
-            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: "Доступ SCrip к аккаунту будет отозван. Ваша музыка и плейлисты останутся в SoundCloud."; color: app.muted }
+            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: "Доступ Сендж к аккаунту будет отозван. Ваша музыка и плейлисты останутся в SoundCloud."; color: app.muted }
             Row { spacing: 8; Tool { text: "Выйти"; primary: true; onClicked: { sc.logout(); disconnectDialog.close() } } Tool { text: "Отмена"; onClicked: disconnectDialog.close() } }
         }
     }
@@ -2021,7 +2021,7 @@ Window {
                         NumberAnimation { to: 0.7; duration: 1600 }
                         NumberAnimation { to: 1; duration: 1600 }
                     }
-                    Txt { id: creatorLabel; anchors.centerIn: parent; text: "✦ Создатель SCrip"; color: app.foreground(app.accent); font.weight: Font.DemiBold }
+                    Txt { id: creatorLabel; anchors.centerIn: parent; text: "✦ Создатель Сендж"; color: app.foreground(app.accent); font.weight: Font.DemiBold }
                 }
                 Avatar { x: 24; y: 32; width: 96; height: 96; source: app.imageUrl(app.displayedProfile.avatar_url || "") }
                 Column {

@@ -1,4 +1,4 @@
-# SCrip name and logo
+# Sendzh name and logo
 
 Copyright (c) 2026 sykia. Authorship of the original name and logo is retained.
 

@@ -89,7 +89,7 @@ qint64 wavePosition(const QVariantMap &snapshot, const QString &mode) {
         return qMax<qint64>(0, checkpoint.value("position").toLongLong());
     return qMax<qint64>(0, snapshot.value("position").toLongLong());
 }
-QByteArray callbackPage(bool valid, bool receivedCode) {
+QByteArray callbackPage(bool valid, bool receivedCode, const QString &retryToken) {
     static const QByteArray page = [] {
         QFile file(":/resources/callback.html");
         if (!file.open(QIODevice::ReadOnly)) return QByteArray{};
@@ -103,11 +103,13 @@ QByteArray callbackPage(bool valid, bool receivedCode) {
         return html;
     }();
     auto html = page;
+    html.replace("RETRY_ACTION", retryToken.isEmpty() ? QByteArray{} :
+        ("<p class=retry><a href='/retry?token=" + retryToken.toUtf8() + "'>Повторить вход</a></p>"));
     if (!valid)
-        return html.replace("PAGE_TITLE", "Начните вход в SCrip").replace("PAGE_MESSAGE", "Откройте приложение и нажмите «Войти в SoundCloud».");
+        return html.replace("PAGE_TITLE", "Начните вход в Сендж").replace("PAGE_MESSAGE", "Откройте приложение и нажмите «Войти в SoundCloud».");
     if (!receivedCode)
-        return html.replace("PAGE_TITLE", "Вход не завершён").replace("PAGE_MESSAGE", "Вернитесь в приложение, чтобы попробовать ещё раз.");
-    return html.replace("PAGE_TITLE", "Вернитесь в SCrip").replace("PAGE_MESSAGE", "Аккаунт SoundCloud подключён. Эту вкладку можно закрыть.");
+        return html.replace("PAGE_TITLE", "Вход не завершён").replace("PAGE_MESSAGE", "Нажмите «Повторить вход», чтобы начать заново в этой вкладке.");
+    return html.replace("PAGE_TITLE", "Вернитесь в Сендж").replace("PAGE_MESSAGE", "Аккаунт SoundCloud подключён. Эту вкладку можно закрыть.");
 }
 QString nonce() {
     QByteArray bytes(32, Qt::Uninitialized);
@@ -1080,23 +1082,27 @@ void SoundCloud::restorePlayback(const QVariantMap &profile) {
     m_restorePosition = qMax<qint64>(0, (sameTrack ? savedPosition.value("position") : snapshot.value("position")).toLongLong());
     set("current", track); set("duration", track.value("duration")); set("position", m_restorePosition);
 }
-void SoundCloud::login() {
-    if (m_state.value("authBusy").toBool() || m_refreshing) return;
-    if (!m_storageReady) { fail(AuthStorage::errorMessage()); return; }
-    if (!loadConfig()) { fail("Подключение ещё не настроено. См. раздел «Первое подключение» в README."); return; }
+void SoundCloud::login() { beginLogin(true); }
+QUrl SoundCloud::beginLogin(bool openBrowser) {
+    if (m_state.value("authBusy").toBool() || m_refreshing) return {};
+    if (!m_storageReady) { fail(AuthStorage::errorMessage()); return {}; }
+    if (!loadConfig()) { fail("Подключение ещё не настроено. См. раздел «Первое подключение» в README."); return {}; }
     const QUrl redirect(m_redirect);
-    if (redirect.scheme() != "http" || redirect.host() != "127.0.0.1" || redirect.path() != "/callback" || (redirect.port() < 1024 || redirect.port() > 65535) || redirect.hasQuery() || redirect.hasFragment() || !redirect.userInfo().isEmpty()) { fail("Настройте локальный адрес возврата."); return; }
-    if (!m_callback.listen(QHostAddress::LocalHost, quint16(redirect.port()))) { fail("Порт для входа занят. Закройте второй экземпляр SCrip или измените порт."); return; }
+    if (redirect.scheme() != "http" || redirect.host() != "127.0.0.1" || redirect.path() != "/callback" || (redirect.port() < 1024 || redirect.port() > 65535) || redirect.hasQuery() || redirect.hasFragment() || !redirect.userInfo().isEmpty()) { fail("Настройте локальный адрес возврата."); return {}; }
+    m_callback.close();
+    if (!m_callback.listen(QHostAddress::LocalHost, quint16(redirect.port()))) { fail("Порт для входа занят. Закройте второй экземпляр Сендж или измените порт."); return {}; }
+    m_retryToken.clear();
     ++m_loginEpoch; clearError(); m_verifier = nonce(); m_oauthState = nonce();
     QUrl url("https://secure.soundcloud.com/authorize"); QUrlQuery query;
     query.addQueryItem("client_id", m_clientId); query.addQueryItem("redirect_uri", m_redirect);
     query.addQueryItem("response_type", "code"); query.addQueryItem("code_challenge_method", "S256"); query.addQueryItem("state", m_oauthState);
     query.addQueryItem("code_challenge", QString::fromLatin1(QCryptographicHash::hash(m_verifier.toLatin1(), QCryptographicHash::Sha256).toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)));
     url.setQuery(query); set("authBusy", true); m_loginTimeout.start();
-    set("authStep", "browser"); emit authorizationRequested(url);
+    set("authStep", "browser"); if (openBrowser) emit authorizationRequested(url);
+    return url;
 }
 void SoundCloud::browserFailed() { cancelLogin(); fail("Не удалось открыть окно входа. Проверьте установленный браузер."); }
-void SoundCloud::cancelLogin() { ++m_loginEpoch; m_callback.close(); m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear(); set("authBusy", false); set("authStep", ""); }
+void SoundCloud::cancelLogin() { ++m_loginEpoch; m_callback.close(); m_retryToken.clear(); m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear(); set("authBusy", false); set("authStep", ""); }
 void SoundCloud::callbackConnection() {
     while (m_callback.hasPendingConnections()) {
         auto *socket = m_callback.nextPendingConnection();
@@ -1110,19 +1116,35 @@ void SoundCloud::callbackConnection() {
             if (socket->property("handled").toBool()) return; socket->setProperty("handled", true);
             auto parts = data.left(data.indexOf("\r\n")).split(' ');
             QUrl url = parts.size() > 1 ? QUrl::fromEncoded(parts[1]) : QUrl{}; QUrlQuery query(url);
+            if (parts.value(0) == "GET" && url.path() == "/retry" && !m_retryToken.isEmpty()
+                && query.queryItemValue("token") == m_retryToken) {
+                cancelLogin();
+                const QUrl authorization = beginLogin(false);
+                if (!authorization.isEmpty()) {
+                    socket->write("HTTP/1.1 303 See Other\r\nLocation: " + authorization.toEncoded()
+                        + "\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    socket->disconnectFromHost();
+                    return;
+                }
+            }
             const bool valid = parts.value(0) == "GET" && url.path() == "/callback" && !m_oauthState.isEmpty() && query.queryItemValue("state") == m_oauthState;
             const bool receivedCode = !query.hasQueryItem("error") && !query.queryItemValue("code").isEmpty();
-            const auto respond = [peer = QPointer<QTcpSocket>(socket), valid](bool success) {
+            const auto respond = [this, peer = QPointer<QTcpSocket>(socket), valid](bool success) {
+                if (valid && !success) {
+                    m_retryToken = nonce();
+                    set("authBusy", false); set("authStep", "");
+                    m_loginTimeout.start();
+                }
                 if (!peer || peer->state() != QAbstractSocket::ConnectedState) return;
-                const auto html = callbackPage(valid, success);
+                const auto html = callbackPage(valid, success, valid && !success ? m_retryToken : QString{});
                 peer->write(QByteArray(valid && success ? "HTTP/1.1 200 OK\r\n" : "HTTP/1.1 400 Bad Request\r\n") +
-                    "Content-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
+                    "Content-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\nContent-Length: " +
                     QByteArray::number(html.size()) + "\r\n\r\n" + html);
                 peer->disconnectFromHost();
             };
             if (!valid) { respond(false); return; }
             const auto verifier = m_verifier; const int loginEpoch = m_loginEpoch;
-            m_callback.close(); m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear();
+            m_loginTimeout.stop(); m_oauthState.clear(); m_verifier.clear();
             if (!receivedCode) { respond(false); fail("Вход отменён в SoundCloud."); return; }
             set("authBusy", true); set("authStep", "exchange");
             QUrlQuery form; form.addQueryItem("grant_type", "authorization_code");
@@ -1151,6 +1173,7 @@ void SoundCloud::callbackConnection() {
                 set("authStep", "");
                 set("status", "Аккаунт подключён");
                 respond(true);
+                m_callback.close(); m_retryToken.clear();
                 profile();
                 browse("likes");
         }, [this, respond](QString message) { set("authBusy", false); set("authStep", ""); respond(false); fail(message); }, loginEpoch);
@@ -1205,8 +1228,8 @@ void SoundCloud::logout() {
             const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             const bool confirmed = reply->error() == QNetworkReply::NoError && status == 204;
             set("disconnectStatus", confirmed ? "confirmed" : "unconfirmed");
-            set("status", confirmed ? "Вы вышли. Доступ SCrip отозван." : "Вы вышли на этом устройстве. Отзыв доступа не подтверждён.");
-            if (!confirmed) fail("Вы вышли на этом устройстве. Не удалось подтвердить отзыв доступа. Откройте настройки подключённых приложений SoundCloud и отключите SCrip.");
+            set("status", confirmed ? "Вы вышли. Доступ Сендж отозван." : "Вы вышли на этом устройстве. Отзыв доступа не подтверждён.");
+            if (!confirmed) fail("Вы вышли на этом устройстве. Не удалось подтвердить отзыв доступа. Откройте настройки подключённых приложений SoundCloud и отключите Сендж.");
         });
     }
 }
@@ -1494,7 +1517,7 @@ void SoundCloud::loadHome(bool force) {
         if (generation != m_homeGeneration) return;
         auto tracks = items(doc).mid(0, 24);
         for (auto &entry : tracks) { auto track = entry.toMap(); track["user_favorite"] = true; entry = track; }
-        add("Микс любимых", "Подборка SCrip из последних добавленных любимых треков", tracks, true, 0);
+        add("Микс любимых", "Подборка Сендж из последних добавленных любимых треков", tracks, true, 0);
         if (tracks.isEmpty()) { finish(); return; }
         QSet<QString> excluded;
         for (const auto &track : items(doc)) excluded.insert(urn(track.toMap()));
@@ -2998,7 +3021,7 @@ void SoundCloud::installUpdate() {
 #ifdef Q_OS_ANDROID
     const jint result = QJniObject::callStaticMethod<jint>("org/scrip/app/ApkInstaller", "install", "(Landroid/content/Context;Ljava/lang/String;)I", QNativeInterface::QAndroidApplication::context().object(), QJniObject::fromString(m_updatePath).object());
     set("updateInstalling", false);
-    if (result == 1) { set("updateResult", "Разрешите установку SCrip в настройках Android, затем нажмите «Установить сейчас» ещё раз."); set("updateError", "Нужно разрешить установку приложений из этого источника."); }
+    if (result == 1) { set("updateResult", "Разрешите установку Сендж в настройках Android, затем нажмите «Установить сейчас» ещё раз."); set("updateError", "Нужно разрешить установку приложений из этого источника."); }
     else if (result == 2) { set("updateResult", "Открыт системный установщик Android. Подтвердите или отмените установку там."); set("updateError", ""); }
     else { set("updateResult", "Не удалось открыть системный установщик Android."); set("updateError", "Android не открыл системный установщик APK."); }
 #elif defined(Q_OS_WIN)
@@ -3019,7 +3042,7 @@ void SoundCloud::installUpdate() {
             });
             watcher->start();
         } else {
-            set("updateResult", "Мастер установки открыт. Завершите его; перезапустите SCrip после установки или отмены.");
+            set("updateResult", "Мастер установки открыт. Завершите его; перезапустите Сендж после установки или отмены.");
         }
     }
 #elif defined(Q_OS_LINUX)

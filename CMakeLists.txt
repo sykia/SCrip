@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(SCrip VERSION 1.6.1 LANGUAGES CXX)
+project(SCrip VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
     message(FATAL_ERROR "macOS не поддерживается")
@@ -31,10 +31,6 @@ if(ANDROID)
 endif()
 qt_add_executable(scrip ${executable_options} src/discordpresence.cpp src/discordpresence.h src/plugins.cpp src/plugins.h src/pluginruntime.cpp src/pluginruntime.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/linkrouter.cpp src/linkrouter.h src/lyrics.cpp src/lyrics.h src/soundcloud.cpp src/recommendationpreferences.cpp src/soundcloudsocial.cpp src/soundcloud.h src/audioeffects.cpp src/audioeffects.h src/streamcache.cpp src/streamcache.h src/artworknetwork.cpp src/artworknetwork.h src/trackwaveform.cpp src/trackwaveform.h)
 set(SCRIP_APP_VERSION "${PROJECT_VERSION}")
-# Выпуск 1.6.1 предназначен только для ПК. Версия Android остаётся прежней.
-if(ANDROID)
-    set(SCRIP_APP_VERSION "1.6.0")
-endif()
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(qml/RecommendationPreferences.qml PROPERTIES QT_RESOURCE_ALIAS RecommendationPreferences.qml)
@@ -113,8 +109,8 @@ if(ANDROID)
         message(FATAL_ERROR "Сначала выполните scripts/build_android_ffmpeg.sh ${CMAKE_ANDROID_ARCH_ABI}")
     endif()
     set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${scrip_avformat}")
-    set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME SCrip
-        QT_ANDROID_VERSION_CODE 10600 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
+    set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME "Сендж"
+        QT_ANDROID_VERSION_CODE 20000 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android")

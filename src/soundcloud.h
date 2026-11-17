@@ -373,6 +373,8 @@ private:
     void prepareStream(const QUrl &url, int generation, int redirects = 0);
     void beginCrossfade();
     void finishCrossfade(bool prepare = true);
+    QUrl beginLogin(bool openBrowser);
+    QString m_retryToken;
     void callbackConnection();
     bool clearSession();
     static QString urn(const QVariantMap &item);

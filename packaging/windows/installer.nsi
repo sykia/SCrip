@@ -13,7 +13,7 @@ ManifestDPIAware true
   !endif
 !macroend
 
-Name "SCrip"
+Name "Сендж"
 OutFile "${OUTPUT}"
 !ifdef TEST_INSTALL_DIR
 InstallDir "${TEST_INSTALL_DIR}"
@@ -21,26 +21,26 @@ InstallDir "${TEST_INSTALL_DIR}"
 InstallDir "$LOCALAPPDATA\Programs\SCrip"
 InstallDirRegKey HKCU "${UNKEY}" "InstallLocation"
 !endif
-BrandingText "SCrip"
+BrandingText "Сендж"
 SetCompressor /SOLID lzma
 Icon "app.ico"
-VIProductVersion "1.6.1.0"
-VIAddVersionKey /LANG=1049 "ProductName" "SCrip"
-VIAddVersionKey /LANG=1049 "FileDescription" "Установка SCrip"
-VIAddVersionKey /LANG=1049 "FileVersion" "1.6.1"
+VIProductVersion "2.0.0.0"
+VIAddVersionKey /LANG=1049 "ProductName" "Сендж"
+VIAddVersionKey /LANG=1049 "FileDescription" "Установка Сендж"
+VIAddVersionKey /LANG=1049 "FileVersion" "2.0.0"
 VIAddVersionKey /LANG=1049 "LegalCopyright" "SCrip"
 !define MUI_ICON "app.ico"
 !define MUI_UNICON "app.ico"
 !define MUI_WELCOMEFINISHPAGE_BITMAP "welcome.bmp"
-!define MUI_WELCOMEPAGE_TITLE "Установить SCrip"
+!define MUI_WELCOMEPAGE_TITLE "Установить Сендж"
 !define MUI_WELCOMEPAGE_TEXT "Ваша музыка из SoundCloud на компьютере.$\r$\n$\r$\nПриложение установится для текущего пользователя. Ярлыки появятся в меню «Пуск» и на рабочем столе."
 !define MUI_WELCOMEPAGE_BUTTON "Установить"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_TITLE "SCrip установлен"
+!define MUI_FINISHPAGE_TITLE "Сендж установлен"
 !define MUI_FINISHPAGE_TEXT "Откройте приложение и войдите в свой аккаунт SoundCloud."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\SCrip.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Открыть SCrip"
+!define MUI_FINISHPAGE_RUN_TEXT "Открыть Сендж"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -80,6 +80,8 @@ Var StageDir
 Var Marker
 Var RecoveryReady
 Var HadPrevious
+Var PreviousName
+Var PreviousVersion
 
 Function RecoverInterruptedUpdate
   !insertmacro TestTrace "recover_fn"
@@ -88,6 +90,12 @@ Function RecoverInterruptedUpdate
   FileOpen $4 "$Marker" r
   IfErrors recovery_restore
   FileRead $4 $5
+  FileRead $4 $PreviousName
+  FileRead $4 $PreviousVersion
+  StrCpy $PreviousName $PreviousName -2
+  StrCpy $PreviousVersion $PreviousVersion -2
+  StrCmp $PreviousName "Сендж" +2
+  StrCpy $PreviousName "SCrip"
   FileClose $4
   StrCmp $5 "COMMIT$\r$\n" recovery_committed recovery_restore
   recovery_committed:
@@ -109,11 +117,15 @@ Function RecoverInterruptedUpdate
   RMDir /r "$BackupDir"
   IfFileExists "$BackupDir\*.*" recovery_failed
   Delete "$Marker"
-  CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
-  CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
-  WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  Delete "$SMPROGRAMS\SCrip.lnk"
+  Delete "$SMPROGRAMS\Сендж.lnk"
+  CreateShortcut "$SMPROGRAMS\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  Delete "$DESKTOP\SCrip.lnk"
+  Delete "$DESKTOP\Сендж.lnk"
+  CreateShortcut "$DESKTOP\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayName" "$PreviousName"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.6.1"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "$PreviousVersion"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
@@ -150,11 +162,15 @@ Function RestorePrevious
   RMDir /r "$StageDir"
   StrCpy $RecoveryReady 0
   StrCmp $HadPrevious 1 0 restore_done
-  CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
-  CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
-  WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  Delete "$SMPROGRAMS\SCrip.lnk"
+  Delete "$SMPROGRAMS\Сендж.lnk"
+  CreateShortcut "$SMPROGRAMS\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  Delete "$DESKTOP\SCrip.lnk"
+  Delete "$DESKTOP\Сендж.lnk"
+  CreateShortcut "$DESKTOP\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayName" "$PreviousName"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.6.1"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "$PreviousVersion"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
@@ -213,9 +229,14 @@ Section
   SetErrorLevel 2
   Abort
   backup_ready:
+  ReadRegStr $PreviousName HKCU "${UNKEY}" "DisplayName"
+  StrCmp $PreviousName "Сендж" +2
+  StrCpy $PreviousName "SCrip"
+  ReadRegStr $PreviousVersion HKCU "${UNKEY}" "DisplayVersion"
   FileOpen $4 "$Marker" w
   IfErrors marker_failed
   FileWrite $4 "SCrip update in progress$\r$\n"
+  FileWrite $4 "$PreviousName$\r$\n$PreviousVersion$\r$\n"
   FileClose $4
   StrCpy $RecoveryReady 1
   StrCpy $HadPrevious 1
@@ -302,11 +323,13 @@ Section
   Abort
   install_shortcuts:
   SetOutPath "$INSTDIR"
-  CreateShortcut "$SMPROGRAMS\SCrip.lnk" "$INSTDIR\SCrip.exe"
-  CreateShortcut "$DESKTOP\SCrip.lnk" "$INSTDIR\SCrip.exe"
-  WriteRegStr HKCU "${UNKEY}" "DisplayName" "SCrip"
+  Delete "$SMPROGRAMS\SCrip.lnk"
+  CreateShortcut "$SMPROGRAMS\Сендж.lnk" "$INSTDIR\SCrip.exe"
+  Delete "$DESKTOP\SCrip.lnk"
+  CreateShortcut "$DESKTOP\Сендж.lnk" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayName" "Сендж"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "1.6.1"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "2.0.0"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
@@ -323,6 +346,8 @@ Section "Uninstall"
   !include "${FILELIST}"
   Delete "$DESKTOP\SCrip.lnk"
   Delete "$SMPROGRAMS\SCrip.lnk"
+  Delete "$DESKTOP\Сендж.lnk"
+  Delete "$SMPROGRAMS\Сендж.lnk"
   DeleteRegKey HKCU "Software\Classes\scrip"
   DeleteRegKey HKCU "${UNKEY}"
   Delete "$INSTDIR\Uninstall.exe"

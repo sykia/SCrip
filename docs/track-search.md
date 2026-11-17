@@ -44,5 +44,5 @@ Qt Quick tests exercise the standalone panel at 280, 372 and 960 logical pixels
 (the phone widths reserve 40 pixels for page margins), plus Enter and reset.
 The Android layout fixture also checks the embedded panel at 320×640 and
 412×860, including its scroll viewport height. Screenshots are generated in the
-build test working directory. These tests do not launch the SCrip application
+build test working directory. These tests do not launch the Sendzh application
 or replace testing on an Android device. No live API requests are needed.
