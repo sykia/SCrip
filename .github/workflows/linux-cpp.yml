@@ -23,14 +23,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            cmake ninja-build pkg-config libsecret-1-dev libgl1-mesa-dev ffmpeg dbus-daemon
+            cmake ninja-build pkg-config libsecret-1-dev libgl1-mesa-dev ffmpeg dbus-daemon pulseaudio
 
-      - name: Install Qt 6.10
+      - name: Install Qt 6.12
         uses: jurplel/install-qt-action@v4
         with:
-          # Qt 6.8.3 bundles FFmpeg 7.1, which fails the fMP4 HLS seek regression.
-          # Keep decoded-audio checks enabled with a corrected FFmpeg runtime.
-          version: 6.10.3
+          # Match the Qt runtime used by the local HLS regression checks.
+          version: 6.12.0
           host: linux
           target: desktop
           arch: linux_gcc_64
@@ -41,6 +40,12 @@ jobs:
 
       - name: Build
         run: cmake --build build/ci --parallel 2
+
+      - name: Start virtual audio output
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=scrip_ci
+          pactl set-default-sink scrip_ci
 
       - name: Generate HLS fixture
         run: bash tests/run-hls-seek.sh --generate-only > build/ci/hls-fixture.log 2>&1

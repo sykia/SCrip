@@ -16,6 +16,11 @@ source. `progressSliderClickAndDrag` exercises click and drag handlers extracted
 from both production QML interfaces. `tests/run-hls-seek.sh` checks decoded audio
 and advancing playback after forward, backward, paused and repeated HLS seeks.
 
+Linux CI uses Qt 6.12.0 and a PulseAudio null sink so playback has an audio
+output on the headless runner. Both HLS regression tests attach an audio output
+and verify decoded PCM together with clock progress; they are not skipped
+when running the full CI suite.
+
 ## Seeking into an uncached HLS segment
 
 The local stream proxy buffers HLS media segments and initialization objects

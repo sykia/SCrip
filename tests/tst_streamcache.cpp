@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 #include <QAudioBufferOutput>
+#include <QAudioOutput>
 #include <QAudioBuffer>
 #endif
 #include <QTcpServer>
@@ -144,7 +145,8 @@ private slots:
             });
         });
         StreamCache cache;
-        QMediaPlayer player; QAudioBufferOutput output; player.setAudioBufferOutput(&output);
+        QMediaPlayer player; QAudioOutput audio; QAudioBufferOutput output;
+        player.setAudioOutput(&audio); player.setAudioBufferOutput(&output);
         int buffers = 0;
         connect(&output, &QAudioBufferOutput::audioBufferReceived, this, [&](const QAudioBuffer &b) { if (b.isValid()) ++buffers; });
         const QUrl remote(QString("http://127.0.0.1:%1/%2").arg(upstream.serverPort()).arg(QFileInfo(fixture).fileName()));
