@@ -5056,7 +5056,9 @@ private slots:
                         && lastTile && lastTile->property("modelData").toMap().value("urn").toString() == QString("soundcloud:tracks:grid-4999");
                 })());
                 QVERIFY(QMetaObject::invokeMethod(lastTile, "enqueueTrack"));
-                QTRY_COMPARE(sc.state()["queue"].toList().last().toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
+                // Enqueue inserts after the current track. The asynchronously
+                // appended page may already be present at the queue's end.
+                QTRY_COMPARE(sc.state()["queue"].toList().value(sc.state()["queueIndex"].toInt() + 1).toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
                 QTRY_COMPARE(sc.state()["tracks"].toList().size(), 5001);
                 QTRY_VERIFY(!sc.state()["hasMore"].toBool());
                 const qreal appendedEnd = gridView->property("contentHeight").toReal() - gridView->property("height").toReal();
