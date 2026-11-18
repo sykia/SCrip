@@ -36,37 +36,34 @@ The project now lives at [sykia/sange](https://github.com/sykia/sange). If an ol
 
 See the [2.0.0 release notes](release-notes/2.0.0.md) for sign-in recovery and upgrade details.
 
-## Find your next favorite
+## Your music, your rhythm
 
-Start a personal mix from Home, browse its track list and save a discovery to your likes or a playlist. Open an artist station to explore related music, or catch up with new releases.
+- **Discover:** start a continuous personal wave, adjust the balance between familiar music and discoveries, explore mixes and artist stations.
+- **Explore:** search tracks, playlists and people; browse your feed, likes, recent tracks and profiles.
+- **Organize:** edit playlists, reorder the queue, choose **Play next**, remove duplicates or save the queue as a playlist.
+- **Keep listening:** use desktop tray controls, system media controls and Android background playback.
+- **Make it yours:** customize the appearance, add [plugins](docs/plugins.md) and enable optional [Discord Rich Presence](docs/discord-presence.md) on desktop.
 
-![Sange Home with personal mixes and track lists](docs/screenshots/home.png)
+## On desktop
 
-## Make the queue your own
+Home brings the personal wave and mixes together. The feed keeps music from your subscriptions within reach, with the player and queue alongside it.
 
-Browse your favorites by artwork and open an artist's profile from their name. Drag tracks into order or choose **Play next**. On desktop, minimize Sange to the system tray to control playback and like tracks from the icon menu.
+![Sange desktop Home with personal wave, mixes and playback queue](docs/screenshots/home-frame.svg)
 
-![Sange library with favorite tracks](docs/screenshots/library.png)
+![Sange desktop feed with track artwork and playback queue](docs/screenshots/feed-frame.svg)
 
-Queue menu actions: save the full queue as a playlist, remove duplicates, or clear
-entries after the current track, with undo from the same menu. See [queue actions](docs/queue-actions.md).
+## On Android
 
-## Share what you are listening to
-
-Desktop settings include optional [Discord Rich Presence](docs/discord-presence.md): clickable track title, artist, cover, elapsed / total track progress, a Sange badge, and buttons to open the track or download Sange on GitHub. It requires the Discord desktop client; the shared project Application ID is already configured.
-
-## Take your music with you
-
-Android includes a dedicated touch interface, a full-screen player, background playback and system media controls.
+A dedicated touch interface with discovery, search, a full-screen player, background playback and system media controls.
 
 <p align="center">
-  <img src="docs/screenshots/android-home-frame.svg" width="32%" alt="Sange Home on Android">
-  <img src="docs/screenshots/android-player-frame.svg" width="32%" alt="Sange player on Android">
+  <img src="docs/screenshots/android-home-frame.svg" width="40%" alt="Sange Home on Android with personal wave and artist stations">
+  <img src="docs/screenshots/android-search-frame.svg" width="40%" alt="Sange track search on Android">
 </p>
 
 ## Build from source
 
-Sange uses **C++20, Qt Quick and CMake**. For a desktop build, install CMake 3.21+, Ninja, a C++20 compiler and Qt 6.5+ with Quick, Network, Multimedia, Widgets, Test and QuickTest. Linux also requires pkg-config and libsecret development files (`libsecret-1-dev` on Debian/Ubuntu or `libsecret` on Arch), plus a running, unlocked Secret Service for sign-in.
+Sange uses **C++20, Qt Quick and CMake**. For a desktop build, install CMake 3.21+, Ninja, a C++20 compiler and Qt 6.5+ with Quick, Network, Multimedia, ShaderTools and Widgets, plus Test and QuickTest for the default test-enabled build. Linux also requires Qt DBus, pkg-config and libsecret development files (`libsecret-1-dev` on Debian/Ubuntu or `libsecret` on Arch), plus a running, unlocked Secret Service for sign-in.
 
 ```sh
 cmake --preset debug
@@ -76,9 +73,19 @@ ctest --test-dir build/debug --output-on-failure
 
 Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. Build output stays in `build/`. The desktop interface is in `qml/Main.qml`, the Android interface in `qml/android/Main.qml`, and the entry point in `src/main.cpp`.
 
-`tests/` contains regression checks, `worker/` contains the SoundCloud authentication service, and `.github/workflows/` contains automated checks and Windows build workflows. Packaging files are in `packaging/`; reusable example plugins are in `examples/plugins/`. Editor settings and local caches are excluded from Git.
+For Android packaging, see [the build script](scripts/build_android.sh) and [playback diagnostics](docs/android-playback-diagnostics.md). Android builds also require the Android Qt kit, SDK/NDK, OpenSSL and the patched FFmpeg libraries configured by the build scripts.
 
-See [public profile collections and artist credits](docs/public-collections-and-artists.md), [track selection and batch additions](docs/track-selection.md), [profiles, collections, playlist editing and link opening](docs/social-and-playlists.md), [track comments](docs/comments.md), [SoundCloud integration and secure storage](docs/soundcloud-security.md), the [plugin guide](docs/plugins.md), the [Plugin API reference](docs/plugin-api-v2-reference.md), the [trusted QML plugin SDK](docs/plugin-runtime.md) and [Android playback diagnostics](docs/android-playback-diagnostics.md) for technical details. For installer issues, see [Windows troubleshooting](docs/windows-install.md).
+## Guides and troubleshooting
+
+| Topic | Guide |
+| --- | --- |
+| Discovery and personal wave | [Recommendations](docs/recommendations.md) · [Wave](docs/wave.md) |
+| Search and library | [Track search](docs/track-search.md) · [Library tools](docs/library-tools.md) |
+| Playlists and queue | [Profiles and playlists](docs/social-and-playlists.md) · [Queue actions](docs/queue-actions.md) |
+| Playback and media controls | [System media and streaming](docs/system-media-and-streaming.md) |
+| Plugins | [User guide](docs/plugins.md) · [API reference](docs/plugin-api-v2-reference.md) · [QML SDK](docs/plugin-runtime.md) |
+| Sign-in and storage | [SoundCloud integration](docs/soundcloud-security.md) |
+| Installation | [Windows troubleshooting](docs/windows-install.md) |
 
 ## License
 
@@ -87,39 +94,3 @@ Sange is independent software and is not an official SoundCloud product.
 Copyright (c) 2026 sykia. The source code is licensed under **GNU GPL v3.0 only (GPL-3.0-only)**. You may use, study, modify and redistribute it under the terms of [LICENSE](LICENSE).
 
 Third-party components retain their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md). The [name and original logo](TRADEMARKS.md) may be copied and modified under the GPL without additional restrictions. [Release licensing materials](licensing/README.md) document the distribution process.
-
-### Personal wave (beta)
-
-The home screen includes a continuous wave above the mixes on desktop and Android.
-“My music” shuffles paginated SoundCloud likes, cycling after the library ends.
-“Discoveries” uses liked tracks as seeds for SoundCloud related-track requests,
-rotates seeds, excludes session duplicates and expands the seed pool with discoveries.
-This is a heuristic using SoundCloud recommendations, not an audio analysis model.
-The queue refills near its end; switching to a track, mix or station cancels the wave.
-Failures preserve the queue and expose a retry action. Empty recommendation batches
-are bounded to avoid a request loop. Playback history is bounded during refills.
-The visual is a single-pass GPU fragment shader compiled with Qt Shader Tools
-(GLSL/SPIR-V/HLSL packages for Linux, Android and Windows). Six smoothly merging
-circular fields use shades of the current accent. The shader renders at a maximum
-width of 720 pixels and updates at ~30 fps, without CPU canvas drawing or blur passes.
-The title sits above the visual and the mode selector below it. Clicking the visual
-starts, pauses or resumes the wave; keyboard Space/Return and accessibility press
-actions are supported. Animation continues when the window loses focus or moves to
-another monitor. It stops outside the viewport, in a hidden/minimized window, or
-when motion is disabled. The software renderer uses a static fallback.
-On Qt 6.8+ with the FFmpeg backend, QAudioBufferOutput supplies decoded PCM: a
-lightweight RMS envelope and a 160 Hz low-pass envelope drive expansion and light.
-Bass onsets use an adaptive baseline with a 180 ms refractory interval; this is an
-onset heuristic, not BPM tracking. Analysis is downsampled to <=12 kHz, emits
-separate visual signals at ~30 Hz and detaches when the wave visual is inactive.
-Other backends and older Qt retain ambient motion without fabricated beat data. Wave queues and positions are saved per mode and restored for the same signed-in account; playback resumes on user action.
-
-Collection filtering, exhaustive search, sorting and saved searches: [library tools](docs/library-tools.md).
-
-Advanced track search and API parameter details: [track search](docs/track-search.md).
-
-Desktop system media integration and playback quality/preload preferences:
-[System media and streaming preferences](docs/system-media-and-streaming.md).
-
-Track metadata, release-date precision and safe waveform navigation:
-[Track information and waveform](docs/track-information.md).
