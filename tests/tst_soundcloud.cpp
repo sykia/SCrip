@@ -3297,7 +3297,9 @@ private slots:
         QTemporaryDir audioFiles; QVERIFY(audioFiles.isValid());
         QFile wav(audioFiles.filePath("equalizer.wav")); QVERIFY(wav.open(QIODevice::WriteOnly));
         QDataStream stream(&wav); stream.setByteOrder(QDataStream::LittleEndian);
-        constexpr int frames = 48000 * 4, dataSize = frames * 2 * 2;
+        // Keep the source alive through asynchronous dual-decoder, pause and
+        // seek checks even when a hosted runner is briefly descheduled.
+        constexpr int frames = 48000 * 30, dataSize = frames * 2 * 2;
         stream.writeRawData("RIFF", 4); stream << quint32(dataSize + 36);
         stream.writeRawData("WAVEfmt ", 8); stream << quint32(16) << quint16(1) << quint16(2)
             << quint32(48000) << quint32(48000 * 4) << quint16(4) << quint16(16);
