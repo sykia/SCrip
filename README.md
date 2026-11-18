@@ -72,7 +72,7 @@ cmake --build --preset debug
 ctest --test-dir build/debug --output-on-failure
 ```
 
-macOS 2.0.1 preparation, native build instructions and release checks are documented in [macOS builds](docs/macos.md).
+macOS **2.0.1 — Hello, Apple!** supports macOS 14.4+ on [Apple Silicon](https://github.com/sykia/sange/releases/download/v2.0.1/Sange-2.0.1-macOS-arm64.dmg) and [Intel](https://github.com/sykia/sange/releases/download/v2.0.1/Sange-2.0.1-macOS-x86_64.dmg). Packages use ad-hoc signatures and are not Apple-notarized. Native build instructions, dependency materials and validation limits are documented in [macOS builds](docs/macos.md). Windows, Linux and Android packages remain at 2.0.0.
 
 Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. Build output stays in `build/`. The desktop interface is in `qml/Main.qml`, the Android interface in `qml/android/Main.qml`, and the entry point in `src/main.cpp`.
 
