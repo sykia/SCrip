@@ -36,6 +36,7 @@
 #include <QDataStream>
 #include <QTcpSocket>
 #include <QWheelEvent>
+#include <QPointingDevice>
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
@@ -4928,7 +4929,13 @@ private slots:
         sc.browse("tracks", "scroll"); QTRY_COMPARE(sc.state()["tracks"].toList().size(),32);
         QTest::qWait(100);
         auto *scroll = window->findChild<QObject *>("libraryScroll"); QVERIFY(scroll);
-        QWheelEvent wheel(QPointF(600,100),QPointF(600,100),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        auto *scrollItem = qobject_cast<QQuickItem *>(scroll); QVERIFY(scrollItem);
+        const QPointF wheelPosition = scrollItem->mapToScene(QPointF(scrollItem->width()/2, scrollItem->height()/2));
+        const QPointF wheelGlobal = window->mapToGlobal(wheelPosition.toPoint());
+        const QPointingDevice mouse("Test wheel mouse", 42, QInputDevice::DeviceType::Mouse,
+            QPointingDevice::PointerType::Generic, QInputDevice::Capability::Position, 1, 3);
+        QWheelEvent wheel(wheelPosition, wheelGlobal, QPoint(), QPoint(0,-120), Qt::NoButton,
+            Qt::NoModifier, Qt::NoScrollPhase, false, Qt::MouseEventNotSynthesized, &mouse);
         QCoreApplication::sendEvent(window,&wheel);
         QTRY_VERIFY(scroll->property("contentY").toReal()>0);
         QVERIFY(scroll->property("contentY").toReal()<=scroll->property("contentHeight").toReal()-scroll->property("height").toReal());

@@ -17,7 +17,7 @@ for path in sorted(bundle.rglob('*')):
     with path.open('rb') as stream:
         if stream.read(4) not in magic:
             continue
-    subprocess.run(['lipo', '-verify_arch', architecture, str(path)], check=True)
+    subprocess.run(['lipo', str(path), '-verify_arch', architecture], check=True)
     output = subprocess.check_output(['otool', '-L', str(path)], text=True)
     dependencies = []
     for line in output.splitlines():

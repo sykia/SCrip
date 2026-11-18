@@ -21,6 +21,15 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$iconset" -o "$package_dir/Sange.app/Contents/Resources/Sange.icns"
 macdeployqt "$package_dir/Sange.app" "-qmldir=$project_dir/qml" -always-overwrite
+# QML scanning pulls in QtSql's optional drivers, including third-party clients
+# absent from the Qt kit. Sange does not use those databases; retain only SQLite.
+python3 - "$package_dir/Sange.app/Contents/PlugIns/sqldrivers" <<'PYTHON'
+from pathlib import Path
+import sys
+for plugin in Path(sys.argv[1]).glob('*.dylib'):
+    if plugin.name != 'libqsqlite.dylib':
+        plugin.unlink()
+PYTHON
 # Test packages use ad-hoc signing. Public distribution requires Developer ID + notarization.
 codesign --force --deep --sign - "$package_dir/Sange.app"
 codesign --verify --deep --strict "$package_dir/Sange.app"
