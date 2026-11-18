@@ -5048,6 +5048,13 @@ private slots:
                 QVERIFY(lastTile);
                 QVERIFY(QMetaObject::invokeMethod(lastTile, "playTrack"));
                 QTRY_COMPARE(sc.state()["current"].toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
+                // The await above processes pagination/layout events. GridView
+                // may recycle the delegate; reacquire the requested model row.
+                QTRY_VERIFY(([&] {
+                    lastTile = nullptr;
+                    return QMetaObject::invokeMethod(gridView, "itemAtIndex", Q_RETURN_ARG(QQuickItem *, lastTile), Q_ARG(int, 4999))
+                        && lastTile && lastTile->property("modelData").toMap().value("urn").toString() == QString("soundcloud:tracks:grid-4999");
+                })());
                 QVERIFY(QMetaObject::invokeMethod(lastTile, "enqueueTrack"));
                 QTRY_COMPARE(sc.state()["queue"].toList().last().toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
                 QTRY_COMPARE(sc.state()["tracks"].toList().size(), 5001);
