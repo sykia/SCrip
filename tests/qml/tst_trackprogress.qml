@@ -57,6 +57,8 @@ TestCase {
         compare(p.requests, 0)
     }
     function test_touchScrollDoesNotSeek() {
+        if (Qt.platform.os === "osx" || Qt.platform.os === "macos")
+            skip("macOS offscreen does not provide touchscreen flicking; wheel input has separate coverage")
         const state = setup(), p = state.progress
         const touch = touchEvent(state.view)
         // Keep screen positions stable as Flickable moves the progress item.
