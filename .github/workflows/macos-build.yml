@@ -56,7 +56,16 @@ jobs:
       - name: Package standalone application
         id: package
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: bash packaging/macos/package.sh build/macos ${{ matrix.arch }}
+        run: |
+          mkdir -p build/macos/sources
+          curl --fail --location --retry 3 https://download.qt.io/archive/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz -o build/macos/sources/qt-everywhere-src-6.12.0.tar.xz
+          echo '98ff4f44bac6ec3e1e62ee2a4316ae0e3d15badb015d753cc0268a20db52f165  build/macos/sources/qt-everywhere-src-6.12.0.tar.xz' | shasum -a 256 -c -
+          curl --fail --location --retry 3 https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz -o build/macos/sources/ffmpeg-9.0.1.tar.xz
+          curl --fail --location --retry 3 https://codeload.github.com/qt/qt5/tar.gz/refs/tags/v6.12.0 -o build/macos/sources/qt5-v6.12.0.tar.gz
+          echo 'cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635  build/macos/sources/ffmpeg-9.0.1.tar.xz' | shasum -a 256 -c -
+          echo '167449f1963e899ef6502330b8791f0e971fb81fdeb560b15af19abd53c15552  build/macos/sources/qt5-v6.12.0.tar.gz' | shasum -a 256 -c -
+          git archive --format=tar.gz --prefix=Sange-2.0.1/ HEAD > build/macos/sources/Sange-2.0.1-source.tar.gz
+          SANGE_RELEASE_SOURCES="$PWD/build/macos/sources" bash packaging/macos/package.sh build/macos ${{ matrix.arch }}
       - name: Smoke test deployed application
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         run: |
@@ -80,7 +89,15 @@ jobs:
             build/macos/package/*.dmg
             build/macos/package/*.sha256
             build/macos/package/bundle-*.json
+            build/macos/package/*-compliance.json
             build/macos/startup.log
             build/macos/Testing/Temporary/LastTest.log
             build/macos/*.png
           if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.package.outcome == 'success' && matrix.arch == 'arm64' }}
+        with:
+          name: macOS-corresponding-sources
+          path: build/macos/sources/*
+          compression-level: 0
+          if-no-files-found: error

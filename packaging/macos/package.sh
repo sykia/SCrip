@@ -12,6 +12,9 @@ rm -rf "$package_dir/Sange.app"
 ditto "$build_dir/Sange.app" "$package_dir/Sange.app"
 mkdir -p "$package_dir/Sange.app/Contents/Resources/legal"
 cp "$project_dir/LICENSE" "$project_dir/THIRD_PARTY_NOTICES.md" "$project_dir/TRADEMARKS.md" "$package_dir/Sange.app/Contents/Resources/legal/"
+cp "$project_dir/packaging/macos/DEPENDENCIES.md" "$package_dir/Sange.app/Contents/Resources/legal/"
+source_dir="${SANGE_RELEASE_SOURCES:?Set SANGE_RELEASE_SOURCES to the corresponding release sources directory}"
+python3 "$project_dir/packaging/macos/collect_notices.py" "$source_dir" "$package_dir/Sange.app/Contents/Resources/legal/upstream"
 iconset="$build_dir/Sange.iconset"
 mkdir -p "$iconset"
 for size in 16 32 128 256 512; do
@@ -30,6 +33,18 @@ for plugin in Path(sys.argv[1]).glob('*.dylib'):
     if plugin.name != 'libqsqlite.dylib':
         plugin.unlink()
 PYTHON
+{
+    echo 'Qt 6.12.0 official clang_64 online installer kit; no downstream library patches.'
+    echo 'Application and dependency rebuild instructions: DEPENDENCIES.md and corresponding source archives.'
+    echo 'Xcode toolchain:'
+    xcodebuild -version
+    echo 'Qt installed build configuration:'
+    find "${QT_ROOT_DIR:?}/mkspecs" -maxdepth 1 -name 'q*.pri' -exec cat {} \;
+    echo 'FFmpeg binary version and configure arguments:'
+    for library in "$package_dir/Sange.app/Contents/Frameworks/"libav*.dylib; do
+        strings "$library" | grep -E '^((--prefix|--disable|--enable)|FFmpeg version|Lav[cfu]|9\.0\.1)' || true
+    done
+} > "$package_dir/Sange.app/Contents/Resources/legal/BUILD-INFO.txt"
 # Test packages use ad-hoc signing. Public distribution requires Developer ID + notarization.
 codesign --force --deep --sign - "$package_dir/Sange.app"
 codesign --verify --deep --strict "$package_dir/Sange.app"
@@ -44,3 +59,4 @@ ditto "$package_dir/Sange.app" "$stage/Sange.app"
 ln -sfn /Applications "$stage/Applications"
 hdiutil create -volname Sange -srcfolder "$stage" -ov -format UDZO "$package_dir/$image"
 (cd "$package_dir" && shasum -a 256 "$image" > "$image.sha256")
+python3 "$project_dir/packaging/macos/compliance.py" --bundle "$package_dir/Sange.app" --image "$package_dir/$image" --architecture "$architecture" --assets "$source_dir" --manifest "$package_dir/macOS-$architecture-compliance.json"

@@ -19,3 +19,17 @@ Published-release CI expects `compliance.tar.gz`: `Windows`, `Linux-DEB`, `Linux
 Release 1.4.1 contains only an Android APK. Corresponding application sources and the per-file manifest are in `licensing/releases/1.4.1/`, linked beside the APK in the release description. Unchanged dependency sources are available in the earlier public 1.4.0 `compliance.tar.gz`. `release.json` pins that archive's SHA-256 and explicitly lists platforms. The new manifest binds the materials to the new APK's SHA-256; the old application manifest is not reused.
 
 CI verifies the base archive hash, restores materials using `scripts/prepare_release_materials.py`, substitutes new application sources and checks the actual APK with `scripts/audit_release.py --platform Android`. All other inventory, license, notice and source checks remain in place. Releases without such a descriptor still require materials for all four platforms.
+
+## macOS releases
+
+macOS 2.0.1 ships separate arm64/x86_64 DMGs, their per-file
+`macOS-<architecture>-compliance.json` manifests and the corresponding source
+archives named by each manifest. `packaging/macos/compliance.py` mounts each
+actual image read-only on macOS, verifies the image and complete file hashes,
+checks internal framework symlinks, requires bundled notices, verifies source
+archives and validates the code signature. External and broken bundle symlinks
+are rejected; only the image-level Applications shortcut points outside the image.
+The native release CI performs this audit independently of the legacy package
+auditor, which does not understand DMG files. Qt's own GPLv3 option does not
+relicense incorporated third-party components; their notices and attribution
+metadata are preserved inside the app and their sources are in the source assets.
