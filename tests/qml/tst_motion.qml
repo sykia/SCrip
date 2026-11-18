@@ -58,8 +58,11 @@ TestCase {
     function test_popupReversalKeepsCurrentOpacity() {
         const root = createTemporaryObject(fixture, this)
         verify(root)
+        // Wait for an actual intermediate frame rather than a platform-specific frame delay.
+        root.popup.enter.duration = 1000
+        root.popup.exit.duration = 1000
         root.popup.open()
-        wait(40)
+        tryVerify(function() { return root.popup.opacity > 0 && root.popup.opacity < 1 })
         const openingOpacity = root.popup.opacity
         verify(openingOpacity > 0 && openingOpacity < 1)
         root.popup.close()

@@ -61,7 +61,7 @@ jobs:
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         run: |
           mkdir -p build/macos/smoke-home
-          HOME="$PWD/build/macos/smoke-home" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software build/macos/package/Sange.app/Contents/MacOS/Sange > build/macos/startup.log 2>&1 &
+          env -u QT_PLUGIN_PATH -u QML2_IMPORT_PATH -u QML_IMPORT_PATH -u QT_ROOT_DIR -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH HOME="$PWD/build/macos/smoke-home" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software build/macos/package/Sange.app/Contents/MacOS/Sange > build/macos/startup.log 2>&1 &
           player_pid=$!
           sleep 10
           if ! kill -0 "$player_pid" 2>/dev/null; then cat build/macos/startup.log; exit 1; fi

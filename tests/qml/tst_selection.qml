@@ -147,6 +147,7 @@ TestCase {
         const s = make(); s.allLoaded()
         const bar = createTemporaryObject(barFixture, test, {width: data.width, selection: s, mobile: data.mobile})
         verify(bar); wait(30)
+        grabImage(bar).save("selection-" + data.tag + ".png")
         verify(bar.height > 0); verify(bar.height <= (data.mobile ? 100 : 50))
         const flow = findChild(bar, "selectionControls")
         for (const child of flow.children) {

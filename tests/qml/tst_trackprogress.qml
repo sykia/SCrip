@@ -59,10 +59,12 @@ TestCase {
     function test_touchScrollDoesNotSeek() {
         const state = setup(), p = state.progress
         const touch = touchEvent(state.view)
-        touch.press(0, p, 150, 26).commit(); wait(30)
-        touch.move(0, p, 150, 0).commit(); wait(20)
-        touch.move(0, p, 150, -60).commit(); wait(20)
-        touch.release(0, p, 150, -80).commit()
+        // Keep screen positions stable as Flickable moves the progress item.
+        const start = p.mapToItem(state.view, 150, 26)
+        touch.press(0, state.view, start.x, start.y).commit(); wait(30)
+        touch.move(0, state.view, start.x, start.y - 26).commit(); wait(20)
+        touch.move(0, state.view, start.x, start.y - 86).commit(); wait(20)
+        touch.release(0, state.view, start.x, start.y - 106).commit()
         wait(30); compare(p.requests, 0)
         tryVerify(function() { return state.view.contentY > 0 }, 1000)
     }
