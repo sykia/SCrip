@@ -28,14 +28,20 @@ jobs:
           target: desktop
           arch: clang_64
           modules: qtmultimedia qtshadertools
+          cache: true
       - name: Configure
         run: cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4 -DBUILD_TESTING=ON
       - name: Build
         run: cmake --build build/macos --parallel 3
+      - name: Generate HLS seek fixture
+        run: |
+          if ! command -v ffmpeg >/dev/null; then brew install ffmpeg; fi
+          bash tests/run-hls-seek.sh --generate-only
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
+          SCRIP_HLS_TEST_PLAYLIST: ${{ github.workspace }}/build/hls-seek-fixture/test.m3u8
         run: ctest --test-dir build/macos --output-on-failure
       - name: Verify native Keychain storage
         run: |
@@ -64,6 +70,8 @@ jobs:
           path: |
             build/macos/package/*.dmg
             build/macos/package/*.sha256
+            build/macos/package/bundle-*.json
             build/macos/startup.log
             build/macos/Testing/Temporary/LastTest.log
+            build/macos/*.png
           if-no-files-found: warn

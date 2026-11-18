@@ -15,9 +15,9 @@ QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
 bash packaging/macos/package.sh build/macos arm64
 ```
 
-Use `x86_64` throughout for Intel. `macdeployqt` must be on PATH. The packaging script copies the app, QML imports, Qt libraries/plugins and legal notices, then produces an ad-hoc-signed DMG and SHA-256 file under `build/macos/package/`. This is a testing package, without Developer ID or Apple notarization. Gatekeeper may require explicit user approval. Do not instruct users to disable Gatekeeper globally.
+Use `x86_64` throughout for Intel. `macdeployqt` must be on PATH. The packaging script copies the app, QML imports, Qt libraries/plugins and legal notices, checks Mach-O architecture/dependency paths and writes a binary inventory, then produces an ad-hoc-signed DMG and SHA-256 file under `build/macos/package/`. This is a testing package, without Developer ID or Apple notarization. Gatekeeper may require explicit user approval. Do not instruct users to disable Gatekeeper globally.
 
-The `macos-build.yml` workflow builds and tests on separate Apple Silicon and Intel runners and uploads packages and logs as Actions artifacts. It does not publish a GitHub release. The deployed app receives a ten-second offscreen startup check; this does not validate actual sound or visual appearance. Tests use fixture credentials; CI runs the native Keychain round-trip test in a disposable keychain. On a local Mac, run `build/macos/secretstore_tests roundTrip` explicitly; it can prompt for Keychain access.
+The `macos-build.yml` workflow builds and tests on separate Apple Silicon and Intel runners and uploads packages, logs and fixture UI screenshots as Actions artifacts. It does not publish a GitHub release. The deployed app receives a ten-second offscreen startup check; this does not validate actual sound or visual appearance. Tests use fixture credentials; CI runs the native Keychain round-trip test in a disposable keychain. On a local Mac, run `build/macos/secretstore_tests roundTrip` explicitly; it can prompt for Keychain access.
 
 ## Release validation
 
@@ -30,6 +30,7 @@ Before releasing 2.0.1, test the downloaded DMG on a Mac without Qt installed:
 - Retina layout, resizing, fullscreen, dialogs, clipboard, Command-F, Command-Q, closing/restoring from menu bar and Dock.
 - `scrip:`/`soundcloud:` links, second-instance forwarding and Discord presence if enabled.
 - Diagnostics copying/export filtering and persistent logs after force quit.
+- An inventory of the exact bundled Qt/FFmpeg libraries, license texts and matching source/build materials, integrated into the release compliance audit.
 - Developer ID signing and notarization for friction-free public distribution, including stapling and testing the final downloaded artifact.
 
 A successful CI run establishes compilation, automated tests, packaging and offscreen startup only. Hardware playback and interactive checks remain a separate release gate.

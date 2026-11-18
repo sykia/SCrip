@@ -24,6 +24,7 @@ macdeployqt "$package_dir/Sange.app" "-qmldir=$project_dir/qml" -always-overwrit
 # Test packages use ad-hoc signing. Public distribution requires Developer ID + notarization.
 codesign --force --deep --sign - "$package_dir/Sange.app"
 codesign --verify --deep --strict "$package_dir/Sange.app"
+python3 "$project_dir/packaging/macos/check_bundle.py" "$package_dir/Sange.app" "$architecture" > "$package_dir/bundle-$architecture.json"
 ln -sfn /Applications "$package_dir/Applications"
 image="Sange-$version-macOS-$architecture.dmg"
 # Only the app and Applications shortcut belong in the disk image.
