@@ -1,4 +1,5 @@
 #include "soundcloud.h"
+#include <QSysInfo>
 #include "recommendations.h"
 #include <QRegularExpression>
 #include <utility>
@@ -2870,6 +2871,8 @@ void SoundCloud::checkForUpdates(bool manual) {
         suffix = "-Android-universal.apk";
 #elif defined(Q_OS_WIN)
         suffix = "-Windows-x64.exe";
+#elif defined(Q_OS_MACOS)
+        suffix = "-macOS-" + QSysInfo::buildCpuArchitecture() + ".dmg";
 #elif defined(Q_OS_LINUX)
         if (QFileInfo::exists("/etc/arch-release")) suffix = "-x86_64.pkg.tar.zst";
         else if (QFileInfo::exists("/etc/debian_version")) suffix = "-amd64.deb";
@@ -3048,6 +3051,12 @@ void SoundCloud::installUpdate() {
             set("updateResult", "Мастер установки открыт. Завершите его; перезапустите Sange после установки или отмены.");
         }
     }
+#elif defined(Q_OS_MACOS)
+    const bool opened = QDesktopServices::openUrl(QUrl::fromLocalFile(m_updatePath));
+    set("updateInstalling", false);
+    set("updateError", opened ? QString{} : QStringLiteral("Не удалось открыть образ обновления macOS."));
+    set("updateResult", opened ? QStringLiteral("Образ открыт. Завершите Sange и перенесите новую версию в Applications, затем запустите её.")
+                                : QStringLiteral("Ошибка открытия образа обновления"));
 #elif defined(Q_OS_LINUX)
     const bool arch = m_updateReadyName.endsWith(".pkg.tar.zst");
     const QFileInfo packageInfo(m_updatePath);

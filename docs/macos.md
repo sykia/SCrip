@@ -1,6 +1,6 @@
 # macOS builds (2.0.1 preparation)
 
-The macOS port uses the desktop Qt Quick interface, macOS Keychain for OAuth records and MediaPlayer for Now Playing and transport commands. It does not require libsecret or D-Bus. Storage keeps the existing `Qsae/SCrip` identity. Closing the window keeps playback running; the menu bar provides Quit (Command-Q) and Open Sange. The desktop Discord IPC client also supports native macOS Discord sockets.
+The macOS port uses the desktop Qt Quick interface with the Basic controls style, macOS Keychain for OAuth records and MediaPlayer for Now Playing and transport commands. It does not require libsecret or D-Bus. Storage keeps the existing `Qsae/SCrip` identity. Closing the window keeps playback running; the menu bar provides Quit (Command-Q) and Open Sange. The desktop Discord IPC client also supports native macOS Discord sockets.
 
 ## Build and package
 
@@ -18,6 +18,8 @@ bash packaging/macos/package.sh build/macos arm64
 Use `x86_64` throughout for Intel. `macdeployqt` must be on PATH. The packaging script copies the app, QML imports, Qt libraries/plugins and legal notices, checks Mach-O architecture/dependency paths and writes a binary inventory, then produces an ad-hoc-signed DMG and SHA-256 file under `build/macos/package/`. This is a testing package, without Developer ID or Apple notarization. Gatekeeper may require explicit user approval. Do not instruct users to disable Gatekeeper globally.
 
 The `macos-build.yml` workflow builds and tests on separate Apple Silicon and Intel runners and uploads packages, logs and fixture UI screenshots as Actions artifacts. It does not publish a GitHub release. The deployed app receives a ten-second offscreen startup check; this does not validate actual sound or visual appearance. Tests use fixture credentials; CI runs the native Keychain round-trip test in a disposable keychain. On a local Mac, run `build/macos/secretstore_tests roundTrip` explicitly; it can prompt for Keychain access.
+
+The updater selects the DMG matching the application architecture, verifies its SHA-256 and opens it in Finder. Replacing the app in Applications remains a user action; the running bundle is not overwritten automatically.
 
 ## Release validation
 

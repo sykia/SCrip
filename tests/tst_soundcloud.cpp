@@ -12,6 +12,7 @@
 #include "recommendations.h"
 #include "lyrics.h"
 #include <QtTest>
+#include <QSysInfo>
 #include <QNetworkReply>
 #include <QTemporaryDir>
 #include <QFile>
@@ -38,6 +39,16 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
+
+static QString updateFixtureName(const QString &version) {
+#ifdef Q_OS_MACOS
+    return "Sange-" + version + "-macOS-" + QSysInfo::buildCpuArchitecture() + ".dmg";
+#elif defined(Q_OS_WIN)
+    return "Sange-" + version + "-Windows-x64.exe";
+#else
+    return QFileInfo::exists("/etc/arch-release") ? "scrip-" + version + "-x86_64.pkg.tar.zst" : "Sange-" + version + "-amd64.deb";
+#endif
+}
 
 // Транспорт подменяется только в тестах. Рабочий клиент использует фиксированные HTTPS-хосты.
 #ifndef Q_MOC_RUN
@@ -220,7 +231,7 @@ private slots:
         sc.postComment(track["urn"].toString(), "blocked");
         QCOMPARE(net.requests.size(), 1);
         track["reveal_comments"] = false; sc.setCommentTrack(track);
-        QTest::qWait(80);
+        QTRY_VERIFY(sc.m_reads.isEmpty());
         QVERIFY(sc.commentsState()["hidden"].toBool()); QVERIFY(sc.commentsState()["items"].toList().isEmpty());
         sc.loadComments(track["urn"].toString(), false, true); QCOMPARE(net.requests.size(), 1);
         track.remove("commentable"); track["reveal_comments"] = true; sc.setCommentTrack(track);
@@ -822,6 +833,8 @@ private slots:
 #endif
         QCoreApplication::setOrganizationName("SCripTests"); QCoreApplication::setApplicationName("SCripTests");
         QVERIFY(directory.isValid()); qputenv("XDG_CONFIG_HOME", directory.path().toUtf8());
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, directory.path());
         qputenv("SCRIP_AUTH_MODE", "local");
         qunsetenv("SOUNDCLOUD_CLIENT_ID"); qunsetenv("SOUNDCLOUD_CLIENT_SECRET");
         config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/SCrip";
@@ -2916,7 +2929,7 @@ private slots:
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion();
         QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')}, {"size", 4},
             {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
@@ -2932,7 +2945,7 @@ private slots:
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')}, {"size", 4},
             {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
@@ -2947,7 +2960,7 @@ private slots:
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("abcd");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex())}, {"size", 4},
             {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -2965,7 +2978,7 @@ private slots:
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("abcd");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
         QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -2981,7 +2994,7 @@ private slots:
         QVERIFY(sc.state()["updateError"].toString().isEmpty());
         QCOMPARE(sc.state()["updateResult"].toString(), QString("Обновление для этой системы пока недоступно"));
         QVERIFY(QFileInfo::exists(verifiedPath));
-        const QString nextName = QFileInfo::exists("/etc/arch-release") ? "scrip-1000.0-x86_64.pkg.tar.zst" : "SCrip-1000.0-amd64.deb";
+        const QString nextName = updateFixtureName("1000.0");
         const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v1000.0/" + nextName}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v1000.0"}, {"assets", QJsonArray{nextAsset}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
@@ -2990,7 +3003,7 @@ private slots:
     }
     void updateDownloadStreamsChunksAndChecksLengthAndOversizedBody() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("multi-block-payload");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
         const QJsonObject asset{{"name", name}, {"digest", digest}, {"size", payload.size()}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -3027,7 +3040,7 @@ private slots:
     }
     void updateDownloadRejectsHttpFailuresAndPartialBodies() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("abcd");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
         QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -4835,6 +4848,7 @@ private slots:
         Network net; net.responses = {{200, "{\"username\":\"Тестовый аккаунт\"}"}, {200, "[]"}}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         QTRY_VERIFY(!sc.state()["busy"].toBool());
+        QTRY_VERIFY(sc.m_reads.isEmpty());
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
         Network lyricsNet; lyricsNet.responseHosts = {"lrclib.net"};
         const QByteArray lyricFixture = "{\"id\":42,\"trackName\":\"A track page\",\"artistName\":\"Test artist\",\"syncedLyrics\":\"[00:00.00]Every sound has a story\\n[00:10.00]Every word finds its way\\n[00:20.00]Stay a little longer\\n[00:30.00]Let the music play\"}";

@@ -83,6 +83,7 @@ qt_add_shaders(scrip wave_shaders
     BASE "qml/shaders"
     FILES qml/shaders/wave.frag
 )
+qt_add_resources(scrip controls_style PREFIX "/" BASE "resources" FILES resources/qtquickcontrols2.conf)
 qt_add_resources(scrip callback_page PREFIX "/" FILES resources/callback.html)
 target_link_libraries(scrip PRIVATE Qt6::Quick Qt6::Network Qt6::Multimedia)
 function(scrip_secret_store target)
@@ -237,6 +238,8 @@ if(BUILD_TESTING AND NOT ANDROID)
     target_link_libraries(artwork_ui_tests PRIVATE Qt6::QuickTest Qt6::Quick Qt6::Network)
     add_test(NAME artwork_ui COMMAND artwork_ui_tests -input ${CMAKE_CURRENT_SOURCE_DIR}/tests/qml)
     set_tests_properties(artwork_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+    set_property(TEST diagnostics plugins soundcloud artwork_ui APPEND PROPERTY
+        ENVIRONMENT "QT_QUICK_CONTROLS_STYLE=Basic")
 endif()
 
 # Тексты лицензий доступны в ресурсах всех платформ и при системной установке.

@@ -59,12 +59,12 @@ TestCase {
     function test_touchScrollDoesNotSeek() {
         const state = setup(), p = state.progress
         const touch = touchEvent(state.view)
-        touch.press(0, p, 150, 26).commit()
+        touch.press(0, p, 150, 26).commit(); wait(30)
         touch.move(0, p, 150, 0).commit(); wait(20)
         touch.move(0, p, 150, -60).commit(); wait(20)
         touch.release(0, p, 150, -80).commit()
         wait(30); compare(p.requests, 0)
-        verify(state.view.contentY > 0)
+        tryVerify(function() { return state.view.contentY > 0 }, 1000)
     }
     function test_horizontalTouchSeek() {
         const state = setup(), p = state.progress
