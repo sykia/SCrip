@@ -64,10 +64,11 @@ jobs:
           qt_kit_dir="${QT_ROOT_DIR:?}"
           mv "$qt_kit_dir" "$qt_kit_dir.smoke-hidden"
           trap 'mv "$qt_kit_dir.smoke-hidden" "$qt_kit_dir"' EXIT
-          env -u QT_PLUGIN_PATH -u QML2_IMPORT_PATH -u QML_IMPORT_PATH -u QT_ROOT_DIR -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH HOME="$PWD/build/macos/smoke-home" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software build/macos/package/Sange.app/Contents/MacOS/Sange > build/macos/startup.log 2>&1 &
+          env -u QT_PLUGIN_PATH -u QML2_IMPORT_PATH -u QML_IMPORT_PATH -u QT_ROOT_DIR -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH HOME="$PWD/build/macos/smoke-home" QT_QPA_PLATFORM=cocoa QT_QUICK_BACKEND=software build/macos/package/Sange.app/Contents/MacOS/Sange > build/macos/startup.log 2>&1 &
           player_pid=$!
           sleep 10
           if ! kill -0 "$player_pid" 2>/dev/null; then cat build/macos/startup.log; exit 1; fi
+          screencapture -x build/macos/startup-native.png || true
           kill "$player_pid"
           wait "$player_pid" || true
           if grep -E 'failed to load component|is not installed|Library not loaded|QML startup failed' build/macos/startup.log; then exit 1; fi

@@ -828,7 +828,7 @@ private slots:
         QVERIFY(!sc.state()["restoreCleared"].toBool());
     }
     void initTestCase() {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
         QStandardPaths::setTestModeEnabled(true);
 #endif
         QCoreApplication::setOrganizationName("SCripTests"); QCoreApplication::setApplicationName("SCripTests");
@@ -4922,6 +4922,10 @@ private slots:
         QTRY_VERIFY(!preview->property("visible").toBool());
 
         QVERIFY(window->property("dockedInspector").toBool());
+        // Keep pagination idle until its response is installed; layout and wheel
+        // animation can otherwise fire the auto-load timer on a slower runner.
+        QQmlExpression autoLoadControl(QQmlEngine::contextForObject(window), window, "prefs.autoLoad=false");
+        autoLoadControl.evaluate(); QVERIFY(!autoLoadControl.hasError());
         QJsonArray scrollTracks;
         for (int i=0; i<32; ++i) scrollTracks.append(QJsonObject{{"urn", QString("soundcloud:tracks:%1").arg(i+10)}, {"title", "Проверка прокрутки"}});
         net.responses = {{200, QJsonDocument(QJsonObject{{"collection", scrollTracks}, {"next_href","https://api.soundcloud.com/tracks?cursor=next"}}).toJson()}};
@@ -4938,9 +4942,10 @@ private slots:
         QCoreApplication::sendEvent(window,&wheel);
         QTRY_VERIFY(scroll->property("contentY").toReal()>0);
         QVERIFY(scroll->property("contentY").toReal()<=scroll->property("contentHeight").toReal()-scroll->property("height").toReal());
-        net.responses = {{200, "[]"}};
         net.responses = {{200, "[{\"urn\":\"soundcloud:tracks:99\",\"title\":\"\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430\"}]"}};
         QTest::qWait(550); // Дождаться завершения анимации колеса перед переходом в конец.
+        autoLoadControl.setExpression("prefs.autoLoad=true"); autoLoadControl.evaluate();
+        QVERIFY(!autoLoadControl.hasError());
         scroll->setProperty("contentY", scroll->property("contentHeight").toReal() - scroll->property("height").toReal());
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 33);
         net.responses = {{200, "[]"}};
