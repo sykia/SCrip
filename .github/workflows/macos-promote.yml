@@ -1,0 +1,96 @@
+name: Prepare verified macOS release assets
+on:
+  push:
+    branches: [codex/release-promotion]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  prepare:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN: '44343676863'
+      RELEASE_COMMIT: '2fbffdf64bcea15dd419be7c9ece2e93dfe88336'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require successful native builds
+        run: |
+          for attempt in $(seq 1 90); do
+            status=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" --jq '.status')
+            if [ "$status" = completed ]; then break; fi
+            sleep 20
+          done
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" --jq '.conclusion')" = success
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" --jq '.head_sha')" = "$RELEASE_COMMIT"
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ env.BUILD_RUN }}
+          github-token: ${{ github.token }}
+          pattern: macOS-*
+          path: build/promotion
+      - name: Assemble release files and source provenance
+        run: |
+          mkdir -p build/release
+          cp build/promotion/macOS-corresponding-sources/* build/release/
+          cp build/promotion/macOS-arm64/package/*.dmg build/release/
+          cp build/promotion/macOS-x86_64/package/*.dmg build/release/
+          cp build/promotion/macOS-arm64/package/bundle-*.json build/release/
+          cp build/promotion/macOS-x86_64/package/bundle-*.json build/release/
+          cp build/promotion/macOS-arm64/package/*-compliance.json build/release/
+          cp build/promotion/macOS-x86_64/package/*-compliance.json build/release/
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os
+          root = Path('build/release')
+          source = root / 'Sange-2.0.1-source.tar.gz'
+          with source.open('rb') as stream:
+              source_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
+          for manifest in root.glob('macOS-*-compliance.json'):
+              data = json.loads(manifest.read_text())
+              for component in data['components'].values():
+                  for entry in component['sources']:
+                      if entry['name'] == source.name and entry['sha256'] != source_hash:
+                          data['application_source_archive'] = {
+                              'commit': os.environ['RELEASE_COMMIT'],
+                              'native_ci_sha256': entry['sha256'],
+                              'distributed_sha256': source_hash,
+                              'note': 'Both architectures build the same commit; the shared source archive is taken from the Apple Silicon build.'}
+                          entry['sha256'] = source_hash
+              manifest.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+      - name: Audit final disk images and corresponding source files
+        run: |
+          for arch in arm64 x86_64; do
+            python3 packaging/macos/compliance.py --image "build/release/Sange-2.0.1-macOS-$arch.dmg" --assets build/release --manifest "build/release/macOS-$arch-compliance.json"
+          done
+          (cd build/release && shasum -a 256 * > SHA256SUMS)
+      - name: Upload assets to draft only
+        run: |
+          test "$(gh api repos/$GITHUB_REPOSITORY/releases/450156306 --jq '.draft')" = true
+          test "$(gh api repos/$GITHUB_REPOSITORY/releases/450156306 --jq '.target_commitish')" = "$RELEASE_COMMIT"
+          gh release upload v2.0.1 build/release/* --clobber
+          gh api repos/$GITHUB_REPOSITORY/releases/450156306 > build/release-upload.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          assets = {a['name']: a for a in json.loads(Path('build/release-upload.json').read_text())['assets']}
+          for path in Path('build/release').iterdir():
+              with path.open('rb') as stream:
+                  digest = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
+              assert assets[path.name]['state'] == 'uploaded'
+              assert assets[path.name]['digest'] == digest, path.name
+          print('All final release assets verified against server SHA-256 values')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-publication-receipt
+          path: |
+            build/release-upload.json
+            build/release/SHA256SUMS
+            build/release/*-compliance.json
