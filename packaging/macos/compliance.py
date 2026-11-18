@@ -43,6 +43,8 @@ def validate(bundle, manifest, assets):
         raise ValueError('Incomplete component attribution')
     checked = set()
     for component in manifest['components'].values():
+        if component['license'] not in {'GPL-3.0-only', 'LGPL-2.1-or-later'} or not component['sources']:
+            raise ValueError('Missing sources or unreviewed primary component license')
         notice = component['notice']
         if notice not in files or not (bundle / notice).stat().st_size:
             raise ValueError('Missing bundled notice')

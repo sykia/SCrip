@@ -42,6 +42,22 @@ class MacBundleInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'executable'):
             module.inventory(self.bundle)
 
+    def test_modified_bundle_file_is_rejected(self):
+        files, links = module.inventory(self.bundle)
+        manifest = {'files': {p: {'sha256': sha, 'components': ['app']} for p, sha in files.items()},
+                    'symlinks': links, 'components': {'app': {}}}
+        (self.bundle / 'Contents/MacOS/Sange').write_bytes(b'modified')
+        with self.assertRaisesRegex(ValueError, 'hash mismatch'):
+            module.validate(self.bundle, manifest, Path(self.temporary.name))
+
+    def test_empty_source_list_is_rejected(self):
+        files, links = module.inventory(self.bundle)
+        manifest = {'files': {p: {'sha256': sha, 'components': ['app']} for p, sha in files.items()},
+                    'symlinks': links,
+                    'components': {'app': {'license': 'GPL-3.0-only', 'sources': []}}}
+        with self.assertRaisesRegex(ValueError, 'Missing sources'):
+            module.validate(self.bundle, manifest, Path(self.temporary.name))
+
 
 if __name__ == '__main__':
     unittest.main()
