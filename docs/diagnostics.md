@@ -18,4 +18,4 @@ A `session.active` marker survives abnormal termination and is removed on orderl
 
 ## Verification
 
-`diagnostics_tests` checks filtering, persistent history, rotation bounds, clipboard contents, interrupted/clean shutdown markers, main-loop stall detection and recovery, and panel layout at desktop and 320 px mobile widths. The existing Android layout fixture also checks report buttons and captures the settings footer. Run `cmake --build --preset debug` and `ctest --test-dir build/debug -R '^(diagnostics|plugins)$' --output-on-failure`.
+`diagnostics_tests` disables PCRE JIT to also exercise platforms where executable-memory optimizations are unavailable. It covers long log lines and prefixed credential keys without quadratic key scanning. It checks filtering, persistent history, rotation bounds, clipboard contents, interrupted/clean shutdown markers, main-loop stall detection and recovery, and panel layout at desktop and 320 px mobile widths. The existing Android layout fixture also checks report buttons and captures the settings footer. Run `cmake --build --preset debug` and `ctest --test-dir build/debug -R '^(diagnostics|plugins)$' --output-on-failure`.

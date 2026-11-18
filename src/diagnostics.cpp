@@ -63,20 +63,27 @@ QString environmentSummary() {
 }
 
 QString Diagnostics::sanitize(QString text) {
+    // Compile once, including on platforms without PCRE JIT. The field-start
+    // boundary avoids retrying a greedy key match at every character of a long word.
+    static const QRegularExpression urls(R"((?:https?|file|content|scrip|soundcloud)://[^\s<>"']+)", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression authorization(R"(\b(?:Bearer|OAuth)\s+[^\s,;"']+)", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression credentials(R"re((?<![\w-])("?(?:[\w-]*(?:token|secret|password|authorization|cookie)[\w-]*|code|client_id)"?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+))re", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression email(R"(\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b)", QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression controls("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]");
     // Strip whole URLs, not just query strings: signed paths can contain credentials.
-    text.replace(QRegularExpression(R"((?:https?|file|content|scrip|soundcloud)://[^\s<>"']+)", QRegularExpression::CaseInsensitiveOption), "[url]");
-    text.replace(QRegularExpression(R"(\b(?:Bearer|OAuth)\s+[^\s,;"']+)", QRegularExpression::CaseInsensitiveOption), "[authorization]");
-    text.replace(QRegularExpression(R"re(("?(?:[\w-]*(?:token|secret|password|authorization|cookie)[\w-]*|code|client_id)"?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+))re", QRegularExpression::CaseInsensitiveOption), "[credential]");
+    text.replace(urls, "[url]");
+    text.replace(authorization, "[authorization]");
+    text.replace(credentials, "[credential]");
     const auto home = QDir::homePath();
     if (home.size() > 1) {
         text.replace(home, "[home]", Qt::CaseInsensitive);
         auto nativeHome = QDir::toNativeSeparators(home);
         text.replace(nativeHome, "[home]", Qt::CaseInsensitive);
     }
-    text.replace(QRegularExpression(R"(\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b)", QRegularExpression::CaseInsensitiveOption), "[email]");
+    text.replace(email, "[email]");
     text.replace('\n', ' '); text.replace('\r', ' ');
     // Avoid terminal/control injection and one event masquerading as multiple entries.
-    text.remove(QRegularExpression("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]"));
+    text.remove(controls);
     return text;
 }
 

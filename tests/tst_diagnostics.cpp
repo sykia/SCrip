@@ -30,6 +30,14 @@ private slots:
         QVERIFY(!safe.contains('\n'));
         QVERIFY(safe.contains("[home]"));
     }
+    void longLinesAndPrefixedCredentials() {
+        const QString plain(64 * 1024, 'x');
+        QCOMPARE(Diagnostics::sanitize(plain), plain);
+        const auto safe = Diagnostics::sanitize(plain + " custom_access_token_field=hidden \"client_secret\":\"private\"");
+        QVERIFY(safe.startsWith(plain));
+        QVERIFY(!safe.contains("hidden"));
+        QVERIFY(!safe.contains("private"));
+    }
     void persistenceRotationAndClipboard() {
         QDir().mkpath(directory());
         QFile marker(directory() + "/session.active");
