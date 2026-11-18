@@ -37,6 +37,14 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
         run: ctest --test-dir build/macos --output-on-failure
+      - name: Verify native Keychain storage
+        run: |
+          keychain="$PWD/build/macos/ci.keychain-db"
+          security create-keychain -p ci-fixture "$keychain"
+          security unlock-keychain -p ci-fixture "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -d user -s "$keychain"
+          build/macos/secretstore_tests roundTrip
       - name: Package standalone application
         run: bash packaging/macos/package.sh build/macos ${{ matrix.arch }}
       - name: Smoke test deployed application

@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
     QMenuBar menuBar;
     auto *applicationMenu = menuBar.addMenu("Sange");
     applicationMenu->addAction("Открыть Sange", restore);
-    auto *quitAction = applicationMenu->addAction("Выход", &app, &QCoreApplication::quit);
+    auto *quitAction = applicationMenu->addAction("Выход", &app, [&] { window->removeEventFilter(&filter); app.quit(); });
     quitAction->setMenuRole(QAction::QuitRole);
     quitAction->setShortcut(QKeySequence::Quit);
     QObject::connect(&app, &QGuiApplication::applicationStateChanged, &app, [restore, window](Qt::ApplicationState state) {
@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
         soundcloud.like(soundcloud.state().value("current").toMap());
     });
     menu.addSeparator();
-    menu.addAction("Выход", &app, &QCoreApplication::quit);
+    menu.addAction("Выход", &app, [&] { window->removeEventFilter(&filter); app.quit(); });
     QObject::connect(&menu, &QMenu::aboutToShow, &app, [&] {
         const auto state = soundcloud.state();
         const auto current = state.value("current").toMap();

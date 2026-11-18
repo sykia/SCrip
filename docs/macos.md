@@ -17,7 +17,7 @@ bash packaging/macos/package.sh build/macos arm64
 
 Use `x86_64` throughout for Intel. `macdeployqt` must be on PATH. The packaging script copies the app, QML imports, Qt libraries/plugins and legal notices, then produces an ad-hoc-signed DMG and SHA-256 file under `build/macos/package/`. This is a testing package, without Developer ID or Apple notarization. Gatekeeper may require explicit user approval. Do not instruct users to disable Gatekeeper globally.
 
-The `macos-build.yml` workflow builds and tests on separate Apple Silicon and Intel runners and uploads packages and logs as Actions artifacts. It does not publish a GitHub release. The deployed app receives a ten-second offscreen startup check; this does not validate actual sound or visual appearance. Tests use fixture credentials; the real Keychain round-trip test is opt-in (`build/macos/secretstore_tests roundTrip`) and can prompt for Keychain access.
+The `macos-build.yml` workflow builds and tests on separate Apple Silicon and Intel runners and uploads packages and logs as Actions artifacts. It does not publish a GitHub release. The deployed app receives a ten-second offscreen startup check; this does not validate actual sound or visual appearance. Tests use fixture credentials; CI runs the native Keychain round-trip test in a disposable keychain. On a local Mac, run `build/macos/secretstore_tests roundTrip` explicitly; it can prompt for Keychain access.
 
 ## Release validation
 
