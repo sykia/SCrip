@@ -1,0 +1,61 @@
+name: Sange macOS build and package
+on:
+  push:
+    branches: [main, 'codex/macos-*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.12.0
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtmultimedia qtshadertools
+      - name: Configure
+        run: cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4 -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build build/macos --parallel 3
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: ctest --test-dir build/macos --output-on-failure
+      - name: Package standalone application
+        run: bash packaging/macos/package.sh build/macos ${{ matrix.arch }}
+      - name: Smoke test deployed application
+        run: |
+          mkdir -p build/macos/smoke-home
+          HOME="$PWD/build/macos/smoke-home" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software build/macos/package/Sange.app/Contents/MacOS/Sange > build/macos/startup.log 2>&1 &
+          player_pid=$!
+          sleep 10
+          if ! kill -0 "$player_pid" 2>/dev/null; then cat build/macos/startup.log; exit 1; fi
+          kill "$player_pid"
+          wait "$player_pid" || true
+          if grep -E 'failed to load component|is not installed|Library not loaded|QML startup failed' build/macos/startup.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macOS-${{ matrix.arch }}
+          path: |
+            build/macos/package/*.dmg
+            build/macos/package/*.sha256
+            build/macos/startup.log
+            build/macos/Testing/Temporary/LastTest.log
+          if-no-files-found: warn

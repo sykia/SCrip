@@ -1754,7 +1754,6 @@ Window {
                     } }
                 }
             }
-            Tool { text: "Плагины…"; onClicked: { app.pluginMessage = ""; app.settingGroup = 1 } }
             FormBlock {
                 width: parent.width; heading: "Воспроизведение"
                 Row { spacing: 12; Txt { text: "Вид медиатеки"; anchors.verticalCenter: parent.verticalCenter } Tool { text: "Обложки"; active: prefs.gridView; onClicked: prefs.gridView = true } Tool { text: "Список"; active: !prefs.gridView; onClicked: prefs.gridView = false } }
@@ -1818,6 +1817,12 @@ Window {
                 Tool { text: "Открыть профиль SoundCloud"; onClicked: sc.openExternal(app.api.profile.permalink_url || "https://soundcloud.com") }
                 Tool { text: "Выйти из аккаунта"; onClicked: disconnectDialog.open() }
             }
+            DiagnosticsPanel {
+                host: app
+                width: parent.width
+                ink: app.ink; muted: app.muted
+            }
+            Tool { text: "Плагины…"; onClicked: { app.pluginMessage = ""; app.settingGroup = 1 } }
             FormBlock {
                 width: parent.width; heading: "Sange"
                 Txt { text: "Версия " + Qt.application.version; color: app.muted }

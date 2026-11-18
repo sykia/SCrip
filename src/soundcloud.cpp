@@ -362,6 +362,7 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         });
         connect(media, &QMediaPlayer::errorOccurred, this, [this, media](QMediaPlayer::Error e, const QString &) {
             if (media == m_activePlayer && e != QMediaPlayer::NoError) {
+                qWarning() << "Playback backend error; code=" << int(e);
                 if (m_startupPending && m_startupUsedPreload && !m_preloadedRetryUsed) {
                     m_preloadedRetryUsed = true;
                     startupStage("preloaded_url_refresh");
@@ -541,7 +542,7 @@ void SoundCloud::set(const QString &key, const QVariant &input) {
         QTimer::singleShot(0, this, [this, link] { openLink(link); });
     }
 }
-void SoundCloud::fail(const QString &message) { set("error", message); }
+void SoundCloud::fail(const QString &message) { qWarning().noquote() << "SoundCloud operation failed:" << message; set("error", message); }
 void SoundCloud::clearError() { set("error", ""); }
 bool SoundCloud::loadConfig() {
     if (!m_storageReady) { fail(AuthStorage::errorMessage()); return false; }
@@ -828,6 +829,8 @@ void SoundCloud::requestAttempt(const QString &path, Callback done, const QByteA
             if (std::exchange(*handled, true)) return;
             observeRate(reply, rateGroup(url, method));
             int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (reply->error() != QNetworkReply::NoError || status >= 400)
+                qWarning() << "SoundCloud request failed; HTTP=" << status << "network=" << int(reply->error()) << "attempt=" << attempt;
             if (status == 401 && retry && !m_refresh.isEmpty()) { m_expires = 0; requestAttempt(path, done, method, body, false, failed, started, redirects, attempt, background); return; }
             if (status == 302 && method == "GET" && (path.startsWith("/resolve?") || path.startsWith("https://api.soundcloud.com/resolve?")) && redirects == 0) {
                 const auto location = reply->url().resolved(reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl());

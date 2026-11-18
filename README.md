@@ -16,7 +16,8 @@
 <p align="center">
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="https://github.com/sykia/sange/releases/tag/v2.0.0">Release files &amp; SHA-256</a> ·
-  <a href="docs/plugins.md">Plugins</a>
+  <a href="docs/plugins.md">Plugins</a> ·
+  <a href="https://github.com/sykia/sange/wiki">Wiki</a>
 </p>
 
 <p align="center">
@@ -71,6 +72,8 @@ cmake --build --preset debug
 ctest --test-dir build/debug --output-on-failure
 ```
 
+macOS 2.0.1 preparation, native build instructions and release checks are documented in [macOS builds](docs/macos.md).
+
 Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. Build output stays in `build/`. The desktop interface is in `qml/Main.qml`, the Android interface in `qml/android/Main.qml`, and the entry point in `src/main.cpp`.
 
 For Android packaging, see [the build script](scripts/build_android.sh) and [playback diagnostics](docs/android-playback-diagnostics.md). Android builds also require the Android Qt kit, SDK/NDK, OpenSSL and the patched FFmpeg libraries configured by the build scripts.
@@ -85,7 +88,7 @@ For Android packaging, see [the build script](scripts/build_android.sh) and [pla
 | Playback and media controls | [System media and streaming](docs/system-media-and-streaming.md) |
 | Plugins | [User guide](docs/plugins.md) · [API reference](docs/plugin-api-v2-reference.md) · [QML SDK](docs/plugin-runtime.md) |
 | Sign-in and storage | [SoundCloud integration](docs/soundcloud-security.md) |
-| Installation | [Windows troubleshooting](docs/windows-install.md) |
+| Bug reports and installation | [Local diagnostics](docs/diagnostics.md) · [Windows troubleshooting](docs/windows-install.md) |
 
 ## License
 

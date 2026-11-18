@@ -1,3 +1,4 @@
+#include "diagnostics.h"
 #include "pluginruntime.h"
 #include "plugins.h"
 #include "playercommand.h"
@@ -37,12 +38,22 @@
 #include <QApplication>
 #include <QSystemTrayIcon>
 #include <QMenu>
+#ifdef Q_OS_MACOS
+#include <QMenuBar>
+#include <QAction>
+#endif
 #include <QEvent>
 
 class TrayWindowFilter : public QObject {
 public:
     bool eventFilter(QObject *object, QEvent *event) override {
-        if (event->type() == QEvent::Close && QSystemTrayIcon::isSystemTrayAvailable()) {
+        if (event->type() == QEvent::Close
+#ifdef Q_OS_MACOS
+            // Keep playback alive after closing the window, as a native Mac app.
+#else
+            && QSystemTrayIcon::isSystemTrayAvailable()
+#endif
+        ) {
             static_cast<QWindow *>(object)->hide();
             event->ignore();
             return true;
@@ -100,7 +111,15 @@ int main(int argc, char *argv[])
         if (!linkServer.listen(socketName)) return EXIT_FAILURE;
     }
 #endif
+    Diagnostics diagnostics;
     SoundCloud soundcloud;
+    QObject::connect(&soundcloud, &SoundCloud::catalogChanged, &diagnostics, [&soundcloud, lastPlaybackState = QString{}]() mutable {
+        const auto state = soundcloud.state();
+        const auto summary = QString("Playback: playing=%1 buffering=%2 active=%3 quality=%4")
+            .arg(state.value("playing").toBool()).arg(state.value("buffering").toBool())
+            .arg(state.value("playbackActive").toBool()).arg(state.value("playbackQuality").toInt());
+        if (summary != lastPlaybackState) { Diagnostics::record(summary); lastPlaybackState = summary; }
+    });
 #ifndef Q_OS_ANDROID
     LinkRouter linkRouter(&soundcloud);
 #endif
@@ -143,6 +162,7 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.setNetworkAccessManagerFactory(&artwork);
     artwork.prepare(&app, [] {});
+    engine.rootContext()->setContextProperty("diagnostics", &diagnostics);
     engine.rootContext()->setContextProperty("sc", &soundcloud);
     engine.rootContext()->setContextProperty("discordPresence", &discordPresence);
     engine.rootContext()->setContextProperty("lyricsBackend", &lyrics);
@@ -153,8 +173,10 @@ int main(int argc, char *argv[])
 #endif
     engine.rootContext()->setContextProperty("pluginManager", &plugins);
     engine.loadFromModule("SCrip", "Main");
-    if (engine.rootObjects().isEmpty())
+    if (engine.rootObjects().isEmpty()) {
+        Diagnostics::record("QML startup failed: no root object");
         return EXIT_FAILURE;
+    }
     if (auto *quickWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
         // Opt-in aggregate timing only: no account, track, URL, or input data.
         if (qEnvironmentVariableIntValue("SCRIP_PERF") == 1) {
@@ -240,6 +262,18 @@ int main(int argc, char *argv[])
         window->raise();
         window->requestActivate();
     };
+#ifdef Q_OS_MACOS
+    app.setQuitOnLastWindowClosed(false);
+    QMenuBar menuBar;
+    auto *applicationMenu = menuBar.addMenu("Sange");
+    applicationMenu->addAction("Открыть Sange", restore);
+    auto *quitAction = applicationMenu->addAction("Выход", &app, &QCoreApplication::quit);
+    quitAction->setMenuRole(QAction::QuitRole);
+    quitAction->setShortcut(QKeySequence::Quit);
+    QObject::connect(&app, &QGuiApplication::applicationStateChanged, &app, [restore, window](Qt::ApplicationState state) {
+        if (state == Qt::ApplicationActive && !window->isVisible()) restore();
+    });
+#endif
     menu.addAction("Открыть Sange", restore);
     menu.addSeparator();
     auto *play = menu.addAction("Воспроизвести", &soundcloud, &SoundCloud::togglePlayback);
