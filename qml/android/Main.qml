@@ -685,10 +685,15 @@ ApplicationWindow {
                     Action { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: "Использовать оформление плагинов"; onClicked: { prefs.accentOverride = false; prefs.coverRadiusOverride = false } }
                     Switch {  text: "Анимации"; checked: prefs.motion; onToggled: prefs.motion = checked }
                     Switch { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: "Догружать при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
-                    Action { text: "Плагины"; Layout.fillWidth: true; onClicked: app.page = 6 }
                     Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
                     Caption { text: "Аккаунт"; font.bold: true; font.pixelSize: 19 }
                     Action { text: sc.signedIn ? "Выйти из SoundCloud" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: sc.signedIn ? sc.logout() : sc.login() }
+                    DiagnosticsPanel {
+                        host: app; mobile: true
+                        Layout.fillWidth: true; Layout.minimumWidth: 0
+                        ink: app.ink; muted: app.muted
+                    }
+                    Action { text: "Плагины"; Layout.fillWidth: true; onClicked: app.page = 6 }
                     Caption { text: "Sange " + Qt.application.version + " · Android"; color: app.muted; font.pixelSize: 12 }
                 }
                 ColumnLayout {

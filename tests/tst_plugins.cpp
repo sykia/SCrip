@@ -912,7 +912,7 @@ Item {
         QFile mainFile(fixture + "/Main.qml");
         QVERIFY(mainFile.open(QIODevice::WriteOnly));
         mainFile.write(source.readAll()); mainFile.close();
-        for (auto name : {"RecommendationPreferences.qml", "RecommendationNotice.qml", "TrackInformation.qml", "TrackProgress.qml", "PlaybackQuality.qml", "SelectionInput.qml", "SelectionBar.qml", "TrackSelection.qml", "QueueActions.qml", "CollectionTools.qml", "TrackSearchFilters.qml", "PeoplePopup.qml", "SurfaceButton.qml", "ProfileExtras.qml", "ProfileStat.qml", "ProfileNavigation.qml", "EngagementAction.qml", "PlaylistEditor.qml", "CommentsPane.qml", "PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
+        for (auto name : {"DiagnosticsPanel.qml", "RecommendationPreferences.qml", "RecommendationNotice.qml", "TrackInformation.qml", "TrackProgress.qml", "PlaybackQuality.qml", "SelectionInput.qml", "SelectionBar.qml", "TrackSelection.qml", "QueueActions.qml", "CollectionTools.qml", "TrackSearchFilters.qml", "PeoplePopup.qml", "SurfaceButton.qml", "ProfileExtras.qml", "ProfileStat.qml", "ProfileNavigation.qml", "EngagementAction.qml", "PlaylistEditor.qml", "CommentsPane.qml", "PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
             const auto sourcePath = QString(SCRIP_SOURCE_DIR) + (QString(name) == "RoundedImage.qml" || QString(name) == "AndroidGlyph.qml" ? "/qml/android/" : "/qml/") + name;
             QFile::remove(fixture + "/" + name);
             QVERIFY(QFile::copy(sourcePath, fixture + "/" + name));
@@ -989,6 +989,18 @@ Item {
             scroll->setProperty("contentY", qMax(0.0, quality->mapToItem(scroll, QPointF()).y() + scroll->property("contentY").toReal() - 90));
             QTest::qWait(80);
             QVERIFY(window->grabWindow().save(QString("playback-settings-android-%1.png").arg(size.width())));
+            auto *copyLog = object->findChild<QQuickItem *>("copyDiagnosticLog");
+            auto *openIssue = object->findChild<QQuickItem *>("openDiagnosticIssue");
+            QVERIFY(copyLog && openIssue);
+            for (auto *button : {copyLog, openIssue}) {
+                const auto rect = button->mapRectToScene(button->boundingRect());
+                QVERIFY(rect.left() >= 0 && rect.right() <= size.width());
+                QVERIFY(button->height() >= 44);
+            }
+            scroll->setProperty("contentY", qMax(0.0, scroll->property("contentHeight").toReal() - scroll->height()));
+            QTest::qWait(80);
+            QVERIFY(window->grabWindow().save(QString("diagnostics-settings-android-%1.png").arg(size.width())));
+
         }
         object->setProperty("page", 0);
         for (const auto size : {QSize(320,640), QSize(412,860)}) {

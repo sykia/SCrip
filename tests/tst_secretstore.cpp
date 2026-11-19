@@ -14,8 +14,12 @@ private slots:
         const bool written = store->write(key, "fixture-secret");
         if (!written) { store->remove(key); QFAIL("Системное хранилище недоступно для записи"); }
         const bool read = store->read(key, value);
+        const bool updated = store->write(key, "updated-fixture");
+        QByteArray replacement;
+        const bool reread = store->read(key, replacement);
         const bool removed = store->remove(key);
-        QVERIFY(read); QCOMPARE(value, QByteArray("fixture-secret")); QVERIFY(removed);
+        QVERIFY(read); QCOMPARE(value, QByteArray("fixture-secret"));
+        QVERIFY(updated); QVERIFY(reread); QCOMPARE(replacement, QByteArray("updated-fixture")); QVERIFY(removed);
         QVERIFY(store->read(key, value)); QVERIFY(value.isEmpty());
         QVERIFY(store->remove(key));
     }

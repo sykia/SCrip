@@ -5,10 +5,14 @@ Linux exports MPRIS on the session bus as
 `org.mpris.MediaPlayer2.scrip.instance<PID>` at `/org/mpris/MediaPlayer2`.
 Windows uses `ISystemMediaTransportControlsInterop::GetForWindow` for the Qt
 window, with native WinRT ABI interfaces from the platform SDK (no additional
-library). Android keeps its existing MediaBridge and playback service.
+library). macOS uses MediaPlayer Now Playing and remote command handlers with
+callbacks queued to the Qt GUI thread. It publishes text metadata, duration,
+position and playback state; macOS artwork is not currently published.
+Android keeps its existing MediaBridge and playback service.
 
-The desktop adapter publishes title, credited artist, public unsigned SoundCloud
-artwork, duration, playback intent, position and command capabilities. It never
+The desktop adapters publish title, credited artist, duration, playback intent,
+position and command capabilities. Linux and Windows also publish public unsigned
+SoundCloud artwork. It never
 exports the controller's complete state, OAuth credentials or stream URLs.
 MPRIS positions and Seeked use microseconds; SMTC timeline values use 100 ns;
 the controller uses milliseconds. Position updates do not produce MPRIS

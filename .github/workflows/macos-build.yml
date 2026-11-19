@@ -1,0 +1,103 @@
+name: Sange macOS build and package
+on:
+  push:
+    branches: [main, 'codex/macos-*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.12.0
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtmultimedia qtshadertools
+          cache: true
+      - name: Configure
+        run: cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4 -DBUILD_TESTING=ON
+      - name: Build
+        id: build
+        run: cmake --build build/macos --parallel 3
+      - name: Generate HLS seek fixture
+        run: |
+          if ! command -v ffmpeg >/dev/null; then brew install ffmpeg; fi
+          bash tests/run-hls-seek.sh --generate-only
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          SCRIP_HLS_TEST_PLAYLIST: ${{ github.workspace }}/build/hls-seek-fixture/test.m3u8
+        run: ctest --test-dir build/macos --output-on-failure --timeout 600
+      - name: Verify native Keychain storage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          keychain="$PWD/build/macos/ci.keychain-db"
+          security create-keychain -p ci-fixture "$keychain"
+          security unlock-keychain -p ci-fixture "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -d user -s "$keychain"
+          build/macos/secretstore_tests roundTrip
+      - name: Package standalone application
+        id: package
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          mkdir -p build/macos/sources
+          curl --fail --location --retry 3 https://download.qt.io/archive/qt/6.12/6.12.0/single/qt-everywhere-src-6.12.0.tar.xz -o build/macos/sources/qt-everywhere-src-6.12.0.tar.xz
+          echo '98ff4f44bac6ec3e1e62ee2a4316ae0e3d15badb015d753cc0268a20db52f165  build/macos/sources/qt-everywhere-src-6.12.0.tar.xz' | shasum -a 256 -c -
+          curl --fail --location --retry 3 https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz -o build/macos/sources/ffmpeg-9.0.1.tar.xz
+          curl --fail --location --retry 3 https://codeload.github.com/qt/qt5/tar.gz/refs/tags/v6.12.0 -o build/macos/sources/qt5-v6.12.0.tar.gz
+          echo 'cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635  build/macos/sources/ffmpeg-9.0.1.tar.xz' | shasum -a 256 -c -
+          echo '167449f1963e899ef6502330b8791f0e971fb81fdeb560b15af19abd53c15552  build/macos/sources/qt5-v6.12.0.tar.gz' | shasum -a 256 -c -
+          git archive --format=tar.gz --prefix=Sange-2.0.1/ HEAD > build/macos/sources/Sange-2.0.1-source.tar.gz
+          SANGE_RELEASE_SOURCES="$PWD/build/macos/sources" bash packaging/macos/package.sh build/macos ${{ matrix.arch }}
+      - name: Smoke test deployed application
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        run: |
+          mkdir -p build/macos/smoke-home
+          qt_kit_dir="${QT_ROOT_DIR:?}"
+          mv "$qt_kit_dir" "$qt_kit_dir.smoke-hidden"
+          trap 'mv "$qt_kit_dir.smoke-hidden" "$qt_kit_dir"' EXIT
+          env -u QT_PLUGIN_PATH -u QML2_IMPORT_PATH -u QML_IMPORT_PATH -u QT_ROOT_DIR -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH HOME="$PWD/build/macos/smoke-home" QT_QPA_PLATFORM=cocoa QT_QUICK_BACKEND=software build/macos/package/Sange.app/Contents/MacOS/Sange > build/macos/startup.log 2>&1 &
+          player_pid=$!
+          sleep 10
+          if ! kill -0 "$player_pid" 2>/dev/null; then cat build/macos/startup.log; exit 1; fi
+          screencapture -x build/macos/startup-native.png || true
+          kill "$player_pid"
+          wait "$player_pid" || true
+          if grep -E 'failed to load component|is not installed|Library not loaded|QML startup failed' build/macos/startup.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macOS-${{ matrix.arch }}
+          path: |
+            build/macos/package/*.dmg
+            build/macos/package/*.sha256
+            build/macos/package/bundle-*.json
+            build/macos/package/*-compliance.json
+            build/macos/startup.log
+            build/macos/Testing/Temporary/LastTest.log
+            build/macos/*.png
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.package.outcome == 'success' && matrix.arch == 'arm64' }}
+        with:
+          name: macOS-corresponding-sources
+          path: build/macos/sources/*
+          compression-level: 0
+          if-no-files-found: error

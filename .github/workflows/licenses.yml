@@ -51,6 +51,16 @@ jobs:
           if [ -n "$TAG" ]; then args+=("$TAG"); fi
           mkdir -p build/release-assets
           gh release download "${args[@]}" --repo "$GITHUB_REPOSITORY" --dir build/release-assets
+          if compgen -G 'build/release-assets/*-macOS-*.dmg' >/dev/null; then
+            if compgen -G 'build/release-assets/*.apk' >/dev/null || compgen -G 'build/release-assets/*.exe' >/dev/null || compgen -G 'build/release-assets/*.deb' >/dev/null; then
+              echo 'Mixed macOS and legacy platform releases require an explicit combined audit'; exit 1
+            fi
+            test -f build/release-assets/macOS-arm64-compliance.json
+            test -f build/release-assets/macOS-x86_64-compliance.json
+            (cd build/release-assets && sha256sum -c SHA256SUMS)
+            echo 'macOS DMG mounting and complete inventory/source audit run in the native macOS job.'
+            exit 0
+          fi
           release_dir="licensing/releases/${TAG#v}"
           if [ -f "$release_dir/release.json" ]; then
             python scripts/prepare_release_materials.py --release-dir "$release_dir" --output build/compliance --bundle build/base-compliance.tar.gz --assets build/release-assets
@@ -64,3 +74,29 @@ jobs:
             python -c 'import tarfile; tarfile.open("build/compliance.tar.gz").extractall("build/compliance", filter="data")'
             python scripts/audit_release.py --assets build/release-assets --materials build/compliance
           fi
+  release-macos:
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Audit actual published macOS disk images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -eu
+          if [ -z "$TAG" ]; then TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName); fi
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -q -- '-macOS-.*\.dmg$'; then
+            echo 'No macOS assets in this release'; exit 0
+          fi
+          mkdir -p build/macos-release-assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir build/macos-release-assets
+          (cd build/macos-release-assets && shasum -a 256 -c SHA256SUMS)
+          for arch in arm64 x86_64; do
+            python packaging/macos/compliance.py --image "build/macos-release-assets/Sange-${TAG#v}-macOS-$arch.dmg" --assets build/macos-release-assets --manifest "build/macos-release-assets/macOS-$arch-compliance.json"
+          done

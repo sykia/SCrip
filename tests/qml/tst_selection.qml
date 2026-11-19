@@ -147,11 +147,12 @@ TestCase {
         const s = make(); s.allLoaded()
         const bar = createTemporaryObject(barFixture, test, {width: data.width, selection: s, mobile: data.mobile})
         verify(bar); wait(30)
+        grabImage(bar).save("selection-" + data.tag + ".png")
         verify(bar.height > 0); verify(bar.height <= (data.mobile ? 100 : 50))
         const flow = findChild(bar, "selectionControls")
         for (const child of flow.children) {
             if (!child.visible) continue
-            verify(child.x >= 0); verify(child.x + child.width <= data.width + 1)
+            verify(child.x >= 0); verify(child.x + child.width <= data.width + 1, "Overflow: " + child + " x=" + child.x + " width=" + child.width + " available=" + data.width)
             verify(child.height >= (data.mobile ? 44 : 36))
         }
         grabImage(bar).save("selection-" + data.tag + ".png")

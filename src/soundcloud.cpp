@@ -1,4 +1,5 @@
 #include "soundcloud.h"
+#include <QSysInfo>
 #include "recommendations.h"
 #include <QRegularExpression>
 #include <utility>
@@ -362,6 +363,7 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         });
         connect(media, &QMediaPlayer::errorOccurred, this, [this, media](QMediaPlayer::Error e, const QString &) {
             if (media == m_activePlayer && e != QMediaPlayer::NoError) {
+                qWarning() << "Playback backend error; code=" << int(e);
                 if (m_startupPending && m_startupUsedPreload && !m_preloadedRetryUsed) {
                     m_preloadedRetryUsed = true;
                     startupStage("preloaded_url_refresh");
@@ -541,7 +543,7 @@ void SoundCloud::set(const QString &key, const QVariant &input) {
         QTimer::singleShot(0, this, [this, link] { openLink(link); });
     }
 }
-void SoundCloud::fail(const QString &message) { set("error", message); }
+void SoundCloud::fail(const QString &message) { qWarning().noquote() << "SoundCloud operation failed:" << message; set("error", message); }
 void SoundCloud::clearError() { set("error", ""); }
 bool SoundCloud::loadConfig() {
     if (!m_storageReady) { fail(AuthStorage::errorMessage()); return false; }
@@ -828,6 +830,8 @@ void SoundCloud::requestAttempt(const QString &path, Callback done, const QByteA
             if (std::exchange(*handled, true)) return;
             observeRate(reply, rateGroup(url, method));
             int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (reply->error() != QNetworkReply::NoError || status >= 400)
+                qWarning() << "SoundCloud request failed; HTTP=" << status << "network=" << int(reply->error()) << "attempt=" << attempt;
             if (status == 401 && retry && !m_refresh.isEmpty()) { m_expires = 0; requestAttempt(path, done, method, body, false, failed, started, redirects, attempt, background); return; }
             if (status == 302 && method == "GET" && (path.startsWith("/resolve?") || path.startsWith("https://api.soundcloud.com/resolve?")) && redirects == 0) {
                 const auto location = reply->url().resolved(reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl());
@@ -2867,6 +2871,8 @@ void SoundCloud::checkForUpdates(bool manual) {
         suffix = "-Android-universal.apk";
 #elif defined(Q_OS_WIN)
         suffix = "-Windows-x64.exe";
+#elif defined(Q_OS_MACOS)
+        suffix = "-macOS-" + QSysInfo::buildCpuArchitecture() + ".dmg";
 #elif defined(Q_OS_LINUX)
         if (QFileInfo::exists("/etc/arch-release")) suffix = "-x86_64.pkg.tar.zst";
         else if (QFileInfo::exists("/etc/debian_version")) suffix = "-amd64.deb";
@@ -3045,6 +3051,12 @@ void SoundCloud::installUpdate() {
             set("updateResult", "Мастер установки открыт. Завершите его; перезапустите Sange после установки или отмены.");
         }
     }
+#elif defined(Q_OS_MACOS)
+    const bool opened = QDesktopServices::openUrl(QUrl::fromLocalFile(m_updatePath));
+    set("updateInstalling", false);
+    set("updateError", opened ? QString{} : QStringLiteral("Не удалось открыть образ обновления macOS."));
+    set("updateResult", opened ? QStringLiteral("Образ открыт. Завершите Sange и перенесите новую версию в Applications, затем запустите её.")
+                                : QStringLiteral("Ошибка открытия образа обновления"));
 #elif defined(Q_OS_LINUX)
     const bool arch = m_updateReadyName.endsWith(".pkg.tar.zst");
     const QFileInfo packageInfo(m_updatePath);

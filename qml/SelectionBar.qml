@@ -36,6 +36,7 @@ ColumnLayout {
         id: controls
         objectName: "selectionControls"
         Layout.fillWidth: true
+        Layout.minimumWidth: 0
         spacing: 4
         SurfaceButton {
             host: bar.host; mobile: bar.mobile; quiet: true

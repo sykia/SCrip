@@ -145,7 +145,7 @@ void DiscordPresence::restart()
 {
     close();
     m_rejected = false;
-    if (!available()) { setStatus("Discord RPC доступен на Linux и Windows"); return; }
+    if (!available()) { setStatus("Discord RPC доступен на Linux, Windows и macOS"); return; }
     if (!m_enabled) { setStatus("Выключено"); return; }
     if (!configured()) { setStatus("Укажите Application ID приложения Sange в Discord"); return; }
     m_endpoints.clear();

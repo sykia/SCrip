@@ -7,6 +7,7 @@ With `SCRIP_AUTH_MODE=local`, Sange calls the official SoundCloud API directly. 
 OAuth access/refresh tokens, expiry time and the local Client Secret are stored only through the internal `SecretStore`, which is inaccessible to QML and the Plugin API:
 
 - **Windows:** DPAPI `CryptProtectData` in the current user's context, without `CRYPTPROTECT_LOCAL_MACHINE`. Only an encrypted blob is saved atomically in `QStandardPaths::AppLocalDataLocation/auth/*.dpapi`; access inherits the profile ACL.
+- **macOS:** Keychain Services generic-password records under service `org.scrip.OAuth`. Updates replace the existing record; read-back verification and migration rules are shared with other platforms. There is no plaintext fallback. Access follows the login keychain lock state and system access prompts.
 - **Linux:** Secret Service through system libsecret (`libsecret-1` dependency). Building requires pkg-config and libsecret headers (Debian/Ubuntu: `libsecret-1-dev`; Arch: `libsecret`). A running, unlocked service such as GNOME Keyring or compatible KWallet is required. Each operation has a 10-second timeout with GCancellable cancellation. On-disk and backup keyring encryption depends on system service settings: use a password-protected keyring.
 - **Android (API 28+):** AES-256-GCM with a new random IV for every write; the key is created in Android Keystore and is non-exportable. The entry name is included in AAD. Encrypted files are saved atomically in private `noBackupFilesDir/oauth`. Hardware-backed key protection depends on the device; StrongBox is not required.
 
@@ -18,7 +19,7 @@ Logout removes the session from system storage and memory; deletion errors are n
 
 Android Backup and device transfer exclude the old OAuth directory through `fullBackupContent` and `dataExtractionRules`; `noBackupFilesDir` is excluded by the system. Other settings and plugin data retain their previous backup rules. The app cannot delete existing external backups. Windows backups retain only the DPAPI blob; protection of the complete profile and Windows/Linux system stores depends on OS and backup policies. Protection does not cover malicious processes running as the user or root.
 
-Plugins v1/v2 remain declarative, without JavaScript execution, arbitrary file/network operations or OAuth access. The internal player snapshot contains only allowed API fields; profiles, stream URLs and arbitrary API response fields are not exposed to plugins. OAuth/API error bodies and storage exceptions are excluded from messages and logs. TLS, HTTPS allowlists and redirect restrictions remain in place.
+API 2 declarative plugins cannot execute JavaScript, perform arbitrary file/network operations or access OAuth credentials. Their player snapshot contains only allowed API fields; profiles, stream URLs and arbitrary API response fields are not exposed through that declarative API. Trusted QML plugins require `code.execute` and run with application authority, without a sandbox; declarative permission limits do not restrict their code. See [the runtime SDK](plugin-runtime.md). OAuth/API error bodies and storage exceptions are excluded from messages and logs. TLS, HTTPS allowlists and redirect restrictions remain in place.
 
 System mechanism documentation: [DPAPI](https://learn.microsoft.com/en-us/windows/win32/SecCrypto/example-c-program-using-cryptprotectdata), [libsecret](https://gnome.pages.gitlab.gnome.org/libsecret/), [Android Keystore](https://developer.android.com/privacy-and-security/keystore), [Android Backup](https://developer.android.com/identity/data/autobackup).
 
@@ -57,7 +58,7 @@ Source and configuration are in `worker/`. To redeploy, run `npx wrangler@4 depl
 
 `cmake --build --preset debug` and `ctest --test-dir build/debug --output-on-failure` check OAuth, migration, read/write/verification/deletion failures, session restoration, secret non-disclosure in state/errors and plugin compatibility. Tests inject storage through the C++ constructor; there is no production switch to an unencrypted test store.
 
-`tests/run-secretstore-linux.sh` checks real libsecret in an isolated D-Bus session and GNOME Keyring, plus failure when the service is unavailable. Requires `dbus-run-session` and `gnome-keyring-daemon`. The user's keyring is untouched. `secretstore_tests roundTrip` can also be run manually on Windows.
+`tests/run-secretstore-linux.sh` checks real libsecret in an isolated D-Bus session and GNOME Keyring, plus failure when the service is unavailable. Requires `dbus-run-session` and `gnome-keyring-daemon`. The user's keyring is untouched. `secretstore_tests roundTrip` can also be run manually on Windows or macOS. macOS CI uses a disposable keychain.
 
 `tests/run-secretstore-android.sh` runs `tests/android/SecretVaultCheck.java` instrumentation in a separate test app/UID: write/read, distinct IVs, no plaintext secrets in files, rejection of ciphertext tampering or key loss, deletion and path traversal prevention. It does not use installed Sange data.
 

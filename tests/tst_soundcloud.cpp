@@ -12,6 +12,7 @@
 #include "recommendations.h"
 #include "lyrics.h"
 #include <QtTest>
+#include <QSysInfo>
 #include <QNetworkReply>
 #include <QTemporaryDir>
 #include <QFile>
@@ -38,6 +39,16 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
+
+static QString updateFixtureName(const QString &version) {
+#ifdef Q_OS_MACOS
+    return "Sange-" + version + "-macOS-" + QSysInfo::buildCpuArchitecture() + ".dmg";
+#elif defined(Q_OS_WIN)
+    return "Sange-" + version + "-Windows-x64.exe";
+#else
+    return QFileInfo::exists("/etc/arch-release") ? "scrip-" + version + "-x86_64.pkg.tar.zst" : "Sange-" + version + "-amd64.deb";
+#endif
+}
 
 // Транспорт подменяется только в тестах. Рабочий клиент использует фиксированные HTTPS-хосты.
 #ifndef Q_MOC_RUN
@@ -220,7 +231,7 @@ private slots:
         sc.postComment(track["urn"].toString(), "blocked");
         QCOMPARE(net.requests.size(), 1);
         track["reveal_comments"] = false; sc.setCommentTrack(track);
-        QTest::qWait(80);
+        QTRY_VERIFY(sc.m_reads.isEmpty());
         QVERIFY(sc.commentsState()["hidden"].toBool()); QVERIFY(sc.commentsState()["items"].toList().isEmpty());
         sc.loadComments(track["urn"].toString(), false, true); QCOMPARE(net.requests.size(), 1);
         track.remove("commentable"); track["reveal_comments"] = true; sc.setCommentTrack(track);
@@ -817,11 +828,13 @@ private slots:
         QVERIFY(!sc.state()["restoreCleared"].toBool());
     }
     void initTestCase() {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
         QStandardPaths::setTestModeEnabled(true);
 #endif
         QCoreApplication::setOrganizationName("SCripTests"); QCoreApplication::setApplicationName("SCripTests");
         QVERIFY(directory.isValid()); qputenv("XDG_CONFIG_HOME", directory.path().toUtf8());
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, directory.path());
         qputenv("SCRIP_AUTH_MODE", "local");
         qunsetenv("SOUNDCLOUD_CLIENT_ID"); qunsetenv("SOUNDCLOUD_CLIENT_SECRET");
         config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/SCrip";
@@ -2916,7 +2929,7 @@ private slots:
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion();
         QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')}, {"size", 4},
             {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
@@ -2932,7 +2945,7 @@ private slots:
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString(64, '0')}, {"size", 4},
             {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v999.0"}, {"assets", QJsonArray{asset}}}).toJson()}};
@@ -2947,7 +2960,7 @@ private slots:
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("abcd");
         QJsonObject asset{{"name", name}, {"digest", "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex())}, {"size", 4},
             {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -2965,7 +2978,7 @@ private slots:
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("abcd");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
         QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -2981,7 +2994,7 @@ private slots:
         QVERIFY(sc.state()["updateError"].toString().isEmpty());
         QCOMPARE(sc.state()["updateResult"].toString(), QString("Обновление для этой системы пока недоступно"));
         QVERIFY(QFileInfo::exists(verifiedPath));
-        const QString nextName = QFileInfo::exists("/etc/arch-release") ? "scrip-1000.0-x86_64.pkg.tar.zst" : "SCrip-1000.0-amd64.deb";
+        const QString nextName = updateFixtureName("1000.0");
         const QJsonObject nextAsset{{"name", nextName}, {"digest", "sha256:" + QString(64, '1')}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v1000.0/" + nextName}};
         net.responses = {{200, QJsonDocument(QJsonObject{{"tag_name", "v1000.0"}, {"assets", QJsonArray{nextAsset}}}).toJson()}};
         sc.checkForUpdates(); QTRY_VERIFY(!sc.state()["updateChecking"].toBool());
@@ -2990,7 +3003,7 @@ private slots:
     }
     void updateDownloadStreamsChunksAndChecksLengthAndOversizedBody() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("multi-block-payload");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
         const QJsonObject asset{{"name", name}, {"digest", digest}, {"size", payload.size()}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -3027,7 +3040,7 @@ private slots:
     }
     void updateDownloadRejectsHttpFailuresAndPartialBodies() {
         const auto previousVersion = QCoreApplication::applicationVersion(); QCoreApplication::setApplicationVersion("1.0.0");
-        const QString name = QFileInfo::exists("/etc/arch-release") ? "scrip-999.0-x86_64.pkg.tar.zst" : "SCrip-999.0-amd64.deb";
+        const QString name = updateFixtureName("999.0");
         const QByteArray payload("abcd");
         const auto digest = "sha256:" + QString::fromLatin1(QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex());
         QJsonObject asset{{"name", name}, {"digest", digest}, {"size", 4}, {"browser_download_url", "https://github.com/sykia/sange/releases/download/v999.0/" + name}};
@@ -3284,7 +3297,9 @@ private slots:
         QTemporaryDir audioFiles; QVERIFY(audioFiles.isValid());
         QFile wav(audioFiles.filePath("equalizer.wav")); QVERIFY(wav.open(QIODevice::WriteOnly));
         QDataStream stream(&wav); stream.setByteOrder(QDataStream::LittleEndian);
-        constexpr int frames = 48000 * 4, dataSize = frames * 2 * 2;
+        // Keep the source alive through asynchronous dual-decoder, pause and
+        // seek checks even when a hosted runner is briefly descheduled.
+        constexpr int frames = 48000 * 30, dataSize = frames * 2 * 2;
         stream.writeRawData("RIFF", 4); stream << quint32(dataSize + 36);
         stream.writeRawData("WAVEfmt ", 8); stream << quint32(16) << quint16(1) << quint16(2)
             << quint32(48000) << quint32(48000 * 4) << quint16(4) << quint16(16);
@@ -4835,6 +4850,7 @@ private slots:
         Network net; net.responses = {{200, "{\"username\":\"Тестовый аккаунт\"}"}, {200, "[]"}}; SoundCloud sc(nullptr, &net, secrets);
         QTRY_VERIFY(sc.state()["connected"].toBool());
         QTRY_VERIFY(!sc.state()["busy"].toBool());
+        QTRY_VERIFY(sc.m_reads.isEmpty());
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
         Network lyricsNet; lyricsNet.responseHosts = {"lrclib.net"};
         const QByteArray lyricFixture = "{\"id\":42,\"trackName\":\"A track page\",\"artistName\":\"Test artist\",\"syncedLyrics\":\"[00:00.00]Every sound has a story\\n[00:10.00]Every word finds its way\\n[00:20.00]Stay a little longer\\n[00:30.00]Let the music play\"}";
@@ -4908,19 +4924,30 @@ private slots:
         QTRY_VERIFY(!preview->property("visible").toBool());
 
         QVERIFY(window->property("dockedInspector").toBool());
+        // Keep pagination idle until its response is installed; layout and wheel
+        // animation can otherwise fire the auto-load timer on a slower runner.
+        QQmlExpression autoLoadControl(QQmlEngine::contextForObject(window), window, "prefs.autoLoad=false");
+        autoLoadControl.evaluate(); QVERIFY(!autoLoadControl.hasError());
         QJsonArray scrollTracks;
         for (int i=0; i<32; ++i) scrollTracks.append(QJsonObject{{"urn", QString("soundcloud:tracks:%1").arg(i+10)}, {"title", "Проверка прокрутки"}});
         net.responses = {{200, QJsonDocument(QJsonObject{{"collection", scrollTracks}, {"next_href","https://api.soundcloud.com/tracks?cursor=next"}}).toJson()}};
         sc.browse("tracks", "scroll"); QTRY_COMPARE(sc.state()["tracks"].toList().size(),32);
         QTest::qWait(100);
         auto *scroll = window->findChild<QObject *>("libraryScroll"); QVERIFY(scroll);
-        QWheelEvent wheel(QPointF(600,100),QPointF(600,100),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        auto *scrollItem = qobject_cast<QQuickItem *>(scroll); QVERIFY(scrollItem);
+        const QPointF wheelPosition = scrollItem->mapToScene(QPointF(scrollItem->width()/2, 20));
+        const QPointF wheelGlobal = window->mapToGlobal(wheelPosition.toPoint());
+        // Leave the nested virtual list so the outer viewport receives the wheel.
+        QTest::mouseMove(window, wheelPosition.toPoint()); QTest::qWait(30);
+        QWheelEvent wheel(wheelPosition, wheelGlobal, QPoint(), QPoint(0,-120), Qt::NoButton,
+            Qt::NoModifier, Qt::NoScrollPhase, false);
         QCoreApplication::sendEvent(window,&wheel);
         QTRY_VERIFY(scroll->property("contentY").toReal()>0);
         QVERIFY(scroll->property("contentY").toReal()<=scroll->property("contentHeight").toReal()-scroll->property("height").toReal());
-        net.responses = {{200, "[]"}};
         net.responses = {{200, "[{\"urn\":\"soundcloud:tracks:99\",\"title\":\"\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430\"}]"}};
         QTest::qWait(550); // Дождаться завершения анимации колеса перед переходом в конец.
+        autoLoadControl.setExpression("prefs.autoLoad=true"); autoLoadControl.evaluate();
+        QVERIFY(!autoLoadControl.hasError());
         scroll->setProperty("contentY", scroll->property("contentHeight").toReal() - scroll->property("height").toReal());
         QTRY_COMPARE(sc.state()["tracks"].toList().size(), 33);
         net.responses = {{200, "[]"}};
@@ -5023,8 +5050,17 @@ private slots:
                 QVERIFY(lastTile);
                 QVERIFY(QMetaObject::invokeMethod(lastTile, "playTrack"));
                 QTRY_COMPARE(sc.state()["current"].toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
+                // The await above processes pagination/layout events. GridView
+                // may recycle the delegate; reacquire the requested model row.
+                QTRY_VERIFY(([&] {
+                    lastTile = nullptr;
+                    return QMetaObject::invokeMethod(gridView, "itemAtIndex", Q_RETURN_ARG(QQuickItem *, lastTile), Q_ARG(int, 4999))
+                        && lastTile && lastTile->property("modelData").toMap().value("urn").toString() == QString("soundcloud:tracks:grid-4999");
+                })());
                 QVERIFY(QMetaObject::invokeMethod(lastTile, "enqueueTrack"));
-                QTRY_COMPARE(sc.state()["queue"].toList().last().toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
+                // Enqueue inserts after the current track. The asynchronously
+                // appended page may already be present at the queue's end.
+                QTRY_COMPARE(sc.state()["queue"].toList().value(sc.state()["queueIndex"].toInt() + 1).toMap().value("urn").toString(), QString("soundcloud:tracks:grid-4999"));
                 QTRY_COMPARE(sc.state()["tracks"].toList().size(), 5001);
                 QTRY_VERIFY(!sc.state()["hasMore"].toBool());
                 const qreal appendedEnd = gridView->property("contentHeight").toReal() - gridView->property("height").toReal();

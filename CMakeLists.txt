@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.21)
-project(Sange VERSION 2.0.0 LANGUAGES CXX)
+project(Sange VERSION 2.0.1 LANGUAGES CXX)
 
 if(APPLE)
-    message(FATAL_ERROR "macOS не поддерживается")
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET 14.4 CACHE STRING "Minimum macOS version")
+    endif()
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 20)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -29,9 +34,10 @@ set(executable_options)
 if(ANDROID)
     list(APPEND executable_options MANUAL_FINALIZATION)
 endif()
-qt_add_executable(scrip ${executable_options} src/discordpresence.cpp src/discordpresence.h src/plugins.cpp src/plugins.h src/pluginruntime.cpp src/pluginruntime.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/linkrouter.cpp src/linkrouter.h src/lyrics.cpp src/lyrics.h src/soundcloud.cpp src/recommendationpreferences.cpp src/soundcloudsocial.cpp src/soundcloud.h src/audioeffects.cpp src/audioeffects.h src/streamcache.cpp src/streamcache.h src/artworknetwork.cpp src/artworknetwork.h src/trackwaveform.cpp src/trackwaveform.h)
+qt_add_executable(scrip ${executable_options} src/discordpresence.cpp src/discordpresence.h src/plugins.cpp src/plugins.h src/pluginruntime.cpp src/pluginruntime.h src/pluginmanifest.cpp src/pluginmanifest.h src/main.cpp src/diagnostics.cpp src/diagnostics.h src/linkrouter.cpp src/linkrouter.h src/lyrics.cpp src/lyrics.h src/soundcloud.cpp src/recommendationpreferences.cpp src/soundcloudsocial.cpp src/soundcloud.h src/audioeffects.cpp src/audioeffects.h src/streamcache.cpp src/streamcache.h src/artworknetwork.cpp src/artworknetwork.h src/trackwaveform.cpp src/trackwaveform.h)
 set(SCRIP_APP_VERSION "${PROJECT_VERSION}")
 target_compile_definitions(scrip PRIVATE SCRIP_VERSION="${SCRIP_APP_VERSION}")
+set_source_files_properties(qml/DiagnosticsPanel.qml PROPERTIES QT_RESOURCE_ALIAS DiagnosticsPanel.qml)
 set_source_files_properties(${main_qml} PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(qml/RecommendationPreferences.qml PROPERTIES QT_RESOURCE_ALIAS RecommendationPreferences.qml)
 set_source_files_properties(qml/RecommendationNotice.qml PROPERTIES QT_RESOURCE_ALIAS RecommendationNotice.qml)
@@ -70,19 +76,22 @@ qt_add_qml_module(scrip
     URI SCrip
     VERSION 1.0
     RESOURCES qml/assets/blob.png
-    QML_FILES qml/CollectionTools.qml qml/RecommendationPreferences.qml qml/RecommendationNotice.qml qml/TrackInformation.qml qml/TrackProgress.qml qml/PlaybackQuality.qml qml/SelectionInput.qml qml/TrackSelection.qml qml/SelectionBar.qml qml/QueueActions.qml qml/TrackSearchFilters.qml qml/ProfileNavigation.qml qml/ProfileStat.qml qml/SurfaceButton.qml qml/EngagementAction.qml qml/PeoplePopup.qml qml/ProfileExtras.qml qml/PlaylistEditor.qml qml/CommentsPane.qml qml/SmoothWheel.qml qml/PlaylistPopup.qml qml/InteractionFeedback.qml qml/SurfaceTransition.qml ${main_qml} qml/WavePanel.qml qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
+    QML_FILES qml/DiagnosticsPanel.qml qml/CollectionTools.qml qml/RecommendationPreferences.qml qml/RecommendationNotice.qml qml/TrackInformation.qml qml/TrackProgress.qml qml/PlaybackQuality.qml qml/SelectionInput.qml qml/TrackSelection.qml qml/SelectionBar.qml qml/QueueActions.qml qml/TrackSearchFilters.qml qml/ProfileNavigation.qml qml/ProfileStat.qml qml/SurfaceButton.qml qml/EngagementAction.qml qml/PeoplePopup.qml qml/ProfileExtras.qml qml/PlaylistEditor.qml qml/CommentsPane.qml qml/SmoothWheel.qml qml/PlaylistPopup.qml qml/InteractionFeedback.qml qml/SurfaceTransition.qml ${main_qml} qml/WavePanel.qml qml/Artwork.qml qml/android/RoundedImage.qml qml/android/AndroidGlyph.qml qml/PluginAction.qml qml/PluginManagerView.qml qml/PluginPanels.qml qml/PluginToolsPopup.qml
 )
 qt_add_shaders(scrip wave_shaders
     PREFIX "/shaders"
     BASE "qml/shaders"
     FILES qml/shaders/wave.frag
 )
+qt_add_resources(scrip controls_style PREFIX "/" BASE "resources" FILES resources/qtquickcontrols2.conf)
 qt_add_resources(scrip callback_page PREFIX "/" FILES resources/callback.html)
 target_link_libraries(scrip PRIVATE Qt6::Quick Qt6::Network Qt6::Multimedia)
 function(scrip_secret_store target)
     target_sources(${target} PRIVATE src/secretstore.cpp src/secretstore.h)
     if(WIN32)
         target_link_libraries(${target} PRIVATE crypt32)
+    elseif(APPLE)
+        target_link_libraries(${target} PRIVATE "-framework Security" "-framework CoreFoundation")
     elseif(NOT ANDROID)
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(LIBSECRET REQUIRED IMPORTED_TARGET libsecret-1)
@@ -110,7 +119,7 @@ if(ANDROID)
     endif()
     set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${scrip_avformat}")
     set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME "Sange"
-        QT_ANDROID_VERSION_CODE 20000 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
+        QT_ANDROID_VERSION_CODE 20001 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android")
@@ -121,6 +130,9 @@ else()
     if(WIN32)
         target_sources(scrip PRIVATE src/smtc.cpp)
         target_link_libraries(scrip PRIVATE windowsapp)
+    elseif(APPLE)
+        target_sources(scrip PRIVATE src/macmedia.mm)
+        target_link_libraries(scrip PRIVATE "-framework MediaPlayer" "-framework Foundation")
     else()
         find_package(Qt6 REQUIRED COMPONENTS DBus)
         target_sources(scrip PRIVATE src/mpris.cpp)
@@ -130,6 +142,16 @@ endif()
 set_target_properties(scrip PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
+
+if(APPLE)
+    set_target_properties(scrip PROPERTIES
+        MACOSX_BUNDLE TRUE
+        OUTPUT_NAME Sange
+        MACOSX_BUNDLE_GUI_IDENTIFIER org.scrip.app
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
+endif()
 
 include(CTest)
 if(BUILD_TESTING AND NOT ANDROID)
@@ -145,6 +167,12 @@ if(BUILD_TESTING AND NOT ANDROID)
     target_link_libraries(track_details_tests PRIVATE Qt6::Test Qt6::Quick Qt6::Network)
     add_test(NAME track_details COMMAND track_details_tests)
     set_tests_properties(track_details PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+    qt_add_executable(diagnostics_tests tests/tst_diagnostics.cpp src/diagnostics.cpp src/diagnostics.h)
+    target_include_directories(diagnostics_tests PRIVATE src)
+    target_compile_definitions(diagnostics_tests PRIVATE SCRIP_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(diagnostics_tests PRIVATE Qt6::Test Qt6::Quick)
+    add_test(NAME diagnostics COMMAND diagnostics_tests)
+    set_tests_properties(diagnostics PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;XDG_DATA_HOME=${CMAKE_BINARY_DIR}/diagnostics-test-data;QT_ENABLE_REGEXP_JIT=0")
     qt_add_executable(discordpresence_tests tests/tst_discordpresence.cpp src/discordpresence.cpp src/discordpresence.h)
     target_include_directories(discordpresence_tests PRIVATE src)
     target_link_libraries(discordpresence_tests PRIVATE Qt6::Test Qt6::Network)
@@ -171,6 +199,9 @@ if(BUILD_TESTING AND NOT ANDROID)
     if(WIN32)
         target_sources(scrip_tests PRIVATE src/smtc.cpp)
         target_link_libraries(scrip_tests PRIVATE windowsapp)
+    elseif(APPLE)
+        target_sources(scrip_tests PRIVATE src/macmedia.mm)
+        target_link_libraries(scrip_tests PRIVATE "-framework MediaPlayer" "-framework Foundation")
     else()
         target_sources(scrip_tests PRIVATE src/mpris.cpp)
         target_link_libraries(scrip_tests PRIVATE Qt6::DBus)
@@ -207,6 +238,8 @@ if(BUILD_TESTING AND NOT ANDROID)
     target_link_libraries(artwork_ui_tests PRIVATE Qt6::QuickTest Qt6::Quick Qt6::Network)
     add_test(NAME artwork_ui COMMAND artwork_ui_tests -input ${CMAKE_CURRENT_SOURCE_DIR}/tests/qml)
     set_tests_properties(artwork_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+    set_property(TEST diagnostics plugins soundcloud artwork_ui APPEND PROPERTY
+        ENVIRONMENT "QT_QUICK_CONTROLS_STYLE=Basic")
 endif()
 
 # Тексты лицензий доступны в ресурсах всех платформ и при системной установке.
