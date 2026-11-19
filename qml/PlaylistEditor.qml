@@ -115,7 +115,7 @@ Popup {
                 checkable: true; implicitHeight: 36; implicitWidth: privacyContent.implicitWidth + 20
                 hoverEnabled: true; leftPadding: 10; rightPadding: 10
                 Accessible.name: checked ? qsTr("Приватный плейлист. Изменить доступ") : qsTr("Публичный плейлист. Изменить доступ")
-                ToolTip.visible: hovered; ToolTip.text: checked ? qsTr("Доступен только вам и по секретной ссылке") : qsTr("Виден всем в SoundCloud")
+                ToolTip.visible: editor.host.showTooltips === true && (hovered); ToolTip.text: checked ? qsTr("Доступен только вам и по секретной ссылке") : qsTr("Виден всем в SoundCloud")
                 background: Rectangle { radius: 18; color: Qt.alpha(editor.host.ink, privacy.down || privacy.hovered ? 0.09 : 0.045) }
                 contentItem: RowLayout {
                     id: privacyContent; spacing: 7

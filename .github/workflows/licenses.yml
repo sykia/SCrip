@@ -53,13 +53,13 @@ jobs:
           gh release download "${args[@]}" --repo "$GITHUB_REPOSITORY" --dir build/release-assets
           if compgen -G 'build/release-assets/*-macOS-*.dmg' >/dev/null; then
             if compgen -G 'build/release-assets/*.apk' >/dev/null || compgen -G 'build/release-assets/*.exe' >/dev/null || compgen -G 'build/release-assets/*.deb' >/dev/null; then
-              echo 'Mixed macOS and legacy platform releases require an explicit combined audit'; exit 1
+              echo 'Auditing macOS checksums here and legacy platform inventories below.'
             fi
             test -f build/release-assets/macOS-arm64-compliance.json
             test -f build/release-assets/macOS-x86_64-compliance.json
             (cd build/release-assets && sha256sum -c SHA256SUMS)
             echo 'macOS DMG mounting and complete inventory/source audit run in the native macOS job.'
-            exit 0
+            if ! compgen -G 'build/release-assets/*.apk' >/dev/null && ! compgen -G 'build/release-assets/*.exe' >/dev/null && ! compgen -G 'build/release-assets/*.deb' >/dev/null; then exit 0; fi
           fi
           release_dir="licensing/releases/${TAG#v}"
           if [ -f "$release_dir/release.json" ]; then

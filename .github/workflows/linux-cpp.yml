@@ -12,7 +12,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 60
     env:
       QT_QPA_PLATFORM: offscreen
       QT_QUICK_BACKEND: software
@@ -34,6 +34,7 @@ jobs:
           target: desktop
           arch: linux_gcc_64
           modules: qtmultimedia qtshadertools
+          cache: true
 
       - name: Configure
         run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
@@ -92,7 +93,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     container: debian:13
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - name: Install build dependencies
         run: |

@@ -7,12 +7,12 @@
 <p align="center">Your SoundCloud music, in a dedicated player for macOS, Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
 
 <p align="center">
-  <a href="https://github.com/sykia/sange/releases/download/v2.0.1/Sange-2.0.1-macOS-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple_Silicon-414650?style=for-the-badge" alt="Download for macOS Apple Silicon"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.0.1/Sange-2.0.1-macOS-x86_64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-414650?style=for-the-badge" alt="Download for macOS Intel"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/scrip-2.0.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-macOS-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple_Silicon-414650?style=for-the-badge" alt="Download for macOS Apple Silicon"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-macOS-x86_64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-414650?style=for-the-badge" alt="Download for macOS Intel"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/scrip-2.1.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
 </p>
 
 <p align="center">
@@ -33,7 +33,7 @@
 
 Install the package for your platform and sign in through the official SoundCloud page in your browser. Sange uses the official SoundCloud API.
 
-**2.0.1 — Hello, Apple!** brings Sange to Apple Silicon and Intel Macs running macOS 14.4+. Download the matching DMG and copy Sange to Applications. These builds are not Apple-notarized; see the [macOS guide](https://github.com/sykia/sange/blob/v2.0.1/docs/macos.md) for installation and update details. Windows, Linux and Android downloads remain at **2.0.0**.
+**2.1.0** adds persistent English/Russian interface selection, playback recovery, media-session improvements and fixes for search, lyrics, recommendations and streaming. Packages are available for Windows, Debian 13, Arch Linux, Android and macOS. See the [release notes](release-notes/2.1.0.md). macOS requires 14.4+; disk images are not Apple-notarized.
 
 Upgrading from SCrip? Install over your existing application to keep your settings and music data. See the [upgrade notes](release-notes/2.0.0.md) if an older build cannot download updates.
 

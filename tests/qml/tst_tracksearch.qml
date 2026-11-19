@@ -34,7 +34,7 @@ TestCase {
             onSearchRequested: mockBackend.requests++
         }
     }
-    function init() { mockBackend.requests = 0; mockBackend.last = {} }
+    function init() { mockHost.motion = 0; mockBackend.requests = 0; mockBackend.last = {} }
     function test_layout_data() {
         return [{tag: "phone320", size: 280, mobile: true}, {tag: "phone412", size: 372, mobile: true}, {tag: "desktop", size: 960, mobile: false}]
     }
@@ -55,6 +55,35 @@ TestCase {
         verify(panel.height > 0)
         compare(mockBackend.requests, 0)
         grabImage(panel).save("panel-" + data.tag + ".png")
+    }
+    function test_revealReversesAndKeepsDraft() {
+        mockHost.motion = 400
+        const panel = createTemporaryObject(fixture, test, {width: 372})
+        const reveal = findChild(panel, "filterReveal")
+        const genre = findChild(panel, "genres")
+        genre.text = "House"
+        compare(reveal.height, 0)
+        panel.expanded = true
+        tryVerify(function() { return reveal.height > 0 && reveal.opacity > 0 && reveal.opacity < 1 })
+        genre.forceActiveFocus()
+        verify(genre.activeFocus)
+        const intermediate = reveal.height
+        panel.expanded = false
+        verify(Math.abs(reveal.height - intermediate) < 1)
+        compare(reveal.enabled, false)
+        verify(!genre.activeFocus)
+        tryCompare(reveal, "height", 0)
+        tryCompare(reveal, "visible", false)
+        mockHost.motion = 0
+        panel.expanded = true
+        wait(1)
+        verify(reveal.height > 0)
+        compare(reveal.opacity, 1)
+        compare(genre.text, "House")
+        compare(mockBackend.requests, 0)
+        panel.expanded = false
+        wait(1)
+        compare(reveal.height, 0)
     }
     function test_applyEnterReset() {
         const panel = createTemporaryObject(fixture, test, {width: 372, expanded: true})

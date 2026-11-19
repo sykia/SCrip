@@ -10,7 +10,7 @@ inline QString id(const QVariant &value) { return value.toMap().value("urn").toS
 inline QString artist(const QVariant &value) { return value.toMap().value("user").toMap().value("urn").toString(); }
 inline bool playable(const QVariant &value) {
     const auto track = value.toMap();
-    return id(value).startsWith("soundcloud:tracks:") && track.value("access").toString() != "blocked"
+    return id(value).startsWith("soundcloud:tracks:") && track.value("access").toString() != "blocked" && track.value("access").toString() != "preview"
         && track.value("streamable") != false;
 }
 inline QVariantList seeds(const QVariantList &tracks, int limit = 3) {

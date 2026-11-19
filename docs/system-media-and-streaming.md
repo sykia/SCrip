@@ -12,7 +12,11 @@ Android keeps its existing MediaBridge and playback service.
 
 The desktop adapters publish title, credited artist, duration, playback intent,
 position and command capabilities. Linux and Windows also publish public unsigned
-SoundCloud artwork. It never
+SoundCloud artwork. Linux downloads artwork through the same CDN transport as
+the application and publishes a local PNG file URL, so the desktop shell does
+not need direct CDN access. Files live in a temporary directory until exit;
+stale downloads cannot replace the current cover. Invalid images and failed
+downloads leave text metadata and playback controls available. It never
 exports the controller's complete state, OAuth credentials or stream URLs.
 MPRIS positions and Seeked use microseconds; SMTC timeline values use 100 ns;
 the controller uses milliseconds. Position updates do not produce MPRIS
@@ -97,3 +101,25 @@ back to preview, and preview-only tracks are not preloaded as full audio. Unknow
 access is not treated as a restriction. Stream errors do not infer a region or
 subscription cause. The selected row stays in the queue so the user can inspect
 it or explicitly advance to the next track.
+
+
+## Playback recovery
+
+A backend error, an unexpectedly early end (over five seconds before the track
+metadata duration), or 30 seconds without playback progress starts recovery.
+The player preserves the position and fetches fresh stream URLs, with at most
+two recovery attempts per track. Fifteen seconds of progress clears the failure
+budget. Existing startup stream-format fallbacks still run first.
+
+Before retrying, an unauthenticated HTTPS request to the SoundCloud API checks
+server reachability. Transport failures, HTTP 429, and server errors keep the
+current track buffering; checks repeat every ten seconds (sixty for 429).
+An HTTP response from the API cannot prove that every CDN is reachable: after
+two unsuccessful reloads, the player skips the track without applying repeat-one.
+A set of failed track IDs prevents repeat-all from cycling indefinitely until
+playback makes sustained progress. Pause, stop, and track selection cancel pending
+recovery; stale asynchronous responses cannot restart playback.
+
+Progressive audio is forwarded as bytes arrive and continues even when larger
+than the 8 MiB per-object cache limit. Only playlist children use atomic segment
+buffering; large full-track MP3/MP4 responses are not treated as HLS segments.

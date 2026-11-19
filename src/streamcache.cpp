@@ -146,6 +146,7 @@ void StreamCache::accept() {
     }
 }
 void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteArray range, bool head, int attempt) {
+    if (!m_resources.contains(key)) { respond(socket, 404, {}, {}, {}, head); return; }
     if (auto *entry = m_cache.object(key)) {
         QFile file(entry->file);
         if (file.open(QIODevice::ReadOnly)) {
@@ -155,6 +156,10 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
                 const auto match = QRegularExpression(QStringLiteral("^bytes=(\\d*)-(\\d*)$")).match(QString::fromLatin1(range));
                 if (!match.hasMatch() || (match.captured(1).isEmpty() && match.captured(2).isEmpty())) { respond(socket, 416, {}); return; }
                 const qint64 size = body.size();
+                bool startValid = true, endValid = true;
+                if (!match.captured(1).isEmpty()) match.captured(1).toLongLong(&startValid);
+                if (!match.captured(2).isEmpty()) match.captured(2).toLongLong(&endValid);
+                if (!startValid || !endValid) { respond(socket, 416, {}, {}, "Content-Range: bytes */" + QByteArray::number(size) + "\r\n", head); return; }
                 qint64 start = match.captured(1).isEmpty() ? qMax<qint64>(0, size - match.captured(2).toLongLong()) : match.captured(1).toLongLong();
                 qint64 end = match.captured(1).isEmpty() || match.captured(2).isEmpty() ? size - 1 : qMin(size - 1, match.captured(2).toLongLong());
                 if (start > end || start >= size) { respond(socket, 416, {}, {}, "Content-Range: bytes */" + QByteArray::number(size) + "\r\n"); return; }
@@ -187,15 +192,16 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     // a seek. Keep small HLS objects atomic so a failed download can be retried
     // before any successful HTTP response reaches the player.
     const auto suffix = QFileInfo(reply->url().path()).suffix().toLower();
-    const bool segment = !head && (suffix == "m4s" || suffix == "ts" || suffix == "mp4" || suffix == "aac" || suffix == "mp3");
+    const bool child = m_resources.value(key).remote.toString(QUrl::FullyEncoded) != m_resources.value(key).root;
+    const bool segment = child && !head && (suffix == "m4s" || suffix == "ts" || suffix == "mp4" || suffix == "aac" || suffix == "mp3");
     struct Download { QByteArray body; qint64 received = 0; bool headers = false; bool manifest = false; bool atomic = false; bool tooLarge = false; };
     auto state = std::make_shared<Download>();
     auto drain = [=] {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status < 200 || status >= 300) return;
         const QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
-        state->manifest = type.contains("mpegurl") || reply->url().path().endsWith(".m3u8");
-        state->atomic = segment || (!head && (type.contains("audio/mp4") || type.contains("video/mp4") ||
+        state->manifest = !head && (type.contains("mpegurl") || reply->url().path().endsWith(".m3u8"));
+        state->atomic = segment || (child && !head && (type.contains("audio/mp4") || type.contains("video/mp4") ||
             type.contains("video/mp2t") || type.contains("audio/aac") || type.contains("audio/mpeg")));
         if (!state->manifest && !state->atomic && socket && !state->headers) {
             state->headers = true;
@@ -222,17 +228,21 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
             const qint64 expected = reply->rawHeader("Content-Length").toLongLong(&parsed);
             lengthValid = parsed && expected >= 0 && state->received == expected;
         }
-        const bool ok = lengthValid && reply->error() == QNetworkReply::NoError && status >= 200 && status < 300 && (!(state->atomic || state->manifest) || !state->tooLarge);
+        const bool currentResource = m_resources.contains(key);
+        const bool ok = currentResource && lengthValid && reply->error() == QNetworkReply::NoError && status >= 200 && status < 300 && (!(state->atomic || state->manifest) || !state->tooLarge);
         QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
+        // Only completed media playlists are immutable. Live/event playlists must
+        // be fetched again so the player can discover newly published segments.
+        const bool cacheable = !state->manifest || state->body.contains("#EXT-X-ENDLIST");
         if (ok && state->manifest && !state->tooLarge) { state->body = playlist(state->body, {reply->url(), m_resources.value(key).root}); type = "application/vnd.apple.mpegurl"; }
-        if (ok && !head && range.isEmpty() && status == 200 && !state->tooLarge) {
+        if (ok && cacheable && !head && range.isEmpty() && status == 200 && !state->tooLarge) {
             const QString path = m_directory.filePath(QString::number(++m_serial));
             QFile file(path);
             if (file.open(QIODevice::WriteOnly) && file.write(state->body) == state->body.size()) {
                 file.close(); m_cache.insert(key, new Entry{path, type}, qMax(1, int(state->body.size())));
             } else { file.close(); QFile::remove(path); }
         }
-        const bool retry = !ok && !background && socket &&
+        const bool retry = currentResource && !ok && !background && socket &&
             socket->state() == QAbstractSocket::ConnectedState && !state->headers && attempt < 2 &&
             reply->error() != QNetworkReply::OperationCanceledError &&
             (status == 0 || status == 200 || status == 206 || status >= 500);
@@ -243,7 +253,7 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
             return;
         }
         if (socket) {
-            if (!state->headers) respond(socket, ok ? status : 502, ok ? state->body : QByteArray{}, type,
+            if (!state->headers) respond(socket, ok ? status : currentResource ? 502 : 404, ok ? state->body : QByteArray{}, type,
                 ok && reply->hasRawHeader("Content-Range") ? "Content-Range: " + reply->rawHeader("Content-Range") + "\r\n" : QByteArray{}, head);
             else socket->disconnectFromHost();
         }

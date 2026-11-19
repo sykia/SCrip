@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.0 — November 19, 2026
+
+- Choose English or Russian in settings on desktop and Android; the choice persists between launches.
+- Resume playback after temporary network failures, retry broken streams, and keep the current listening position.
+- Improve desktop media-session integration and playback state synchronization.
+- Refine track search, engagement controls, profile navigation, responsive layouts and interface motion.
+- Correct lyrics identity, duration matching, custom-text removal and malformed synchronized lyrics.
+- Fix wave recommendation ordering after queue pruning and exclude preview-only tracks from automatic selection.
+- Harden stream-cache eviction, HTTP range handling and live HLS playlist refreshes.
+- Keep stale resource responses from replacing the page most recently requested.
+
+
 ## 2.0.0 — Sange
 
 - Android package update: hide collection tools on profiles and load Home recommendations when the account profile becomes ready.

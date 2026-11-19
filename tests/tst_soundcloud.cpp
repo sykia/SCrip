@@ -11,11 +11,15 @@
 #endif
 #include "recommendations.h"
 #include "lyrics.h"
+#include "languagecontroller.h"
+#include <limits>
 #include <QtTest>
 #include <QSysInfo>
 #include <QNetworkReply>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QBuffer>
+#include <QImage>
 #include <QDir>
 #include <QStandardPaths>
 #include <cstring>
@@ -186,6 +190,46 @@ private:
         file.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"client_secret", "test-secret"}, {"redirect_uri", QString("http://127.0.0.1:%1/callback").arg(callbackPort)}}).toJson());
     }
 private slots:
+    void playbackWatchdogRecoversStallsButHonorsPause() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
+        sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:1"}});
+        sc.set("position", 18000); sc.set("playbackActive", true);
+        for (int i = 0; i < 30; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
+        QVERIFY(sc.m_playbackRecovering); QCOMPARE(sc.m_recoveryPosition, 18000);
+        sc.pausePlayback();
+        for (int i = 0; i < 35; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
+        QVERIFY(!sc.m_playbackRecovering); QVERIFY(!sc.m_playbackRecoveryTimer.isActive());
+    }
+    void playbackRecoveryWaitsOfflineAndPauseCancels() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
+        sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:1"}});
+        sc.set("position", 42000); sc.set("playbackActive", true);
+        sc.recoverPlayback(); sc.m_playbackRecoveryTimer.stop();
+        QVERIFY(sc.m_playbackRecovering); QCOMPARE(sc.m_recoveryPosition, 42000);
+        const auto generation = sc.m_playGeneration;
+        sc.recoverPlayback(); QCOMPARE(sc.m_playGeneration, generation);
+        net.responses = {{0, "", 0, QNetworkReply::HostNotFoundError}};
+        sc.checkPlaybackConnection();
+        QTRY_VERIFY(sc.m_playbackRecoveryTimer.isActive());
+        QCOMPARE(sc.m_playbackRetries, 0); QVERIFY(sc.state()["playbackActive"].toBool());
+        QVERIFY(net.requests.last().rawHeader("Authorization").isEmpty());
+        sc.pausePlayback(); QVERIFY(!sc.m_playbackRecovering);
+        QVERIFY(!sc.m_playbackRecoveryTimer.isActive()); QVERIFY(!sc.state()["buffering"].toBool());
+    }
+    void exhaustedPlaybackSkipsDespiteRepeatOneAndStopsOnCycle() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false); sc.setPreloadEnabled(false);
+        const QVariantMap a{{"urn", "soundcloud:tracks:1"}}, b{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}};
+        sc.m_queue = {a,b}; sc.m_queueIndex = 0; sc.resetQueueOrder();
+        sc.set("current", a); sc.set("repeatMode", 1); sc.set("playbackActive", true);
+        sc.m_playbackRetries = 2; sc.recoverPlayback(); sc.m_playbackRecoveryTimer.stop();
+        net.responses = {{401, "{}"}}; sc.checkPlaybackConnection();
+        QTRY_COMPARE(sc.m_queueIndex, 1); QVERIFY(sc.m_failedPlaybackTracks.contains("soundcloud:tracks:1"));
+        sc.set("current", a); sc.set("playbackActive", true); sc.m_playbackRetries = 2;
+        sc.recoverPlayback(); sc.m_playbackRecoveryTimer.stop();
+        net.responses = {{401, "{}"}}; sc.checkPlaybackConnection();
+        QTRY_VERIFY(!sc.state()["playbackActive"].toBool());
+        QVERIFY(!sc.m_playbackRecovering);
+    }
     void undoCurrentRemovalAndEmptyQueueDoesNotRestartAudio() {
         Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false); sc.setPreloadEnabled(false);
         const QVariantMap a{{"urn", "soundcloud:tracks:1"}, {"access", "blocked"}}, b{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}};
@@ -451,6 +495,34 @@ private slots:
         QVERIFY(media.snapshot().value("title").toString().isEmpty());
     }
 #ifdef Q_OS_LINUX
+    void desktopArtworkLocalFile() {
+        Network net, images; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
+        DesktopMedia media(&sc, nullptr);
+        media.setArtworkNetwork(&images);
+        QByteArray png;
+        QBuffer output(&png); output.open(QIODevice::WriteOnly);
+        QImage image(16, 16, QImage::Format_RGB32); image.fill(Qt::red);
+        QVERIFY(image.save(&output, "PNG"));
+        images.responses = {Response{200, png}, Response{200, "invalid image"}, Response{200, png, 100}};
+        auto select = [&sc](const QString &url) {
+            sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:cover"}, {"title", "Cover"}, {"artwork_url", url}});
+        };
+        select("https://i1.sndcdn.com/first-large.jpg");
+        QTRY_VERIFY(!media.snapshot().value("artwork").toString().isEmpty());
+        const QUrl local(media.snapshot().value("artwork").toString());
+        QVERIFY(local.isLocalFile());
+        QCOMPARE(QImage(local.toLocalFile()).pixelColor(0, 0), QColor(Qt::red));
+        QCOMPARE(images.requests.first().url().path(), QString("/first-t500x500.jpg"));
+        select("https://i1.sndcdn.com/broken.jpg");
+        QTest::qWait(30);
+        QVERIFY(media.snapshot().value("artwork").toString().isEmpty());
+        select("https://i1.sndcdn.com/slow.jpg");
+        select("https://i1.sndcdn.com/private.jpg?token=secret");
+        QTest::qWait(150);
+        QVERIFY(media.snapshot().value("artwork").toString().isEmpty());
+        QCOMPARE(images.requests.size(), 3);
+        QCOMPARE(media.snapshot().value("title").toString(), QString("Cover"));
+    }
     void mprisSessionBusProtocol() {
         if (!QDBusConnection::sessionBus().isConnected()) QSKIP("Session bus unavailable");
         Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
@@ -938,6 +1010,32 @@ private slots:
         QJsonObject loaded;
         QVERIFY(storage.load("session", file.fileName(), loaded)); QCOMPARE(loaded, latest);
         QVERIFY(!file.exists());
+    }
+    void savedAccountSurvivesOfflineStartup() {
+        const QList<QNetworkReply::NetworkError> errors = {
+            QNetworkReply::TimeoutError, QNetworkReply::HostNotFoundError,
+            QNetworkReply::TemporaryNetworkFailureError
+        };
+        for (const auto error : errors) {
+            prepare();
+            QVERIFY(AuthStorage(secrets).save("session", {{"client_id", "test-client"},
+                {"access_token", "old-access"}, {"refresh_token", "old-refresh"},
+                {"expires_at", 0}, {"user_session", true}}));
+            const auto saved = secrets->records["session"];
+            Network net; net.responses = {{0, "", 0, error}};
+            SoundCloud sc(nullptr, &net, secrets);
+            QTRY_VERIFY(sc.signedIn());
+            QTRY_VERIFY(!sc.state()["busy"].toBool());
+            QVERIFY(sc.signedIn());
+            QVERIFY(!sc.state()["connected"].toBool());
+            QVERIFY(sc.state()["error"].toString().contains("интернетом"));
+            QCOMPARE(secrets->records["session"], saved);
+            QCOMPARE(sc.m_refresh, QString("old-refresh"));
+            net.responses = {guest(), {200, "{\"id\":1}"}, {200, "{\"collection\":[]}"}};
+            sc.connectCatalog();
+            QTRY_VERIFY(sc.state()["connected"].toBool());
+            QVERIFY(sc.signedIn());
+        }
     }
     void failedRefreshPersistenceNeverWritesPlaintext() {
         Network net; net.responses = {guest()};
@@ -2725,14 +2823,16 @@ private slots:
         QVERIFY(sc.state()["current"].toMap().isEmpty());
         QVERIFY(sc.state()["error"].toString().isEmpty());
     }
-    void streamFailureEndsPlaybackSession() {
+    void streamFailureKeepsPlaybackSessionForRecovery() {
         Network net; net.responses = {guest(), {503, "{}"}};
         SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
         sc.play({{"urn", "soundcloud:tracks:1"}});
         QVERIFY(sc.state()["playbackActive"].toBool());
-        QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
-        QVERIFY(!sc.state()["playbackActive"].toBool());
-        QVERIFY(!sc.state()["buffering"].toBool());
+        QTRY_VERIFY(sc.m_playbackRecovering);
+        sc.m_playbackRecoveryTimer.stop();
+        QVERIFY(sc.state()["error"].toString().isEmpty());
+        QVERIFY(sc.state()["playbackActive"].toBool());
+        QVERIFY(sc.state()["buffering"].toBool());
     }
     void aac96IsPreferredToLegacyAndStartupLogIsRedacted() {
         Network net;
@@ -2876,7 +2976,8 @@ private slots:
         QVERIFY(!sc.m_startupUsedPreload);
         sc.m_activePlayer->errorOccurred(QMediaPlayer::NetworkError, "fresh stream failed");
         QCOMPARE(net.requests.size(), 1);
-        QVERIFY(!sc.state()["playbackActive"].toBool());
+        QVERIFY(sc.state()["playbackActive"].toBool());
+        QVERIFY(sc.m_playbackRecovering);
     }
     void lateStreamsResponseCannotReplaceRapidlySelectedTrack() {
         Network net;
@@ -2907,7 +3008,7 @@ private slots:
         QCOMPARE(net.requests.size(), 2);
         QVERIFY(!sc.state()["buffering"].toBool());
     }
-    void streamRateLimitAndTimeoutFinishBuffering() {
+    void streamRateLimitAndTimeoutEnterRecovery() {
         for (const Response failure : {Response{429, "{}"}, Response{0, "", 0, QNetworkReply::TimeoutError}}) {
             Network net; net.responses = {failure, failure, failure};
             SoundCloud sc(nullptr, &net, secrets);
@@ -2916,12 +3017,12 @@ private slots:
             sc.m_requestNow = [&] { return now; };
             sc.m_requestLater = [&](qint64 delay, std::function<void()> task) { now += delay; QTimer::singleShot(0, &sc, task); };
             sc.startTrack({{"urn", "soundcloud:tracks:failure"}});
-            QTRY_VERIFY(!sc.state()["error"].toString().isEmpty());
-            QVERIFY(!sc.state()["buffering"].toBool());
-            QVERIFY(!sc.state()["playbackActive"].toBool());
+            QTRY_VERIFY(sc.m_playbackRecovering);
+            sc.m_playbackRecoveryTimer.stop();
+            QVERIFY(sc.state()["buffering"].toBool());
+            QVERIFY(sc.state()["playbackActive"].toBool());
             QCOMPARE(net.requests.size(), 3);
-            if (failure.status == 429) QVERIFY(sc.state()["error"].toString().contains("ограничил"));
-            else QVERIFY(sc.state()["error"].toString().contains("ожидания"));
+            QVERIFY(sc.state()["error"].toString().isEmpty());
         }
     }
     void updateCheckDoesNotDownloadOrInstall() {
@@ -3110,6 +3211,50 @@ private slots:
         qunsetenv("CAPTURE_ARGS"); qunsetenv("CAPTURE_EXIT");
     }
 #endif
+    void lyricsMalformedTimingRemainsReadable() {
+        Network net;
+        net.responses = {{200, R"({"id":1,"syncedLyrics":"[bad timestamp]Still readable"})"}};
+        Lyrics lyrics(nullptr, &net);
+        lyrics.lookup("Song", "Artist", 180000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QVERIFY(!lyrics.state()["synced"].toBool());
+        QCOMPARE(lyrics.state()["lines"].toList().size(), 1);
+        QCOMPARE(lyrics.state()["lines"].toList().first().toMap()["text"].toString(), QString("[bad timestamp]Still readable"));
+    }
+    void lyricsExtremeOffsetDoesNotWrap() {
+        const auto lines = Lyrics::parseLrc("[offset:9223372036854775807]\n[00:01.00]Text");
+        QCOMPARE(lines.size(), 1);
+        QCOMPARE(lines.first().toMap()["time"].toLongLong(), std::numeric_limits<qint64>::max());
+    }
+    void lyricsSearchDoesNotChangeTrackDuration() {
+        Network net; net.responseHosts = {"lrclib.net"};
+        net.responses = {{200, R"({"id":1,"plainLyrics":"Original"})"}};
+        Lyrics lyrics(nullptr, &net);
+        lyrics.lookup("Song", "Artist", 180000);
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        net.responses = {{200, "[]"}};
+        lyrics.search("Another song");
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QVERIFY(lyrics.setCustomText("Custom"));
+        lyrics.removeCustomText();
+        // The original lookup is cached, but must still include its duration.
+        QTRY_VERIFY(!lyrics.state()["busy"].toBool());
+        QCOMPARE(lyrics.state()["rawText"].toString(), QString("Original"));
+    }
+    void directResourceLinksIgnoreOldResponses() {
+        Network net; net.responses = {guest()};
+        SoundCloud sc(nullptr, &net, secrets); QTRY_VERIFY(sc.state()["connected"].toBool());
+        QSignalSpy resolved(&sc, &SoundCloud::resourceResolved);
+        net.responses = {{200, R"({"urn":"soundcloud:tracks:1"})", 100},
+                         {200, R"({"urn":"soundcloud:tracks:2"})"}};
+        sc.openLink("soundcloud://tracks/1");
+        sc.openLink("soundcloud://tracks/2");
+        QTRY_COMPARE(resolved.count(), 1);
+        QTest::qWait(150);
+        QCOMPARE(resolved.count(), 1);
+        QCOMPARE(resolved.first().first().toMap()["urn"].toString(), QString("soundcloud:tracks:2"));
+        QVERIFY(!sc.state()["linkBusy"].toBool());
+    }
     void lyricsParsingAndTransport() {
         const auto lines = Lyrics::parseLrc("[ar:Artist]\n[offset:-100]\n[00:02.50][00:04.125]Repeat\n[00:01.1]First\n[00:05.000]\nmalformed");
         QCOMPARE(lines.size(), 4);
@@ -3502,6 +3647,30 @@ private slots:
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         QSettings().remove("recommendations/soundcloud:users:802");
     }
+    void wavePreferenceSurvivesHistoryPruning() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
+        sc.setPreloadEnabled(false);
+        sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.set("signedIn", true); sc.set("profile", QVariantMap{{"urn", "soundcloud:users:804"}});
+        for (int i = 0; i <= 50; ++i)
+            sc.m_queue.append(QVariantMap{{"urn", QString("soundcloud:tracks:%1").arg(i)}});
+        const QVariantMap current = sc.m_queue.last().toMap();
+        const QVariantMap manual{{"urn", "soundcloud:tracks:51"}, {"scripManualQueue", true}};
+        sc.m_queue.append(manual); sc.m_queueIndex = 50; sc.set("current", current);
+        sc.m_waveMode = "discovery"; sc.m_waveSeeds = {current};
+        QJsonArray candidates;
+        for (int i = 100; i < 120; ++i)
+            candidates.append(QJsonObject{{"urn", QString("soundcloud:tracks:%1").arg(i)}});
+        net.responses = {{200, QJsonDocument(candidates).toJson(), 40}, {403, "{}"}};
+        sc.chooseWavePreference(2);
+        QVERIFY(sc.m_wavePreferenceWaiting);
+        QTRY_VERIFY(!sc.m_wavePreferenceWaiting);
+        QCOMPARE(sc.m_queueIndex, 21);
+        QCOMPARE(Recommendations::id(sc.state()["current"]), QString("soundcloud:tracks:100"));
+        QCOMPARE(sc.m_queue[22].toMap(), manual);
+        QCOMPARE(sc.m_queueIds.size(), sc.m_queue.size());
+        QSettings().remove("recommendations/soundcloud:users:804");
+    }
     void wavePreferenceWaitsForAutomaticReplyAndRespectsPause() {
         Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
         sc.m_access = "test-access"; sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
@@ -3826,7 +3995,10 @@ private slots:
         QCOMPARE(Recommendations::seeds({a, a, b, c, d}), (QVariantList{a, c, d}));
         auto blocked = track(5, 4); blocked["access"] = "blocked";
         auto unavailable = track(6, 5); unavailable["streamable"] = false;
-        const QVariantList pool{a, b, a, blocked, unavailable, c, d};
+        auto preview = track(7, 6); preview["access"] = "preview";
+        QVERIFY(!Recommendations::playable(preview));
+        QVERIFY(Recommendations::seeds({preview}).isEmpty());
+        const QVariantList pool{a, b, a, blocked, unavailable, preview, c, d};
         QCOMPARE(Recommendations::select(pool, 24), (QVariantList{a, c, d, b}));
         QCOMPARE(Recommendations::select({a, b, blocked, unavailable}, 24, {}, "soundcloud:users:1"), (QVariantList{a, b}));
         QCOMPARE(Recommendations::select(pool, 24, {"soundcloud:tracks:1", "soundcloud:tracks:3"}), (QVariantList{b, d}));
@@ -4719,6 +4891,8 @@ private slots:
         Network net; SoundCloud sc(nullptr, &net, secrets);
         sc.set("signedIn", true);
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        auto *language = new LanguageController(&engine);
+        engine.rootContext()->setContextProperty("uiLanguage", language);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty());
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
@@ -4754,6 +4928,8 @@ private slots:
         for (int i = 0; i < 3; ++i)
             sc.enqueue({{"urn", QString("soundcloud:tracks:%1").arg(i + 1)}, {"title", QString("Трек %1").arg(i + 1)}});
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        auto *language = new LanguageController(&engine);
+        engine.rootContext()->setContextProperty("uiLanguage", language);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty());
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
@@ -4852,6 +5028,8 @@ private slots:
         QTRY_VERIFY(!sc.state()["busy"].toBool());
         QTRY_VERIFY(sc.m_reads.isEmpty());
         QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        auto *language = new LanguageController(&engine);
+        engine.rootContext()->setContextProperty("uiLanguage", language);
         Network lyricsNet; lyricsNet.responseHosts = {"lrclib.net"};
         const QByteArray lyricFixture = "{\"id\":42,\"trackName\":\"A track page\",\"artistName\":\"Test artist\",\"syncedLyrics\":\"[00:00.00]Every sound has a story\\n[00:10.00]Every word finds its way\\n[00:20.00]Stay a little longer\\n[00:30.00]Let the music play\"}";
         lyricsNet.responses = {{200, lyricFixture}, {200, lyricFixture}, {200, lyricFixture}};

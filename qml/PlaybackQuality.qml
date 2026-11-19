@@ -27,6 +27,8 @@ Control {
             height: (parent.height - 8) / (control.stacked ? control.segments.length : 1)
             radius: 9
             color: control.accent
+            Behavior on y { NumberAnimation { duration: control.motion; easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: control.motion } }
             Behavior on x { NumberAnimation { duration: control.motion; easing.type: Easing.OutCubic } }
         }
     }
@@ -53,6 +55,7 @@ Control {
                 background: Rectangle {
                     radius: 9
                     color: segment.down ? Qt.alpha(control.ink, 0.12) : segment.hovered && !segment.checked ? Qt.alpha(control.ink, 0.06) : "transparent"
+                    Behavior on color { ColorAnimation { duration: control.motion * 0.5 } }
                     border.width: segment.visualFocus ? 2 : 0
                     border.color: control.ink
                 }
@@ -61,6 +64,7 @@ Control {
                     font.pixelSize: 12
                     font.weight: segment.checked ? Font.DemiBold : Font.Normal
                     color: segment.checked ? control.selectedInk : control.ink
+                    Behavior on color { ColorAnimation { duration: control.motion * 0.5 } }
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     wrapMode: Text.WordWrap

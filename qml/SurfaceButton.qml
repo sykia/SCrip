@@ -15,12 +15,17 @@ Button {
     hoverEnabled: true
     Accessible.name: text
     opacity: enabled ? 1 : 0.45
+    scale: down && host.motion > 0 ? 0.975 : 1
+    Behavior on opacity { NumberAnimation { duration: control.host.motion * 0.5; easing.type: Easing.OutCubic } }
+    Behavior on scale { NumberAnimation { duration: control.host.motion * (control.down ? 0.25 : 0.65); easing.type: Easing.OutCubic } }
+    InteractionFeedback {}
     contentItem: Text {
         id: label
         text: control.text; textFormat: Text.PlainText
         font.pixelSize: 13; font.weight: Font.Medium
         color: control.primary ? control.host.foreground(control.host.accent) : control.destructive ? (control.host.dark ? "#ff8c8c" : "#bb3535") : control.selected ? control.host.accent : control.host.ink
         horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+        Behavior on color { ColorAnimation { duration: control.host.motion * 0.5 } }
         elide: Text.ElideRight
     }
     background: Rectangle {

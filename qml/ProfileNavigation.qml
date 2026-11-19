@@ -77,7 +77,7 @@ Item {
                             text: "⌄"; font.pixelSize: 13; color: label.color
                         }
                     }
-                    background: Rectangle { radius: 6; color: host.ink; opacity: tab.down ? 0.06 : tab.hovered ? 0.03 : 0 }
+                    background: Rectangle { radius: 6; color: host.ink; opacity: tab.down ? 0.06 : tab.hovered ? 0.03 : 0; Behavior on opacity { NumberAnimation { duration: host.motion * 0.5; easing.type: Easing.OutCubic } } }
                 }
             }
         }
@@ -101,6 +101,9 @@ Item {
         id: likesMenu
         objectName: "profileLikesMenu"
         width: 210; padding: 4
+        opacity: 0; scale: 0.985
+        enter: SurfaceTransition { duration: host.motion * 0.75 }
+        exit: SurfaceTransition { duration: host.motion * 0.75; leaving: true }
         background: Rectangle { radius: 10; color: host.panel; border.color: host.raised }
         Choice { text: qsTr("Любимые треки"); checked: navigation.likes === "likes"; onTriggered: navigation.navigate(2, "likes") }
         Choice { text: qsTr("Любимые плейлисты"); checked: navigation.likes === "likedPlaylists"; onTriggered: navigation.navigate(2, "likedPlaylists") }
@@ -110,6 +113,9 @@ Item {
         id: repostsMenu
         objectName: "profileRepostsMenu"
         width: 210; padding: 4
+        opacity: 0; scale: 0.985
+        enter: SurfaceTransition { duration: host.motion * 0.75 }
+        exit: SurfaceTransition { duration: host.motion * 0.75; leaving: true }
         background: Rectangle { radius: 10; color: host.panel; border.color: host.raised }
         Choice { text: qsTr("Репосты треков"); checked: navigation.reposts === "reposts"; onTriggered: navigation.navigate(3, "reposts") }
         Choice { text: qsTr("Репосты плейлистов"); checked: navigation.reposts === "repostedPlaylists"; onTriggered: navigation.navigate(3, "repostedPlaylists") }

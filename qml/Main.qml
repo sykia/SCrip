@@ -69,6 +69,9 @@ Window {
                     prefs.darkMode = app.requestedDark
                 }
                 themeVeil.opacity = 0
+                pageTransition.stop()
+                pageBody.opacity = 1
+                pageBody.entrance = 0
             }
         }
     }
@@ -150,6 +153,7 @@ Window {
     readonly property bool dockedInspector: width >= 1100 && inspectorOpen
     readonly property int inspectorWidth: dockedInspector ? (width >= 1300 ? 280 : 256) : 0
     readonly property int gutter: 24
+    readonly property bool showTooltips: prefs.showTooltips
     readonly property int motion: prefs.motion ? prefs.animationMs : 0
     readonly property string pageTitle: section === 4 && settingGroup === 1 ? qsTr("Плагины") : section === 1 ? (libraryPage === "likes" ? qsTr("Любимые треки") : libraryPage === "history" ? qsTr("Недавно слушали") : qsTr("Лента")) : pages[section]
     property bool lastSignedIn: false
@@ -178,6 +182,7 @@ Window {
     Settings { id: prefs; objectName: "uiPreferences"; category: "appleInterface"; property bool gridView: true; property real volume: 0.7; property bool motion: true
         property string hiddenMixTracks: "{}"
         property bool showComments: true
+        property bool showTooltips: false
         property bool commentsLeft: false
         property bool timedComments: false
         property int spectrumStyle: 0
@@ -302,7 +307,7 @@ Window {
         opacity: enabled ? 1 : 0.4
         Behavior on opacity { NumberAnimation { duration: app.motion * 0.6; easing.type: Easing.OutCubic } }
         scale: down && app.motion > 0 ? 0.965 : 1
-        Behavior on scale { NumberAnimation { duration: app.motion / 2; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: app.motion * (tool.down ? 0.25 : 0.65); easing.type: Easing.OutCubic } }
         background: Rectangle {
             radius: tool.round ? height / 2 : 7
             color: tool.primary ? (tool.down ? Qt.darker(app.accent, 1.12) : app.accent)
@@ -336,7 +341,7 @@ Window {
         onClicked: sc.toggleFollow(user || {})
         active: followed
         symbol: compact ? (followed ? "following" : "follow") : ""
-        ToolTip.visible: hovered
+        ToolTip.visible: app.showTooltips && (hovered)
         ToolTip.text: text + " · " + (user?.username || "")
     }
 
@@ -768,7 +773,7 @@ Window {
                                 BusyIndicator { anchors.centerIn: parent; width: 28; height: 28; running: !!app.api.buffering; visible: running }
                             }
                             Tool { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; text: qsTr("Следующий трек"); enabled: !!sc.queueTracks?.length; onClicked: sc.next() }
-                            Tool { ToolTip.visible: hovered; ToolTip.text: text; anchors.verticalCenter: parent.verticalCenter; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; text: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
+                            Tool { ToolTip.visible: app.showTooltips && (hovered); ToolTip.text: text; anchors.verticalCenter: parent.verticalCenter; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; text: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
                         }
                         RowLayout {
                             visible: player.hasTrack; Layout.fillWidth: true; spacing: 8
@@ -1320,6 +1325,7 @@ Window {
             id: homeContent
             readonly property var mixes: sc.homeShelves.filter(s => s.mix)
             WavePanel {
+                showTooltips: app.showTooltips
                 width: parent.width
                 backend: sc
                 dark: app.dark
@@ -1503,6 +1509,9 @@ Window {
     Component {
         id: coverGrid
         GridView {
+            // Animate structural edits only; recycled scrolling delegates stay immediate.
+            move: Transition { NumberAnimation { properties: "x,y"; duration: app.motion; easing.type: Easing.OutCubic } }
+            displaced: Transition { NumberAnimation { properties: "x,y"; duration: app.motion; easing.type: Easing.OutCubic } }
             id: virtualCoverGrid
             objectName: "coverGridView"
             width: parent.width
@@ -1587,6 +1596,9 @@ Window {
     Component {
         id: trackList
         ListView {
+            // Animate structural edits only; recycled scrolling delegates stay immediate.
+            move: Transition { NumberAnimation { properties: "x,y"; duration: app.motion; easing.type: Easing.OutCubic } }
+            displaced: Transition { NumberAnimation { properties: "x,y"; duration: app.motion; easing.type: Easing.OutCubic } }
             id: virtualTrackList
             objectName: "trackListView"
             width: parent.width
@@ -1672,7 +1684,7 @@ Window {
                                 hoverEnabled: true; focusPolicy: Qt.StrongFocus
                                 Accessible.name: qsTr("Только фрагмент; полная версия может требовать Go+")
                                 ToolTip.text: Accessible.name
-                                ToolTip.visible: hovered || down || visualFocus
+                                ToolTip.visible: app.showTooltips && (hovered || down || visualFocus)
                                 ToolTip.delay: 250
                                 contentItem: Item {
                                     Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: app.accent }
@@ -1792,6 +1804,7 @@ Window {
                 SettingSlider { label: qsTr("Обложки"); suffix: " px"; maximum: 24; value: prefs.coverRadius; onEdited: v => { prefs.coverRadius = v; prefs.coverRadiusOverride = true } }
                 SettingSlider { label: qsTr("Аватары"); suffix: " %"; maximum: 50; value: prefs.avatarRoundness; onEdited: v => prefs.avatarRoundness = v }
                 SettingSlider { label: qsTr("Панели"); suffix: " px"; maximum: 24; value: prefs.panelRadius; onEdited: v => prefs.panelRadius = v }
+                CheckBox { InteractionFeedback {} text: qsTr("Всплывающие подсказки"); checked: prefs.showTooltips; onToggled: prefs.showTooltips = checked }
                 CheckBox { InteractionFeedback {} text: qsTr("Анимации и плавная прокрутка"); checked: prefs.motion; onToggled: prefs.motion = checked }
                 SettingSlider { label: qsTr("Длительность"); suffix: qsTr(" мс"); minimum: 120; maximum: 500; value: prefs.animationMs; enabled: prefs.motion; onEdited: v => prefs.animationMs = v }
                 CheckBox { InteractionFeedback {} text: qsTr("Автоматически загружать ещё при прокрутке"); checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }

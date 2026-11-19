@@ -28,7 +28,7 @@ Column {
                 text: modelData.title || modelData.service || modelData.username || modelData.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]
                 Accessible.name: qsTr("Открыть ") + text + ": " + modelData.url
                 onClicked: sc.openProfileWebsite(modelData.url)
-                ToolTip.visible: hovered; ToolTip.text: modelData.url
+                ToolTip.visible: extras.host.showTooltips === true && (hovered); ToolTip.text: modelData.url
             }
         }
         SurfaceButton { host: extras.host; mobile: extras.mobile; quiet: true; visible: extras.links.length > 3; text: extras.expanded ? qsTr("Свернуть ссылки") : qsTr("Ещё ") + (extras.links.length - 3); onClicked: extras.expanded = !extras.expanded }

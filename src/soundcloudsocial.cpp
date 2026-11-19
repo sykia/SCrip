@@ -413,7 +413,19 @@ void SoundCloud::openLink(const QString &input) {
             const auto id = url.path().mid(1);
             if (id.isEmpty() || id.contains('/') || !std::all_of(id.begin(), id.end(), [](QChar c) { return c.isDigit(); })) { fail("Некорректная ссылка SoundCloud."); return; }
             if (!m_state.value("connected").toBool()) { m_pendingLink = input; return; }
-            request("/" + url.host() + "/soundcloud%3A" + url.host() + "%3A" + id, [this](QJsonDocument doc) { emit resourceResolved(doc.object().toVariantMap()); }); return;
+            const int generation = ++m_linkGeneration;
+            const QString expected = "soundcloud:" + url.host() + ":" + id;
+            set("linkBusy", true); clearError();
+            request("/" + url.host() + "/soundcloud%3A" + url.host() + "%3A" + id, [this, generation, expected](QJsonDocument doc) {
+                if (generation != m_linkGeneration) return;
+                set("linkBusy", false);
+                const auto item = doc.object().toVariantMap();
+                if (urn(item) != expected) { fail("SoundCloud не нашёл этот ресурс."); return; }
+                emit resourceResolved(item);
+            }, "GET", {}, true, [this, generation](QString error) {
+                if (generation != m_linkGeneration) return;
+                set("linkBusy", false); fail(error);
+            }); return;
         }
     }
     const auto host = url.host().toLower();

@@ -319,6 +319,13 @@ private:
     void resolveStream(const QUrl &url, int generation, int redirects = 0);
     void nextStream(int generation, const char *reason);
     void startupStage(const char *stage);
+    void recoverPlayback();
+    void checkPlaybackConnection();
+    QTimer m_playbackRecoveryTimer, m_playbackWatchdog;
+    bool m_playbackRecovering = false;
+    int m_playbackRetries = 0, m_playbackIdleSeconds = 0;
+    qint64 m_recoveryPosition = 0, m_watchdogPosition = -1;
+    QSet<QString> m_failedPlaybackTracks;
     void prepareNext();
     void cancelPreload();
     void updatePreloadPolicy();

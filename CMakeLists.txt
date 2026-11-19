@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(Sange VERSION 2.0.1 LANGUAGES CXX)
+project(Sange VERSION 2.1.0 LANGUAGES CXX)
 
 if(APPLE)
     if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
@@ -119,7 +119,7 @@ if(ANDROID)
     endif()
     set_property(TARGET scrip APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "${scrip_avformat}")
     set_target_properties(scrip PROPERTIES QT_ANDROID_PACKAGE_NAME org.scrip.app QT_ANDROID_APP_NAME "Sange"
-        QT_ANDROID_VERSION_CODE 20001 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
+        QT_ANDROID_VERSION_CODE 20100 QT_ANDROID_VERSION_NAME "${SCRIP_APP_VERSION}"
         QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qml/android"
         QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android")
@@ -191,7 +191,7 @@ if(BUILD_TESTING AND NOT ANDROID)
     )
     scrip_secret_store(scrip_tests)
     qt_add_resources(scrip_tests callback_test PREFIX "/" FILES resources/callback.html)
-    target_sources(scrip_tests PRIVATE src/trackwaveform.cpp src/trackwaveform.h)
+    target_sources(scrip_tests PRIVATE src/trackwaveform.cpp src/trackwaveform.h src/languagecontroller.h)
     target_include_directories(scrip_tests PRIVATE src)
     target_link_libraries(scrip_tests PRIVATE Qt6::Test Qt6::Quick Qt6::Network Qt6::Multimedia)
     target_compile_definitions(scrip_tests PRIVATE SCRIP_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

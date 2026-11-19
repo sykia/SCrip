@@ -11,6 +11,7 @@
 #include <QTextDocumentFragment>
 #include <algorithm>
 #include <memory>
+#include <limits>
 
 namespace {
 QUrl endpoint(const QString &base, std::initializer_list<QPair<QString, QString>> params = {})
@@ -103,8 +104,9 @@ void Lyrics::cancel()
 void Lyrics::lookup(const QString &title, const QString &artist, qint64 duration, const QString &trackKey)
 {
     cancel(); m_state.clear(); m_seen.clear(); m_hadError = false;
+    m_trackIdentity = trackKey;
     m_trackKey = trackKey.isEmpty() ? QString{} : QString::fromLatin1(QCryptographicHash::hash(trackKey.toUtf8(), QCryptographicHash::Sha256).toHex());
-    m_title = title; m_artist = artist; m_duration = duration;
+    m_title = title; m_artist = artist; m_duration = duration; m_queryDuration = duration;
     m_queryTitle = cleanTitle(title); m_queryArtist = artist.trimmed();
     static const QRegularExpression separator(R"(\s+[-–—]\s+)");
     const auto split = separator.match(m_queryTitle);
@@ -132,7 +134,7 @@ void Lyrics::search(const QString &query)
 {
     if (query.trimmed().isEmpty()) return;
     cancel(); m_state.clear(); m_seen.clear(); m_hadError = false;
-    m_queryTitle = cleanTitle(query); m_queryArtist.clear(); m_duration = 0;
+    m_queryTitle = cleanTitle(query); m_queryArtist.clear(); m_queryDuration = 0;
     searchProviders(query.trimmed());
 }
 void Lyrics::fetch(const QUrl &url, std::function<void(const QByteArray &)> consume)
@@ -247,7 +249,7 @@ void Lyrics::searchProviders(const QString &query)
         }
         addResults(records);
     });
-    fetch(endpoint("https://lyrics.kugou.com/search", {{"keyword", query}, {"ver", "1"}, {"client", "pc"}, {"timelength", QString::number(m_duration)}}), [this](const QByteArray &bytes) {
+    fetch(endpoint("https://lyrics.kugou.com/search", {{"keyword", query}, {"ver", "1"}, {"client", "pc"}, {"timelength", QString::number(m_queryDuration)}}), [this](const QByteArray &bytes) {
         QVariantList records;
         for (const auto &value : object(bytes)["candidates"].toArray()) {
             const auto song = value.toObject();
@@ -283,9 +285,9 @@ void Lyrics::addResults(const QVariantList &records)
         const auto expectedArtist = normalized(m_queryArtist);
         const bool artistMatches = !expectedArtist.isEmpty() && artist == expectedArtist;
         const double duration = item.value("duration").toDouble();
-        const bool durationMatches = duration > 0 && m_duration > 0 && qAbs(duration - m_duration / 1000.0) <= 3;
+        const bool durationMatches = duration > 0 && m_queryDuration > 0 && qAbs(duration - m_queryDuration / 1000.0) <= 3;
         // A same-title live/remix upload with a different length must not get studio timing.
-        if (duration > 0 && m_duration > 0 && qAbs(duration - m_duration / 1000.0) > 10) return 0;
+        if (duration > 0 && m_queryDuration > 0 && qAbs(duration - m_queryDuration / 1000.0) > 10) return 0;
         return (artistMatches ? 4 : 0) + (durationMatches ? 2 : 0)
             + (expectedArtist.isEmpty() && matches.size() == 1 ? 1 : 0);
     };
@@ -388,7 +390,11 @@ QVariantList Lyrics::parseLrc(const QString &text)
             const auto match = matches.next();
             const auto fraction = match.captured(3);
             const qint64 ms = fraction.isEmpty() ? 0 : fraction.leftJustified(3, '0').toLongLong();
-            times.append(qMax(qint64(0), match.captured(1).toLongLong() * 60000 + match.captured(2).toLongLong() * 1000 + ms + offset));
+            const qint64 base = match.captured(1).toLongLong() * 60000 + match.captured(2).toLongLong() * 1000 + ms;
+            // Saturate untrusted offsets before addition to avoid signed overflow.
+            const qint64 time = offset > std::numeric_limits<qint64>::max() - base
+                ? std::numeric_limits<qint64>::max() : base + offset;
+            times.append(qMax(qint64(0), time));
             end = match.capturedEnd();
         }
         for (auto time : times) lines.append(QVariantMap{{"time", time}, {"text", raw.mid(end).trimmed()}});
@@ -398,10 +404,12 @@ QVariantList Lyrics::parseLrc(const QString &text)
 }
 void Lyrics::apply(const QVariantMap &record)
 {
-    m_state["rawText"] = record.value("syncedLyrics").toString().isEmpty() ? record.value("plainLyrics") : record.value("syncedLyrics");
     auto lines = parseLrc(record.value("syncedLyrics").toString());
     m_state["synced"] = !lines.isEmpty();
-    if (lines.isEmpty()) for (const auto &line : record.value("plainLyrics").toString().split('\n'))
+    const auto plain = record.value("plainLyrics").toString();
+    const auto fallback = plain.trimmed().isEmpty() ? record.value("syncedLyrics").toString() : plain;
+    m_state["rawText"] = lines.isEmpty() ? fallback : record.value("syncedLyrics").toString();
+    if (lines.isEmpty()) for (const auto &line : fallback.split('\n'))
         if (!line.trimmed().isEmpty()) lines.append(QVariantMap{{"time", -1}, {"text", line.trimmed()}});
     m_state["lines"] = lines;
     m_state["instrumental"] = record.value("instrumental").toBool();
@@ -427,8 +435,5 @@ bool Lyrics::setCustomText(const QString &text)
 void Lyrics::removeCustomText()
 {
     if (!m_trackKey.isEmpty()) QSettings().remove("lyrics/" + m_trackKey);
-    // lookup hashes the original identity, so retain the existing storage key here.
-    const auto key = m_trackKey;
-    lookup(m_title, m_artist, m_duration);
-    m_trackKey = key;
+    lookup(m_title, m_artist, m_duration, m_trackIdentity);
 }

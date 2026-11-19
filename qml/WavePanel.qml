@@ -6,6 +6,7 @@ Rectangle {
     id: root
     required property var backend
     property bool motion: true
+    property bool showTooltips: false
     property bool foreground: true
     property bool dark: false
     property color panelColor: dark ? "#1a1a1a" : "#f7f7f8"
@@ -57,7 +58,7 @@ Rectangle {
         enabled: !root.loading
         Accessible.name: root.failed ? qsTr("Повторить загрузку волны") : root.playing ? qsTr("Приостановить волну") : qsTr("Слушать волну")
         Accessible.description: root.failed ? root.api.waveError : root.discovery && root.api.current?.recommendationSource ? qsTr("Похоже на «") + root.api.current.recommendationSource + "» · SoundCloud" : (root.discovery ? qsTr("Больше открытий") : qsTr("Больше знакомого"))
-        ToolTip.visible: hovered && (root.failed || (root.discovery && !!root.api.current?.recommendationSource))
+        ToolTip.visible: root.showTooltips === true && (hovered && (root.failed || (root.discovery && !!root.api.current?.recommendationSource)))
         ToolTip.text: Accessible.description
         background: Item {}
         onClicked: {

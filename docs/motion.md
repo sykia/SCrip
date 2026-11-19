@@ -1,7 +1,7 @@
 # Interface motion
 
 Desktop and Android use the window's `motion` duration as their timing source.
-Desktop retains the existing 120–500 ms preference; Android uses 360 ms.
+Desktop retains the existing 120–500 ms preference; Android uses 280 ms.
 Disabling interface motion sets the duration to zero. Press compression is also
 removed, while feedback colors and keyboard focus remain available.
 
@@ -50,3 +50,25 @@ Windows and Android device performance still requires testing on those platforms
 Sidebar navigation uses one neutral fill for selected, hover and press states.
 It keeps text and geometry fixed, avoids stacked accent overlays, and reserves
 the outline for keyboard focus. State changes retarget the current fill opacity.
+
+## Interaction refinement
+
+Shared surface buttons compress subtly on press, settle more slowly on release,
+and interpolate enabled and text-color states. Profile statistics and tab backgrounds
+blend interaction states; profile collection menus use reversible surface transitions.
+Playback quality selection moves vertically in stacked phone layouts as well as
+horizontally on desktop.
+
+Search filters reveal existing content through an animated clipped viewport.
+Closing disables fields immediately and moves keyboard focus out of the hidden
+form. Drafts survive interrupted transitions. A rotating chevron follows the same
+state, and zero-duration motion keeps expansion immediate.
+
+Collection views animate model moves and displaced items without animating delegate
+creation during scrolling. Android collection-tab changes share the page entrance;
+seeking and touch scrolling remain directly controlled. Disabling motion during a
+page entrance stops it and restores the final opacity and offset immediately.
+
+Refinement validation: the QML suite passed 66 checks, including interrupted filter
+reveal, preserved drafts, reduced motion, touch scrolling and seeking. Physical
+Android and native Windows frame pacing still require device validation.

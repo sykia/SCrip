@@ -141,7 +141,7 @@ ColumnLayout {
                 }
             }
             onClicked: tools.openOptions(this)
-            ToolTip.visible: hovered; ToolTip.text: text
+            ToolTip.visible: tools.host.showTooltips === true && (hovered); ToolTip.text: text
         }
     }
     Copy {

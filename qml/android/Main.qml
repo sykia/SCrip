@@ -69,6 +69,9 @@ ApplicationWindow {
                     prefs.darkMode = app.requestedDark
                 }
                 themeVeil.opacity = 0
+                pageArrival.stop()
+                body.opacity = 1
+                pageOffset.y = 0
             }
         }
     }
@@ -111,6 +114,7 @@ ApplicationWindow {
         }
         property bool timedComments: false
         property bool showComments: true
+        property bool showTooltips: false
         property bool commentsLeft: false
         property bool darkMode: true
         property bool accentOverride: false
@@ -209,7 +213,11 @@ ApplicationWindow {
         else if (page === 3) sc.browse(library, "", force)
         else if (page === 4) sc.browse(guest ? ["userTracks", "userSets", {likes: "userLikes", likedPlaylists: "userLikedPlaylists", likedStations: "userLikedStations"}[profileLikes], repostLibrary === "reposts" ? "userReposts" : "userRepostedPlaylists"][profileTab] : ["mine", "playlists", profileLikes, repostLibrary][profileTab], guest?.urn || "", force)
     }
-    readonly property int motion: prefs.motion ? 360 : 0
+    readonly property bool showTooltips: prefs.showTooltips
+    readonly property int motion: prefs.motion ? 280 : 0
+    // Collection navigation animates once; typing and filter edits do not retrigger it.
+    readonly property string arrivalKey: page + ":" + (page === 3 ? library : page === 2 ? searchKind : page === 4 ? profileTab + ":" + profileLikes + ":" + repostLibrary + ":" + (guest?.urn || "me") : "")
+    onArrivalKeyChanged: if (prefs.motion && !pageArrival.running) pageArrival.start()
     property var scrollPositions: ({})
     readonly property string scrollKey: page + ":" + (page === 3 ? library : page === 2 ? searchKind + ":" + search.text + ":" + (searchKind === "tracks" ? trackFilters.summary : "") : page === 4 ? profileTab + ":" + profileLikes + ":" + repostLibrary + ":" + (guest?.urn || "me") : "")
     property string activeScrollKey: scrollKey
@@ -267,8 +275,8 @@ ApplicationWindow {
             x: fine.leftPadding + fine.visualPosition * (fine.availableWidth - width)
             y: fine.topPadding + fine.availableHeight / 2 - height / 2
             width: 12; height: 12; radius: 6; color: app.accent
-            scale: fine.pressed ? 1.35 : 1
-            Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
+            scale: fine.pressed && app.motion > 0 ? 1.35 : 1
+            Behavior on scale { NumberAnimation { duration: app.motion * 0.5; easing.type: Easing.OutCubic } }
         }
     }
     component PlayerButton: AbstractButton {
@@ -283,7 +291,7 @@ ApplicationWindow {
         implicitHeight: main ? 76 : 48
         Accessible.name: text
         scale: down && app.motion > 0 ? 0.965 : 1
-        Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: app.motion * (down ? 0.25 : 0.65); easing.type: Easing.OutCubic } }
         background: Rectangle {
             radius: width / 2
             color: transport.main ? app.accent : transport.down ? (app.dark ? "#383838" : "#e6e6e6") : "transparent"
@@ -360,7 +368,7 @@ ApplicationWindow {
         font.bold: true
         Accessible.name: text
         scale: down && app.motion > 0 ? 0.965 : 1
-        Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: app.motion * 0.5; easing.type: Easing.OutCubic } }
         contentItem: Item {
             implicitWidth: control.symbol ? 16 : label.implicitWidth
             implicitHeight: 22
@@ -403,7 +411,7 @@ ApplicationWindow {
                         hoverEnabled: true; focusPolicy: Qt.StrongFocus
                         Accessible.name: qsTr("Только фрагмент; полная версия может требовать Go+")
                         ToolTip.text: Accessible.name
-                        ToolTip.visible: hovered || down || visualFocus
+                        ToolTip.visible: app.showTooltips && (hovered || down || visualFocus)
                         ToolTip.delay: 250
                         contentItem: Item {
                             Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: app.accent }
@@ -444,7 +452,7 @@ ApplicationWindow {
                 RowLayout {
                     spacing: 5
                     Rectangle { Layout.preferredWidth: 22; Layout.preferredHeight: 22; radius: 7; color: app.accent; Image { anchors.fill: parent; anchors.margins: 3; source: "qrc:/qt/qml/SCrip/assets/blob.png"; fillMode: Image.PreserveAspectFit } }
-                    Caption { text: qsTr("Sange  /  ТВОЙ РИТМ"); color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
+                    Caption { text: "Sange"; color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
                 }
                 Caption { text: [qsTr("Слушай своё"), qsTr("На твоей волне"), qsTr("Найди свой звук"), qsTr("Твоя коллекция"), qsTr("Профиль"), qsTr("Настройки"), qsTr("Плагины")][app.page]; font.pixelSize: 27; font.bold: true }
             }
@@ -478,6 +486,13 @@ ApplicationWindow {
             color: "#ffe8ee"
             Label { id: errorText; anchors.fill: parent; anchors.margins: 10; text: app.api.error || ""; wrapMode: Text.Wrap; color: "#97233b" }
             TapHandler { onTapped: sc.clearError() }
+        }
+        Action {
+            visible: sc.signedIn && !app.api.connected && !!app.api.error
+            text: app.api.busy ? qsTr("Подключение…") : qsTr("Повторить подключение")
+            enabled: !app.api.busy
+            Layout.fillWidth: true
+            onClicked: sc.connectCatalog()
         }
         ColumnLayout {
             visible: !sc.signedIn
@@ -564,6 +579,7 @@ ApplicationWindow {
             Column {
                 width: parent.width; spacing: 24
                 WavePanel {
+                    showTooltips: app.showTooltips
                     x: 18; width: parent.width - 36
                     backend: sc
                     dark: app.dark
@@ -692,6 +708,7 @@ ApplicationWindow {
                     Caption { text: qsTr("Скругление обложек"); color: app.muted }
                     FineSlider { Layout.fillWidth: true; from: 0; to: 28; value: prefs.coverRadius; onMoved: { prefs.coverRadius = value; prefs.coverRadiusOverride = true } Accessible.name: qsTr("Скругление обложек") }
                     Action { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: qsTr("Использовать оформление плагинов"); onClicked: { prefs.accentOverride = false; prefs.coverRadiusOverride = false } }
+                    Switch { text: qsTr("Всплывающие подсказки"); checked: prefs.showTooltips; onToggled: prefs.showTooltips = checked }
                     Switch {  text: qsTr("Анимации"); checked: prefs.motion; onToggled: prefs.motion = checked }
                     Switch { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: qsTr("Догружать при прокрутке"); checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
                     Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
@@ -727,6 +744,8 @@ ApplicationWindow {
         SelectionBar { id: selectionBar; objectName: "collectionSelectionBar"; Layout.fillWidth: true; Layout.leftMargin: 12; Layout.rightMargin: 12; host: app; mobile: true; selection: trackSelection; visible: sc.signedIn && app.page > 0 && app.page < 4 && !(app.page === 2 && app.searchKind === "users") }
         ListView {
             id: tracks
+            move: Transition { NumberAnimation { properties: "x,y"; duration: app.motion; easing.type: Easing.OutCubic } }
+            displaced: Transition { NumberAnimation { properties: "x,y"; duration: app.motion; easing.type: Easing.OutCubic } }
             bottomMargin: navigationFooter.height
             visible: sc.signedIn && app.page > 0 && app.page < 5
             Layout.fillWidth: true; Layout.fillHeight: true
@@ -983,7 +1002,7 @@ ApplicationWindow {
                                 Accessible.name: modelData.title
                                 readonly property bool selected: app.page === modelData.page
                                 scale: down ? 0.96 : 1
-                                Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
+                                Behavior on scale { NumberAnimation { duration: app.motion * 0.5; easing.type: Easing.OutCubic } }
                                 contentItem: Column {
                                     spacing: 3
                                     AndroidGlyph {
@@ -1011,7 +1030,7 @@ ApplicationWindow {
                     Layout.preferredWidth: 62; Layout.preferredHeight: 62
                     Accessible.name: qsTr("Поиск")
                     scale: down ? 0.95 : 1
-                    Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: app.motion * 0.5; easing.type: Easing.OutCubic } }
                     background: Rectangle {
                         radius: width / 2
                         color: floatingSearch.down ? Qt.darker(app.accent, 1.1) : app.accent
@@ -1096,13 +1115,18 @@ ApplicationWindow {
             AbstractButton {
                 id: commentPreview
                 objectName: "playingCommentPreview"
-                Layout.fillWidth: true; Layout.preferredHeight: 44
+                Layout.fillWidth: true; Layout.preferredHeight: 64
+                leftPadding: 14; rightPadding: 14; topPadding: 10; bottomPadding: 10
                 property var displayedComment: ({})
                 readonly property string desiredKey: String(app.api.current.urn || "") + ":" + (app.playingComment.urn || "")
                 onDesiredKeyChanged: { commentArrival.stop(); commentArrival.start() }
                 Accessible.name: displayedComment.body ? qsTr("Комментарий: ") + displayedComment.body + qsTr(". Открыть комментарии") : qsTr("Открыть комментарии к треку")
                 onClicked: { commentsSheet.followCurrent = true; commentsSheet.open() }
-                background: Rectangle { radius: 12; color: commentPreview.down ? Qt.alpha(app.ink, 0.05) : "transparent" }
+                background: Rectangle {
+                    radius: 16
+                    color: Qt.alpha(app.ink, commentPreview.down ? 0.09 : 0.045)
+                    border.width: 1; border.color: Qt.alpha(app.ink, 0.035)
+                }
                 SequentialAnimation {
                     id: commentArrival
                     NumberAnimation { target: previewContent; property: "opacity"; to: 0; duration: app.motion * 0.3; easing.type: Easing.InQuad }
@@ -1114,15 +1138,21 @@ ApplicationWindow {
                 }
                 contentItem: RowLayout {
                     id: previewContent
-                    spacing: 8
+                    spacing: 12
                     transform: Translate { id: previewOffset }
-                    Caption { text: commentPreview.displayedComment.body ? app.time(commentPreview.displayedComment.timestamp) : "···"; font.pixelSize: 11; color: app.muted }
+                    Caption {
+                        Layout.preferredWidth: 38; Layout.alignment: Qt.AlignVCenter
+                        text: commentPreview.displayedComment.body ? app.time(commentPreview.displayedComment.timestamp) : "···"
+                        font.pixelSize: 11; font.features: { "tnum": 1 }; color: app.muted
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 28; color: Qt.alpha(app.ink, 0.1) }
                     ColumnLayout {
                         Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 2
-                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.user?.username || qsTr("Комментарии"); font.pixelSize: 10; color: app.muted }
+                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.user?.username || qsTr("Комментарии"); font.pixelSize: 11; color: app.muted }
                         Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.body || qsTr("Обсудить этот трек"); textFormat: Text.PlainText; font.pixelSize: 12; maximumLineCount: 1 }
                     }
-                    AndroidGlyph { name: "arrow"; width: 16; height: 16; ink: app.muted }
+                    AndroidGlyph { name: "arrow"; Layout.preferredWidth: 16; Layout.preferredHeight: 16; Layout.alignment: Qt.AlignVCenter; ink: app.muted }
                 }
             }
             Item { Layout.fillHeight: true }
@@ -1159,7 +1189,7 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true }
                 PlayerButton { text: qsTr("Следующий трек"); symbol: "next"; onClicked: sc.next() }
                 Item { Layout.fillWidth: true }
-                PlayerButton { ToolTip.visible: down; ToolTip.delay: 500; ToolTip.text: Accessible.name; text: [qsTr("Повтор выкл."), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; Accessible.name: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
+                PlayerButton { ToolTip.visible: app.showTooltips && (down); ToolTip.delay: 500; ToolTip.text: Accessible.name; text: [qsTr("Повтор выкл."), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; Accessible.name: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -1274,8 +1304,8 @@ ApplicationWindow {
                     MenuRow { glyph: "list"; text: qsTr("Информация о треке"); onClicked: { trackInfoSheet.track = app.selectedTrack; trackMenu.close(); trackInfoSheet.open() } }
                     MenuRow { glyph: "list"; text: qsTr("Комментарии"); onClicked: { commentsSheet.selectedTrack = app.selectedTrack; commentsSheet.followCurrent = app.selectedTrack.urn === app.api.current.urn; trackMenu.close(); commentsSheet.open() } }
                     MenuRow { glyph: "list"; text: qsTr("Текст песни"); visible: (app.lyricState.lines || []).length > 0; onClicked: { trackMenu.close(); lyricsSheet.open() } }
-                    EngagementAction { host: app; mobile: true; Layout.fillWidth: true; item: app.selectedTrack; repost: true }
-                    EngagementAction { host: app; mobile: true; item: app.selectedTrack; Layout.fillWidth: true }
+                    EngagementAction { host: app; mobile: true; menuPresentation: true; Layout.fillWidth: true; item: app.selectedTrack; repost: true }
+                    EngagementAction { host: app; mobile: true; menuPresentation: true; item: app.selectedTrack; Layout.fillWidth: true }
                 MenuRow { glyph: "close"; text: qsTr("Не предлагать этот трек"); enabled: !!app.selectedTrack.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, false); trackMenu.close() } }
                 MenuRow { multiline: true; glyph: "close"; text: qsTr("Не предлагать треки этого аккаунта: ") + (app.selectedTrack.user?.username || app.selectedTrack.user?.urn || "SoundCloud"); enabled: !!app.selectedTrack.user?.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, true); trackMenu.close() } }
                     MenuRow { glyph: "next"; visible: app.selectedQueue >= 0; text: qsTr("Играть следующим"); Layout.fillWidth: true; onClicked: { sc.queueNext(app.selectedQueue); trackMenu.close() } }

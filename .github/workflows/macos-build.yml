@@ -64,7 +64,8 @@ jobs:
           curl --fail --location --retry 3 https://codeload.github.com/qt/qt5/tar.gz/refs/tags/v6.12.0 -o build/macos/sources/qt5-v6.12.0.tar.gz
           echo 'cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635  build/macos/sources/ffmpeg-9.0.1.tar.xz' | shasum -a 256 -c -
           echo '167449f1963e899ef6502330b8791f0e971fb81fdeb560b15af19abd53c15552  build/macos/sources/qt5-v6.12.0.tar.gz' | shasum -a 256 -c -
-          git archive --format=tar.gz --prefix=Sange-2.0.1/ HEAD > build/macos/sources/Sange-2.0.1-source.tar.gz
+          version=$(sed -n 's/^project(Sange VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)
+          git archive --format=tar.gz --prefix="Sange-$version/" HEAD > "build/macos/sources/Sange-$version-source.tar.gz"
           SANGE_RELEASE_SOURCES="$PWD/build/macos/sources" bash packaging/macos/package.sh build/macos ${{ matrix.arch }}
       - name: Smoke test deployed application
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}

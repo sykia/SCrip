@@ -1,4 +1,5 @@
 // English interface catalog. Keep source keys identical to qsTr() strings.
+            {QStringLiteral("Всплывающие подсказки"), QStringLiteral("Tooltips")},
             {QStringLiteral(" · доступна "), QStringLiteral(" · available ")},
             {QStringLiteral(" · поиск по всей коллекции"), QStringLiteral(" · searching entire library")},
             {QStringLiteral(" МБ / "), QStringLiteral(" MB / ")},
@@ -529,3 +530,7 @@
             {QStringLiteral("✦ Создатель Sange"), QStringLiteral("✦ Sange creator")},
             {QStringLiteral("Язык интерфейса"), QStringLiteral("Interface language")},
             {QStringLiteral("Включите трек в медиатеке.\nЗдесь появятся обложка и очередь."), QStringLiteral("Play a track from your library.\nArtwork and the queue will appear here.")},
+
+            {QStringLiteral("Повторить подключение"), QStringLiteral("Retry connection")},
+            {QStringLiteral("Подключение…"), QStringLiteral("Connecting…")},
+            {QStringLiteral("Не удалось восстановить воспроизведение. Попробуйте другой трек или повторите позже."), QStringLiteral("Playback could not be recovered. Try another track or try again later.")},

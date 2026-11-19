@@ -6,6 +6,7 @@ SurfaceButton {
     id: control
     property var item: ({})
     property bool repost: false
+    property bool menuPresentation: false
     property var backend: sc
     readonly property string itemUrn: item?.urn || ""
     readonly property bool track: itemUrn.startsWith("soundcloud:tracks:")
@@ -32,27 +33,35 @@ SurfaceButton {
     visible: track || itemUrn.startsWith("soundcloud:playlists:") || (!repost && itemUrn.startsWith("soundcloud:system-playlists:"))
     text: countText
     quiet: true
-    leftPadding: 10; rightPadding: 10
+    leftPadding: menuPresentation ? 14 : 10; rightPadding: menuPresentation ? 14 : 10
+    implicitHeight: menuPresentation ? 50 : (mobile ? 44 : 36)
     implicitWidth: Math.max(mobile ? 48 : 44, contents.implicitWidth + 20)
     Accessible.name: description
     Accessible.description: hasPeople ? qsTr("Удерживайте или откройте контекстное меню для списка пользователей") : ""
     Accessible.checkable: true
     Accessible.checked: selected
-    ToolTip.visible: hovered
+    ToolTip.visible: control.host.showTooltips === true && (hovered)
     ToolTip.text: description
     contentItem: RowLayout {
         id: contents
-        spacing: 6
+        spacing: control.menuPresentation ? 16 : 6
         Loader {
             id: glyph
-            Layout.preferredWidth: 18; Layout.preferredHeight: 18
+            Layout.preferredWidth: control.menuPresentation ? 22 : 18; Layout.preferredHeight: control.menuPresentation ? 22 : 18
             // CMake packages shared QML in a flat module; source-tree tests
             // retain the android subdirectory.
             source: Qt.resolvedUrl(Qt.resolvedUrl(".").toString().endsWith("/qml/") ? "android/AndroidGlyph.qml" : "AndroidGlyph.qml")
         }
         Binding { target: glyph.item; property: "name"; value: control.repost ? "repeat" : control.selected ? "liked" : "heart"; when: glyph.status === Loader.Ready }
         Binding { target: glyph.item; property: "ink"; value: control.selected ? control.host.accent : control.host.ink; when: glyph.status === Loader.Ready }
-        Label { objectName: "engagementCount"; text: control.countText; font.pixelSize: 12; color: control.selected ? control.host.accent : control.host.ink; elide: Text.ElideRight; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+        Label {
+            visible: control.menuPresentation
+            Layout.fillWidth: true; Layout.minimumWidth: 0
+            text: control.repost ? (control.selected ? qsTr("Отменить репост") : qsTr("Сделать репост")) : (control.selected ? qsTr("Убрать из любимых") : qsTr("Добавить в любимые"))
+            font.pixelSize: 14; elide: Text.ElideRight
+            color: control.selected ? control.host.accent : control.host.ink
+        }
+        Label { objectName: "engagementCount"; text: control.countText; font.pixelSize: 12; color: control.selected ? control.host.accent : control.host.ink; elide: Text.ElideRight; Layout.fillWidth: !control.menuPresentation; horizontalAlignment: control.menuPresentation ? Text.AlignRight : Text.AlignHCenter }
     }
     function sync() { if (visible && !(track && !repost)) backend.loadEngagement(kind) }
     function showPeople() { if (hasPeople) host.openEngagementPeople(item, repost ? "reposters" : "favoriters") }

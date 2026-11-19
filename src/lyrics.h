@@ -43,8 +43,8 @@ private:
     QHash<QString, QByteArray> m_cache;
     quint64 m_generation = 0;
     QHash<QString, QDateTime> m_retryAfter;
-    QString m_trackKey;
+    QString m_trackKey, m_trackIdentity;
     QString m_title, m_artist;
-    qint64 m_duration = 0;
+    qint64 m_duration = 0, m_queryDuration = 0;
     QString m_queryTitle, m_queryArtist;
 };

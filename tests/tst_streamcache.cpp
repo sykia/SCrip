@@ -13,6 +13,102 @@
 class StreamCacheTest : public QObject {
     Q_OBJECT
 private slots:
+    void evictedPlaylistCannotRecreateResources() {
+        QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
+        QPointer<QTcpSocket> pending;
+        connect(&upstream, &QTcpServer::newConnection, this, [&] {
+            pending = upstream.nextPendingConnection();
+            connect(pending, &QTcpSocket::disconnected, pending, &QObject::deleteLater);
+        });
+        StreamCache cache;
+        const QUrl remote(QString("http://127.0.0.1:%1/list.m3u8").arg(upstream.serverPort()));
+        const auto local = cache.source(remote);
+        QNetworkAccessManager client; auto *reply = client.get(QNetworkRequest(local));
+        QSignalSpy done(reply, &QNetworkReply::finished);
+        QTRY_VERIFY(pending && pending->bytesAvailable() > 0);
+        pending->readAll();
+        for (int i = 0; i < 4; ++i) cache.source(QUrl(QString("https://cdn.example/%1.m3u8").arg(i)));
+        QVERIFY(!cache.m_resources.contains(local.path().mid(1)));
+        const auto resources = cache.m_resources.size();
+        const QByteArray body = "#EXTM3U\n#EXTINF:5,\npart.ts\n#EXT-X-ENDLIST\n";
+        pending->write("HTTP/1.1 200 OK\r\nContent-Type: application/vnd.apple.mpegurl\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
+        pending->disconnectFromHost();
+        QTRY_VERIFY(reply->isFinished());
+        QCOMPARE(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), 404);
+        QCOMPARE(cache.m_resources.size(), resources);
+        QVERIFY(!cache.m_cache.contains(local.path().mid(1)));
+        reply->deleteLater();
+    }
+    void progressiveAudioExceedingCacheLimitStillStreams() {
+        QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
+        const QByteArray body(9 * 1024 * 1024, 'a');
+        connect(&upstream, &QTcpServer::newConnection, this, [&] {
+            auto *socket = upstream.nextPendingConnection();
+            connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                socket->readAll();
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: audio/mpeg\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n");
+                socket->write(body.left(1024)); socket->flush();
+                QTimer::singleShot(200, socket, [&, socket] {
+                    socket->write(body.mid(1024)); socket->disconnectFromHost();
+                });
+            });
+        });
+        StreamCache cache;
+        const auto local = cache.source(QUrl(QString("http://127.0.0.1:%1/full.mp3").arg(upstream.serverPort())));
+        QNetworkAccessManager client; auto *reply = client.get(QNetworkRequest(local));
+        QSignalSpy chunks(reply, &QNetworkReply::readyRead), done(reply, &QNetworkReply::finished);
+        QVERIFY(chunks.wait()); QVERIFY(!reply->isFinished());
+        QVERIFY(done.wait()); QCOMPARE(reply->error(), QNetworkReply::NoError);
+        QCOMPARE(reply->readAll(), body); QVERIFY(!cache.m_cache.contains(local.path().mid(1)));
+        reply->deleteLater();
+    }
+    void livePlaylistRefreshesAndHeadPreservesLength() {
+        QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
+        int gets = 0;
+        connect(&upstream, &QTcpServer::newConnection, this, [&] {
+            auto *socket = upstream.nextPendingConnection();
+            connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                const bool head = socket->readAll().startsWith("HEAD ");
+                if (!head) ++gets;
+                const QByteArray body = "#EXTM3U\n#EXTINF:5,\npart" + QByteArray::number(gets) + ".ts\n";
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/vnd.apple.mpegurl\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n");
+                if (!head) socket->write(body);
+                socket->disconnectFromHost();
+            });
+        });
+        StreamCache cache;
+        const auto local = cache.source(QUrl(QString("http://127.0.0.1:%1/live.m3u8").arg(upstream.serverPort())));
+        QNetworkAccessManager client;
+        for (int i = 1; i <= 2; ++i) {
+            auto *reply = client.get(QNetworkRequest(local));
+            QSignalSpy done(reply, &QNetworkReply::finished); QVERIFY(done.wait());
+            QCOMPARE(reply->error(), QNetworkReply::NoError);
+            QVERIFY(!reply->readAll().isEmpty()); QCOMPARE(gets, i);
+            QVERIFY(!cache.m_cache.contains(local.path().mid(1)));
+            reply->deleteLater();
+        }
+        auto *reply = client.head(QNetworkRequest(local));
+        QSignalSpy done(reply, &QNetworkReply::finished); QVERIFY(done.wait());
+        QCOMPARE(reply->error(), QNetworkReply::NoError);
+        QCOMPARE(reply->rawHeader("Content-Length"), QByteArray::number(QByteArray("#EXTM3U\n#EXTINF:5,\npart2.ts\n").size()));
+        QVERIFY(reply->readAll().isEmpty()); reply->deleteLater();
+    }
+    void cachedRangeRejectsOverflow() {
+        StreamCache cache;
+        const auto local = cache.source(QUrl("https://cdn.example/part.bin"));
+        const auto path = cache.m_directory.filePath("range");
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("0123456789"); file.close();
+        cache.m_cache.insert(local.path().mid(1), new StreamCache::Entry{path, "application/octet-stream"}, 10);
+        QNetworkAccessManager client;
+        for (const QByteArray &range : {QByteArray("bytes=999999999999999999999999-"), QByteArray("bytes=-999999999999999999999999")}) {
+            QNetworkRequest request(local); request.setRawHeader("Range", range);
+            auto *reply = client.get(request); QSignalSpy done(reply, &QNetworkReply::finished); QVERIFY(done.wait());
+            QCOMPARE(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), 416);
+            QCOMPARE(reply->rawHeader("Content-Range"), QByteArray("bytes */10")); reply->deleteLater();
+        }
+    }
     void disabledBackgroundStillServesDemand() {
         QTcpServer upstream; QVERIFY(upstream.listen(QHostAddress::LocalHost));
         int requests = 0;

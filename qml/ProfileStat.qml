@@ -10,11 +10,19 @@ AbstractButton {
     implicitHeight: 48
     hoverEnabled: true
     Accessible.name: caption + ": " + value
+    InteractionFeedback {}
     HoverHandler { cursorShape: Qt.PointingHandCursor }
-    background: Rectangle { radius: 8; color: Qt.alpha(control.host.ink, control.down || control.hovered ? 0.04 : 0) }
+    background: Rectangle { radius: 8; color: Qt.alpha(control.host.ink, control.down || control.hovered ? 0.04 : 0); Behavior on color { ColorAnimation { duration: control.host.motion * 0.5 } } }
     contentItem: Column {
         spacing: 4
-        Text { id: count; anchors.horizontalCenter: parent.horizontalCenter; text: Number(control.value).toLocaleString(Qt.locale(), "f", 0); color: control.hovered ? control.host.accent : control.host.ink; font.pixelSize: 16; font.weight: Font.DemiBold; textFormat: Text.PlainText }
+        Text {
+            id: count
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: Number(control.value).toLocaleString(Qt.locale(), "f", 0)
+            color: control.hovered ? control.host.accent : control.host.ink
+            font.pixelSize: 16; font.weight: Font.DemiBold; textFormat: Text.PlainText
+            Behavior on color { ColorAnimation { duration: control.host.motion * 0.5 } }
+        }
         Text { id: label; anchors.horizontalCenter: parent.horizontalCenter; text: control.caption; color: control.host.muted; font.pixelSize: 11; textFormat: Text.PlainText }
     }
 }
