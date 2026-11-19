@@ -14,6 +14,7 @@ jobs:
     env:
       QT_QPA_PLATFORM: offscreen
       QT_QUICK_BACKEND: software
+      QT_QUICK_CONTROLS_STYLE: Basic
     steps:
       - uses: actions/checkout@v4
         with:
