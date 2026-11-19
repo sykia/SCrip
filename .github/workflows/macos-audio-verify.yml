@@ -1,0 +1,47 @@
+name: Sange Intel macOS audio verification
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact source commit to verify
+        required: true
+permissions:
+  contents: read
+jobs:
+  audio:
+    runs-on: macos-15-intel
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.12.0
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtmultimedia qtshadertools
+          cache: true
+      - name: Build the original release regression executable
+        run: |
+          cmake -S . -B build/audio-verification -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4 -DBUILD_TESTING=ON
+          cmake --build build/audio-verification --target scrip_tests --parallel 3
+      - name: Verify decoding, crossfade routing and seeking repeatedly
+        run: |
+          for attempt in 1 2 3; do
+            build/audio-verification/scrip_tests equalizerLocalAudioPlayback -o "build/audio-verification/audio-$attempt.log",txt
+            cat "build/audio-verification/audio-$attempt.log"
+            grep -Eq 'PASS[[:space:]]*:[[:space:]]+SoundCloudTest::equalizerLocalAudioPlayback\(\)' "build/audio-verification/audio-$attempt.log"
+          done
+      - name: Run the complete SoundCloud regression suite
+        run: build/audio-verification/scrip_tests -o build/audio-verification/soundcloud.log,txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Intel-macOS-audio-verification
+          path: build/audio-verification/*.log
+          if-no-files-found: warn
