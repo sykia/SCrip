@@ -24,7 +24,7 @@ ColumnLayout {
             Label { text: modelData.label; color: root.host.muted; font.pixelSize: 11; textFormat: Text.PlainText }
             AbstractButton {
                 id: field
-                readonly property bool profileLink: modelData.label === "Загрузил" && !!root.track.user?.urn
+                readonly property bool profileLink: modelData.label === qsTr("Загрузил") && !!root.track.user?.urn
                 Layout.fillWidth: true; padding: 0
                 focusPolicy: profileLink ? Qt.StrongFocus : Qt.NoFocus
                 Accessible.name: modelData.value

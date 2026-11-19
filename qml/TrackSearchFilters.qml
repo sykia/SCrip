@@ -49,14 +49,14 @@ Column {
     readonly property string summary: {
         let parts = []
         if (applied.genres) parts.push(applied.genres)
-        if (applied.tags) parts.push("Теги: " + applied.tags)
+        if (applied.tags) parts.push(qsTr("Теги: ") + applied.tags)
         const range = (from, to, suffix) => {
             if (applied[from] || applied[to]) parts.push((applied[from] || "…") + "–" + (applied[to] || "…") + suffix)
         }
-        range("durationFrom", "durationTo", " с")
+        range("durationFrom", "durationTo", qsTr(" с"))
         range("bpmFrom", "bpmTo", " BPM")
         range("createdFrom", "createdTo", "")
-        if (applied.fullOnly) parts.push("Полные треки")
+        if (applied.fullOnly) parts.push(qsTr("Полные треки"))
         return parts.join(" · ")
     }
     readonly property int activeCount: [applied.genres, applied.tags, applied.durationFrom || applied.durationTo, applied.bpmFrom || applied.bpmTo, applied.createdFrom || applied.createdTo, applied.fullOnly].filter(value => !!value).length
@@ -67,12 +67,12 @@ Column {
             Layout.preferredHeight: root.mobile ? 44 : 34
             implicitWidth: toggleLabel.implicitWidth + 4
             padding: 0; hoverEnabled: true
-            Accessible.name: "Фильтры поиска"
-            Accessible.description: root.expanded ? "Развернуто" : "Свернуто"
+            Accessible.name: qsTr("Фильтры поиска")
+            Accessible.description: root.expanded ? qsTr("Развернуто") : qsTr("Свернуто")
             contentItem: Row {
                 id: toggleLabel
                 spacing: 8
-                Text { text: "Фильтры"; color: toggle.hovered || root.expanded ? root.host.ink : root.host.muted; font.pixelSize: 13; font.weight: Font.Medium; anchors.verticalCenter: parent.verticalCenter }
+                Text { text: qsTr("Фильтры"); color: toggle.hovered || root.expanded ? root.host.ink : root.host.muted; font.pixelSize: 13; font.weight: Font.Medium; anchors.verticalCenter: parent.verticalCenter }
                 Text { visible: root.activeCount > 0; text: root.activeCount; color: root.host.accent; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                 Text { text: root.expanded ? "⌃" : "⌄"; color: root.host.muted; font.pixelSize: 15; anchors.verticalCenter: parent.verticalCenter }
             }
@@ -80,7 +80,7 @@ Column {
             onClicked: root.expanded = !root.expanded
         }
         Item { Layout.fillWidth: true }
-        SurfaceButton { host: root.host; mobile: root.mobile; quiet: true; visible: root.expanded || !!root.summary; text: "Сбросить"; onClicked: root.reset() }
+        SurfaceButton { host: root.host; mobile: root.mobile; quiet: true; visible: root.expanded || !!root.summary; text: qsTr("Сбросить"); onClicked: root.reset() }
     }
     Text { width: parent.width; visible: !!text; text: root.summary; color: root.host.muted; wrapMode: Text.Wrap; font.pixelSize: 12; textFormat: Text.PlainText }
     Column {
@@ -92,11 +92,11 @@ Column {
             Repeater {
                 id: groups
                 model: [
-                    {label: "Жанр", fields: [{key: "genres", hint: "House, Pop"}]},
-                    {label: "Теги", fields: [{key: "tags", hint: "chill, piano"}]},
-                    {label: "Длительность · с", fields: [{key: "durationFrom", hint: "От"}, {key: "durationTo", hint: "До"}]},
-                    {label: "Темп · BPM", fields: [{key: "bpmFrom", hint: "От"}, {key: "bpmTo", hint: "До"}]},
-                    {label: "Дата загрузки · UTC", date: true, fields: [{key: "createdFrom", hint: "С: ГГГГ-ММ-ДД"}, {key: "createdTo", hint: "По: ГГГГ-ММ-ДД"}]}
+                    {label: qsTr("Жанр"), fields: [{key: "genres", hint: "House, Pop"}]},
+                    {label: qsTr("Теги"), fields: [{key: "tags", hint: "chill, piano"}]},
+                    {label: qsTr("Длительность · с"), fields: [{key: "durationFrom", hint: qsTr("От")}, {key: "durationTo", hint: qsTr("До")}]},
+                    {label: qsTr("Темп · BPM"), fields: [{key: "bpmFrom", hint: qsTr("От")}, {key: "bpmTo", hint: qsTr("До")}]},
+                    {label: qsTr("Дата загрузки · UTC"), date: true, fields: [{key: "createdFrom", hint: qsTr("С: ГГГГ-ММ-ДД")}, {key: "createdTo", hint: qsTr("По: ГГГГ-ММ-ДД")}]}
                 ]
                 ColumnLayout {
                     required property var modelData
@@ -125,7 +125,7 @@ Column {
                                     implicitWidth: 50; implicitHeight: root.mobile ? 44 : 36
                                     leftPadding: 10; rightPadding: 8
                                     placeholderText: modelData.hint
-                                    Accessible.name: ({genres: "Жанры через запятую", tags: "Теги через запятую", durationFrom: "Длительность от, секунды", durationTo: "Длительность до, секунды", bpmFrom: "BPM от", bpmTo: "BPM до", createdFrom: "Загружено с, ГГГГ-ММ-ДД", createdTo: "Загружено по, ГГГГ-ММ-ДД"})[modelData.key]
+                                    Accessible.name: ({genres: qsTr("Жанры через запятую"), tags: qsTr("Теги через запятую"), durationFrom: qsTr("Длительность от, секунды"), durationTo: qsTr("Длительность до, секунды"), bpmFrom: qsTr("BPM от"), bpmTo: qsTr("BPM до"), createdFrom: qsTr("Загружено с, ГГГГ-ММ-ДД"), createdTo: qsTr("Загружено по, ГГГГ-ММ-ДД")})[modelData.key]
                                     color: root.host.ink; placeholderTextColor: Qt.alpha(root.host.muted, 0.7)
                                     selectByMouse: true; font.pixelSize: 12
                                     inputMethodHints: modelData.key.startsWith("duration") || modelData.key.startsWith("bpm") ? Qt.ImhDigitsOnly : Qt.ImhNone
@@ -149,7 +149,7 @@ Column {
                 Layout.fillWidth: true; Layout.minimumWidth: 0
                 implicitHeight: root.mobile ? 44 : 36
                 spacing: 8; padding: 0
-                text: "Только полные треки"
+                text: qsTr("Только полные треки")
                 indicator: Rectangle {
                     x: 0; y: (fullOnly.height - height) / 2
                     width: 16; height: 16; radius: 4
@@ -160,9 +160,9 @@ Column {
                 contentItem: Text { text: fullOnly.text; leftPadding: 24; color: root.host.ink; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap }
                 onClicked: root.error = ""
             }
-            SurfaceButton { host: root.host; mobile: root.mobile; text: "Применить"; primary: true; onClicked: root.apply() }
+            SurfaceButton { host: root.host; mobile: root.mobile; text: qsTr("Применить"); primary: true; onClicked: root.apply() }
         }
-        Text { width: parent.width; text: "Жанр и BPM — по метаданным SoundCloud"; color: Qt.alpha(root.host.muted, 0.8); font.pixelSize: 11; wrapMode: Text.Wrap }
+        Text { width: parent.width; text: qsTr("Жанр и BPM — по метаданным SoundCloud"); color: Qt.alpha(root.host.muted, 0.8); font.pixelSize: 11; wrapMode: Text.Wrap }
         Text { width: parent.width; visible: !!root.error; text: root.error; color: root.host.dark ? "#ff8c8c" : "#bb3535"; wrapMode: Text.Wrap; font.pixelSize: 12 }
     }
 }

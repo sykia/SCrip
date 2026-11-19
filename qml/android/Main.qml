@@ -332,8 +332,8 @@ ApplicationWindow {
         readonly property bool pending: !!app.api.followingPending?.[userUrn]
         visible: !!userUrn && userUrn !== (app.api.profile?.urn || "")
         enabled: !app.api.signedIn || (!app.api.followingsLoading && !pending)
-        text: pending ? "Сохранение…" : app.api.followingsLoading ? "Загрузка…" : app.api.signedIn && !app.api.followingsReady ? "Повторить" : followed ? "Вы подписаны" : "Подписаться"
-        Accessible.name: (followed ? "Отписаться от " : "Подписаться на ") + (user?.username || "исполнителя")
+        text: pending ? qsTr("Сохранение…") : app.api.followingsLoading ? qsTr("Загрузка…") : app.api.signedIn && !app.api.followingsReady ? qsTr("Повторить") : followed ? qsTr("Вы подписаны") : qsTr("Подписаться")
+        Accessible.name: (followed ? qsTr("Отписаться от ") : qsTr("Подписаться на ")) + (user?.username || qsTr("исполнителя"))
         onUserUrnChanged: if (visible) Qt.callLater(sc.loadFollowings)
         Connections {
             target: sc
@@ -396,12 +396,12 @@ ApplicationWindow {
                 Layout.fillWidth: true; spacing: 4
                 RowLayout {
                     Layout.fillWidth: true; spacing: 6
-                    Caption { text: row.modelData.title || row.modelData.username || "Без названия"; Layout.fillWidth: true; font.bold: true; color: row.modelData.urn === app.api.current?.urn ? app.accent : app.ink }
+                    Caption { text: row.modelData.title || row.modelData.username || qsTr("Без названия"); Layout.fillWidth: true; font.bold: true; color: row.modelData.urn === app.api.current?.urn ? app.accent : app.ink }
                     AbstractButton {
                         visible: row.modelData.access === "preview"
                         Layout.preferredWidth: 18; Layout.preferredHeight: 18
                         hoverEnabled: true; focusPolicy: Qt.StrongFocus
-                        Accessible.name: "Только фрагмент; полная версия может требовать Go+"
+                        Accessible.name: qsTr("Только фрагмент; полная версия может требовать Go+")
                         ToolTip.text: Accessible.name
                         ToolTip.visible: hovered || down || visualFocus
                         ToolTip.delay: 250
@@ -416,10 +416,10 @@ ApplicationWindow {
                         }
                     }
                 }
-                Caption { text: (sc.displayArtist(row.modelData) || (row.modelData.track_count ? row.modelData.track_count + " треков" : "SoundCloud")) + (sc.trackAvailability(row.modelData) ? " · " + sc.trackAvailability(row.modelData) : ""); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
+                Caption { text: (sc.displayArtist(row.modelData) || (row.modelData.track_count ? row.modelData.track_count + qsTr(" треков") : "SoundCloud")) + (sc.trackAvailability(row.modelData) ? " · " + sc.trackAvailability(row.modelData) : ""); Layout.fillWidth: true; color: app.muted; font.pixelSize: 12; TapHandler { enabled: !!row.modelData.user?.urn && !sc.hasSeparateArtist(row.modelData); onTapped: app.openProfile(row.modelData.user) } }
             }
             EngagementAction { host: app; mobile: true; visible: (row.modelData.urn || "").startsWith("soundcloud:tracks:"); item: row.modelData }
-            Action { text: "Действия"; symbol: "menu"; implicitWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = row.modelData; app.selectedQueue = row.queued ? row.queueIndex : -1; trackMenu.open() } }
+            Action { text: qsTr("Действия"); symbol: "menu"; implicitWidth: 48; Accessible.name: qsTr("Действия с треком"); onClicked: { app.selectedTrack = row.modelData; app.selectedQueue = row.queued ? row.queueIndex : -1; trackMenu.open() } }
         }
         onClicked: {
             if (selectionIndex >= 0 && trackSelection.active) return
@@ -444,16 +444,16 @@ ApplicationWindow {
                 RowLayout {
                     spacing: 5
                     Rectangle { Layout.preferredWidth: 22; Layout.preferredHeight: 22; radius: 7; color: app.accent; Image { anchors.fill: parent; anchors.margins: 3; source: "qrc:/qt/qml/SCrip/assets/blob.png"; fillMode: Image.PreserveAspectFit } }
-                    Caption { text: "Sange  /  ТВОЙ РИТМ"; color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
+                    Caption { text: qsTr("Sange  /  ТВОЙ РИТМ"); color: app.muted; font.bold: true; font.pixelSize: 10; font.letterSpacing: 1.4 }
                 }
-                Caption { text: ["Слушай своё", "На твоей волне", "Найди свой звук", "Твоя коллекция", "Профиль", "Настройки", "Плагины"][app.page]; font.pixelSize: 27; font.bold: true }
+                Caption { text: [qsTr("Слушай своё"), qsTr("На твоей волне"), qsTr("Найди свой звук"), qsTr("Твоя коллекция"), qsTr("Профиль"), qsTr("Настройки"), qsTr("Плагины")][app.page]; font.pixelSize: 27; font.bold: true }
             }
             AbstractButton {
                 
                 id: accountButton
                 width: 48; height: 48
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                Accessible.name: app.page === 4 ? "Настройки" : "Мой профиль"
+                Accessible.name: app.page === 4 ? qsTr("Настройки") : qsTr("Мой профиль")
                 scale: down ? 0.94 : 1
                 Behavior on scale { NumberAnimation { duration: app.motion / 2 } }
                 contentItem: Item {
@@ -485,10 +485,10 @@ ApplicationWindow {
             Layout.margins: 28; spacing: 20
             Item { Layout.fillHeight: true }
             Image { source: "qrc:/qt/qml/SCrip/assets/blob.png"; Layout.preferredWidth: 120; Layout.preferredHeight: 120; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit; Rectangle { anchors.fill: parent; anchors.margins: -8; radius: 32; color: app.accent; z: -1 } }
-            Label { text: "Твоя музыка.\nВ твоём ритме."; font.pixelSize: 27; font.bold: true; color: app.ink; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
-            Label { text: app.api.authBusy ? "Заверши вход в браузере и вернись в Sange" : "Любимые треки, новые находки и миксы SoundCloud"; color: app.muted; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
-            Action { visible: app.api.disconnectStatus === "unconfirmed"; text: "Настройки SoundCloud"; Layout.fillWidth: true; onClicked: sc.openExternal("https://soundcloud.com/settings") }
-            Action { text: app.api.authBusy ? "Отменить вход" : "Войти в SoundCloud"; primary: true; Layout.fillWidth: true; onClicked: app.api.authBusy ? sc.cancelLogin() : sc.login() }
+            Label { text: qsTr("Твоя музыка.\nВ твоём ритме."); font.pixelSize: 27; font.bold: true; color: app.ink; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
+            Label { text: app.api.authBusy ? qsTr("Заверши вход в браузере и вернись в Sange") : qsTr("Любимые треки, новые находки и миксы SoundCloud"); color: app.muted; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
+            Action { visible: app.api.disconnectStatus === "unconfirmed"; text: qsTr("Настройки SoundCloud"); Layout.fillWidth: true; onClicked: sc.openExternal("https://soundcloud.com/settings") }
+            Action { text: app.api.authBusy ? qsTr("Отменить вход") : qsTr("Войти в SoundCloud"); primary: true; Layout.fillWidth: true; onClicked: app.api.authBusy ? sc.cancelLogin() : sc.login() }
             Item { Layout.fillHeight: true }
         }
         RowLayout {
@@ -497,14 +497,14 @@ ApplicationWindow {
             TextField {
                 id: search
                 Layout.fillWidth: true; implicitHeight: 48
-                placeholderText: "Поиск или ссылка SoundCloud"
+                placeholderText: qsTr("Поиск или ссылка SoundCloud")
                 color: app.ink; placeholderTextColor: (app.dark ? "#aaaaaa" : "#77717a"); selectionColor: app.accent; selectedTextColor: app.foreground(app.accent)
                 font.pixelSize: 14; leftPadding: 14
                 background: Rectangle { radius: 16; color: search.activeFocus ? (app.dark ? "#2c2c2c" : "#f2f2f2") : (app.dark ? "#242424" : "#eeeeee"); border.width: search.activeFocus ? 1 : 0; border.color: Qt.alpha(app.accent, 0.45); Behavior on color { ColorAnimation { duration: app.motion } } }
                 onAccepted: app.searchNow()
             }
-            Action { text: "Найти"; primary: true; onClicked: app.searchNow() }
-            Action { text: "Сохранённые поиски"; symbol: "menu"; implicitWidth: 44; onClicked: collectionTools.openOptions(this) }
+            Action { text: qsTr("Найти"); primary: true; onClicked: app.searchNow() }
+            Action { text: qsTr("Сохранённые поиски"); symbol: "menu"; implicitWidth: 44; onClicked: collectionTools.openOptions(this) }
         }
         Flickable {
             visible: sc.signedIn && app.page === 2 && app.searchKind === "tracks"
@@ -523,7 +523,7 @@ ApplicationWindow {
             visible: sc.signedIn && (app.page === 2 || app.page === 3)
             Layout.leftMargin: 20; Layout.rightMargin: 20; Layout.bottomMargin: 12
             Repeater {
-                model: app.page === 2 ? ["Треки", "Плейлисты", "Люди"] : ["Любимые", "Плейлисты", "История"]
+                model: app.page === 2 ? [qsTr("Треки"), qsTr("Плейлисты"), qsTr("Люди")] : [qsTr("Любимые"), qsTr("Плейлисты"), qsTr("История")]
                 Action {
                     required property string modelData
                     required property int index
@@ -547,14 +547,14 @@ ApplicationWindow {
                 id: libraryFilters
                 x: 20; spacing: 8
                 Repeater {
-                    model: [{label: "Треки", key: "likes"}, {label: "Плейлисты", key: "likedPlaylists"}, {label: "Станции", key: "likedStations"}]
+                    model: [{label: qsTr("Треки"), key: "likes"}, {label: qsTr("Плейлисты"), key: "likedPlaylists"}, {label: qsTr("Станции"), key: "likedStations"}]
                     Action { required property var modelData; text: modelData.label; primary: app.library === modelData.key; font.pixelSize: 12; implicitHeight: 44; onClicked: { app.library = modelData.key; app.refresh() } }
                 }
             }
         }
         Action {
             visible: sc.signedIn && app.page === 3 && app.library === "playlists"
-            text: "Создать плейлист"; Layout.leftMargin: 20; Layout.bottomMargin: 12
+            text: qsTr("Создать плейлист"); Layout.leftMargin: 20; Layout.bottomMargin: 12
             onClicked: createPlaylist.open()
         }
         ScrollView {
@@ -585,7 +585,7 @@ ApplicationWindow {
                             const id = track.user?.urn
                             if (id && !artists.has(id) && seeds.length < 16) { artists.add(id); seeds.push(track) }
                         }
-                        return (seeds.length ? [{title: "Станции исполнителей", station: true, tracks: seeds}] : []).concat(shelves)
+                        return (seeds.length ? [{title: qsTr("Станции исполнителей"), station: true, tracks: seeds}] : []).concat(shelves)
                     }
                     Column {
                         id: homeShelf
@@ -613,8 +613,8 @@ ApplicationWindow {
                                         width: 154; height: 154; radius: app.coverRadius; color: (app.dark ? "#2c2c2c" : "#ededed"); clip: true
                                         RoundedImage { radius: app.coverRadius; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0; anchors.fill: parent; source: homeShelf.modelData.station ? modelData.user?.avatar_url || app.cover(modelData) : app.cover(modelData) }
                                     }
-                                    Caption { width: 154; text: homeShelf.modelData.station ? sc.displayArtist(modelData) || "Исполнитель" : modelData.title || ""; font.bold: true; font.pixelSize: 13 }
-                                    Caption { width: 154; text: homeShelf.modelData.station ? (modelData.user?.station_urn ? "Станция исполнителя" : "Подборка Sange") : sc.displayArtist(modelData) || ""; color: app.muted; font.pixelSize: 12 }
+                                    Caption { width: 154; text: homeShelf.modelData.station ? sc.displayArtist(modelData) || qsTr("Исполнитель") : modelData.title || ""; font.bold: true; font.pixelSize: 13 }
+                                    Caption { width: 154; text: homeShelf.modelData.station ? (modelData.user?.station_urn ? qsTr("Станция исполнителя") : qsTr("Подборка Sange")) : sc.displayArtist(modelData) || ""; color: app.muted; font.pixelSize: 12 }
                                 }
                                 onClicked: {
                                     if (homeShelf.modelData.station) playlistView.beginStation(modelData)
@@ -625,7 +625,7 @@ ApplicationWindow {
                         }
                     }
                 }
-                Label { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy || (!app.homeAccount && !app.api.error) ? "Собираем твою музыку…" : app.api.homeError || app.api.error || "Добавь любимые треки, чтобы здесь появились подборки"; wrapMode: Text.Wrap; color: app.muted }
+                Label { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy || (!app.homeAccount && !app.api.error) ? qsTr("Собираем твою музыку…") : app.api.homeError || app.api.error || qsTr("Добавь любимые треки, чтобы здесь появились подборки"); wrapMode: Text.Wrap; color: app.muted }
                 PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted; x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: navigationFooter.height + 16 }
             }
@@ -638,35 +638,44 @@ ApplicationWindow {
             ColumnLayout {
                 width: settingsScroll.availableWidth
                 spacing: 18
-                Action { text: "Назад"; symbol: "back"; Layout.leftMargin: 20; onClicked: app.page = app.page === 6 ? 5 : 4 }
+                Action { text: qsTr("Назад"); symbol: "back"; Layout.leftMargin: 20; onClicked: app.page = app.page === 6 ? 5 : 4 }
                 ColumnLayout {
                     visible: app.page === 5
                     Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.margins: 18; spacing: 14
+                    Caption { text: qsTr("Язык интерфейса"); Layout.fillWidth: true; wrapMode: Text.Wrap; font.bold: true; font.pixelSize: 19 }
+                    ComboBox {
+                        objectName: "interfaceLanguageControl"
+                        Layout.fillWidth: true; Layout.minimumWidth: 0
+                        model: ["Русский", "English"]
+                        currentIndex: uiLanguage.language === "ru" ? 0 : 1
+                        Accessible.name: qsTr("Язык интерфейса")
+                        onActivated: index => uiLanguage.language = index === 0 ? "ru" : "en"
+                    }
                     Caption { text: "Sange"; font.bold: true; font.pixelSize: 19 }
-                    Caption { text: "Версия " + Qt.application.version + (app.api.updateAvailable ? " · доступна " + app.api.latestVersion : ""); color: app.api.updateAvailable ? app.accent : app.muted; font.pixelSize: 13 }
-                    Caption { text: app.api.updateError || app.api.updateResult || (app.api.updateChecking ? "Проверяем обновления…" : "Проверка ещё не выполнялась"); color: app.api.updateError ? "#a22c39" : app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
-                    Caption { visible: !!app.api.updateDownloading; text: app.api.updateTotal > 0 ? (Number(app.api.updateDownloaded / 1048576).toFixed(1) + " МБ / " + Number(app.api.updateTotal / 1048576).toFixed(1) + " МБ · " + Math.floor(100 * app.api.updateDownloaded / app.api.updateTotal) + "%") : (app.api.updateDownloaded + " байт скачано"); color: app.muted; Layout.fillWidth: true }
+                    Caption { text: qsTr("Версия ") + Qt.application.version + (app.api.updateAvailable ? qsTr(" · доступна ") + app.api.latestVersion : ""); color: app.api.updateAvailable ? app.accent : app.muted; font.pixelSize: 13 }
+                    Caption { text: app.api.updateError || app.api.updateResult || (app.api.updateChecking ? qsTr("Проверяем обновления…") : qsTr("Проверка ещё не выполнялась")); color: app.api.updateError ? "#a22c39" : app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Caption { visible: !!app.api.updateDownloading; text: app.api.updateTotal > 0 ? (Number(app.api.updateDownloaded / 1048576).toFixed(1) + qsTr(" МБ / ") + Number(app.api.updateTotal / 1048576).toFixed(1) + qsTr(" МБ · ") + Math.floor(100 * app.api.updateDownloaded / app.api.updateTotal) + "%") : (app.api.updateDownloaded + qsTr(" байт скачано")); color: app.muted; Layout.fillWidth: true }
                     ProgressBar { visible: !!app.api.updateDownloading; Layout.fillWidth: true; indeterminate: !(app.api.updateTotal > 0); from: 0; to: 100; value: app.api.updateTotal > 0 ? 100 * app.api.updateDownloaded / app.api.updateTotal : 0 }
-                    Action { text: "Проверить обновления"; visible: !app.api.updateChecking && !app.api.updateDownloading && !app.api.updateInstalling && !app.api.updateReady; enabled: !app.api.updateChecking; Layout.fillWidth: true; onClicked: sc.checkForUpdates(true) }
-                    Action { text: "Скачать обновление"; visible: !!app.api.updateAvailable && !app.api.updateDownloading && !app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.downloadUpdate() }
-                    Action { text: "Отмена"; visible: !!app.api.updateDownloading; Layout.fillWidth: true; onClicked: sc.cancelUpdateDownload() }
-                    Action { text: "Установить сейчас"; visible: !!app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.installUpdate() }
-                    Caption { text: "Воспроизведение"; font.bold: true; font.pixelSize: 19 }
+                    Action { text: qsTr("Проверить обновления"); visible: !app.api.updateChecking && !app.api.updateDownloading && !app.api.updateInstalling && !app.api.updateReady; enabled: !app.api.updateChecking; Layout.fillWidth: true; onClicked: sc.checkForUpdates(true) }
+                    Action { text: qsTr("Скачать обновление"); visible: !!app.api.updateAvailable && !app.api.updateDownloading && !app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.downloadUpdate() }
+                    Action { text: qsTr("Отмена"); visible: !!app.api.updateDownloading; Layout.fillWidth: true; onClicked: sc.cancelUpdateDownload() }
+                    Action { text: qsTr("Установить сейчас"); visible: !!app.api.updateReady && !app.api.updateInstalling; Layout.fillWidth: true; onClicked: sc.installUpdate() }
+                    Caption { text: qsTr("Воспроизведение"); font.bold: true; font.pixelSize: 19 }
 
-                    Action { text: "Исключения рекомендаций · " + (app.api.recommendationExclusions || []).length; Layout.fillWidth: true; onClicked: recommendationSettings.open() }
-                    Caption { text: "Качество воспроизведения"; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                    Action { text: qsTr("Исключения рекомендаций · ") + (app.api.recommendationExclusions || []).length; Layout.fillWidth: true; onClicked: recommendationSettings.open() }
+                    Caption { text: qsTr("Качество воспроизведения"); Layout.fillWidth: true; wrapMode: Text.Wrap }
                     PlaybackQuality {
                         Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.maximumWidth: 360; Layout.alignment: Qt.AlignLeft
                         objectName: "playbackQualityControl"
                         value: app.api.playbackQuality || 0; onEdited: value => sc.setPlaybackQuality(value)
                         ink: app.ink; surface: app.raised; accent: app.accent; selectedInk: app.foreground(app.accent); motion: app.motion
                     }
-                    Switch { Layout.fillWidth: true; Layout.minimumWidth: 0; objectName: "preloadControl"; Accessible.name: "Предзагрузка"; text: "Предзагрузка"; checked: !!app.api.preloadEnabled; onToggled: sc.setPreloadEnabled(checked) }
-                    Caption { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Заранее загружать следующий трек и сегменты текущего. Качество применяется со следующей загрузки."; color: app.muted }
-                    Switch { visible: !!app.api.wifiPolicyAvailable || !!app.api.preloadWifiOnly; enabled: !!app.api.preloadEnabled; objectName: "preloadWifiControl"; text: "Только по Wi-Fi"; Accessible.name: "Предзагрузка только по Wi-Fi"; checked: !!app.api.preloadWifiOnly; onToggled: sc.setPreloadWifiOnly(checked) }
-                    Caption { visible: !!app.api.preloadWifiOnly; Layout.fillWidth: true; wrapMode: Text.Wrap; color: app.muted; text: "Если тип сети неизвестен, предзагрузка отключена." }
-                    Caption { text: "Оформление"; font.bold: true; font.pixelSize: 19 }
-                    Switch {  text: "Тёмная тема"; checked: prefs.darkMode; onToggled: app.switchTheme(checked) }
+                    Switch { Layout.fillWidth: true; Layout.minimumWidth: 0; objectName: "preloadControl"; Accessible.name: qsTr("Предзагрузка"); text: qsTr("Предзагрузка"); checked: !!app.api.preloadEnabled; onToggled: sc.setPreloadEnabled(checked) }
+                    Caption { Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("Заранее загружать следующий трек и сегменты текущего. Качество применяется со следующей загрузки."); color: app.muted }
+                    Switch { visible: !!app.api.wifiPolicyAvailable || !!app.api.preloadWifiOnly; enabled: !!app.api.preloadEnabled; objectName: "preloadWifiControl"; text: qsTr("Только по Wi-Fi"); Accessible.name: qsTr("Предзагрузка только по Wi-Fi"); checked: !!app.api.preloadWifiOnly; onToggled: sc.setPreloadWifiOnly(checked) }
+                    Caption { visible: !!app.api.preloadWifiOnly; Layout.fillWidth: true; wrapMode: Text.Wrap; color: app.muted; text: qsTr("Если тип сети неизвестен, предзагрузка отключена.") }
+                    Caption { text: qsTr("Оформление"); font.bold: true; font.pixelSize: 19 }
+                    Switch {  text: qsTr("Тёмная тема"); checked: prefs.darkMode; onToggled: app.switchTheme(checked) }
                     Row {
                         spacing: 14
                         Repeater {
@@ -674,32 +683,32 @@ ApplicationWindow {
                             AbstractButton {
                                 
                                 required property string modelData
-                                width: 42; height: 42; Accessible.name: "Цвет " + modelData
+                                width: 42; height: 42; Accessible.name: qsTr("Цвет ") + modelData
                                 background: Rectangle { color: modelData; radius: 21; border.width: prefs.accentOverride && prefs.accent === modelData ? 4 : 0; border.color: (app.dark ? "#e7e7e7" : "#d0d0d0") }
                                 onClicked: { prefs.accent = modelData; prefs.accentOverride = true }
                             }
                         }
                     }
-                    Caption { text: "Скругление обложек"; color: app.muted }
-                    FineSlider { Layout.fillWidth: true; from: 0; to: 28; value: prefs.coverRadius; onMoved: { prefs.coverRadius = value; prefs.coverRadiusOverride = true } Accessible.name: "Скругление обложек" }
-                    Action { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: "Использовать оформление плагинов"; onClicked: { prefs.accentOverride = false; prefs.coverRadiusOverride = false } }
-                    Switch {  text: "Анимации"; checked: prefs.motion; onToggled: prefs.motion = checked }
-                    Switch { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: "Догружать при прокрутке"; checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
+                    Caption { text: qsTr("Скругление обложек"); color: app.muted }
+                    FineSlider { Layout.fillWidth: true; from: 0; to: 28; value: prefs.coverRadius; onMoved: { prefs.coverRadius = value; prefs.coverRadiusOverride = true } Accessible.name: qsTr("Скругление обложек") }
+                    Action { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: qsTr("Использовать оформление плагинов"); onClicked: { prefs.accentOverride = false; prefs.coverRadiusOverride = false } }
+                    Switch {  text: qsTr("Анимации"); checked: prefs.motion; onToggled: prefs.motion = checked }
+                    Switch { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: qsTr("Догружать при прокрутке"); checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
                     Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
-                    Caption { text: "Аккаунт"; font.bold: true; font.pixelSize: 19 }
-                    Action { text: sc.signedIn ? "Выйти из SoundCloud" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: sc.signedIn ? sc.logout() : sc.login() }
+                    Caption { text: qsTr("Аккаунт"); font.bold: true; font.pixelSize: 19 }
+                    Action { text: sc.signedIn ? qsTr("Выйти из SoundCloud") : qsTr("Войти в SoundCloud"); Layout.fillWidth: true; onClicked: sc.signedIn ? sc.logout() : sc.login() }
                     DiagnosticsPanel {
                         host: app; mobile: true
                         Layout.fillWidth: true; Layout.minimumWidth: 0
                         ink: app.ink; muted: app.muted
                     }
-                    Action { text: "Плагины"; Layout.fillWidth: true; onClicked: app.page = 6 }
+                    Action { text: qsTr("Плагины"); Layout.fillWidth: true; onClicked: app.page = 6 }
                     Caption { text: "Sange " + Qt.application.version + " · Android"; color: app.muted; font.pixelSize: 12 }
                 }
                 ColumnLayout {
                     visible: app.page === 6
                     Layout.fillWidth: true; Layout.margins: 18
-                    PluginManagerView { dark: app.dark; ink: app.ink; muted: app.muted; Layout.fillWidth: true; manager: pluginManager; appearanceHint: prefs.accentOverride || prefs.coverRadiusOverride ? "Пользовательское оформление перекрывает соответствующие свойства темы плагина." : "" }
+                    PluginManagerView { dark: app.dark; ink: app.ink; muted: app.muted; Layout.fillWidth: true; manager: pluginManager; appearanceHint: prefs.accentOverride || prefs.coverRadiusOverride ? qsTr("Пользовательское оформление перекрывает соответствующие свойства темы плагина.") : "" }
                 }
                 Item { Layout.fillWidth: true; implicitHeight: navigationFooter.height }
             }
@@ -778,11 +787,11 @@ ApplicationWindow {
                                 visible: profileCard.creator
                                 anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10
                                 width: creatorBadge.implicitWidth + 20; height: 27; radius: 14; color: app.accent
-                                Text { id: creatorBadge; anchors.centerIn: parent; text: "✦ Создатель Sange"; color: app.foreground(app.accent); font.pixelSize: 11; font.bold: true }
+                                Text { id: creatorBadge; anchors.centerIn: parent; text: qsTr("✦ Создатель Sange"); color: app.foreground(app.accent); font.pixelSize: 11; font.bold: true }
                             }
                         }
                         FollowButton { anchors.horizontalCenter: parent.horizontalCenter; user: app.profile || ({}) }
-                        Caption { anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter; text: app.profile?.username || "Твой профиль"; font.pixelSize: 19; font.bold: true }
+                        Caption { anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter; text: app.profile?.username || qsTr("Твой профиль"); font.pixelSize: 19; font.bold: true }
                         Caption {
                             anchors.horizontalCenter: parent.horizontalCenter; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter
                             color: app.accent; font.bold: true; font.pixelSize: 12; visible: !!text
@@ -801,7 +810,7 @@ ApplicationWindow {
                         Row {
                             anchors.horizontalCenter: parent.horizontalCenter; spacing: 22
                             Repeater {
-                                model: [{value: app.profile?.followers_count || 0, label: "подписчиков"}, {value: app.profile?.followings_count || 0, label: "подписок"}, {value: app.profile?.track_count || 0, label: "треков"}]
+                                model: [{value: app.profile?.followers_count || 0, label: qsTr("подписчиков")}, {value: app.profile?.followings_count || 0, label: qsTr("подписок")}, {value: app.profile?.track_count || 0, label: qsTr("треков")}]
                                 ProfileStat {
                                     required property var modelData
                                     required property int index
@@ -837,9 +846,9 @@ ApplicationWindow {
                     topPadding: 24; bottomPadding: 24
                     horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
                     visible: !tracks.count; color: app.muted
-                    text: collectionTools.query.trim() ? (app.api.hasMore || app.api.busy || app.api.collectionSearchStatus === "error" || app.api.collectionSearchStatus === "limit" ? "В загруженной части совпадений нет" : "Ничего не найдено") : app.api.busy ? "Загрузка…" : app.api.collectionStatus === "unavailable" ? "Раздел недоступен" : app.api.collectionStatus === "error" ? "Не удалось загрузить раздел" : app.page === 4 ? "В этом разделе пока пусто" : app.page === 2 ? "Найди то, что хочется услышать" : app.page === 4 && app.profileTab === 1 ? "Здесь пока нет плейлистов" : "Здесь пока нет треков"
+                    text: collectionTools.query.trim() ? (app.api.hasMore || app.api.busy || app.api.collectionSearchStatus === "error" || app.api.collectionSearchStatus === "limit" ? qsTr("В загруженной части совпадений нет") : qsTr("Ничего не найдено")) : app.api.busy ? qsTr("Загрузка…") : app.api.collectionStatus === "unavailable" ? qsTr("Раздел недоступен") : app.api.collectionStatus === "error" ? qsTr("Не удалось загрузить раздел") : app.page === 4 ? qsTr("В этом разделе пока пусто") : app.page === 2 ? qsTr("Найди то, что хочется услышать") : app.page === 4 && app.profileTab === 1 ? qsTr("Здесь пока нет плейлистов") : qsTr("Здесь пока нет треков")
                 }
-                Action { anchors.horizontalCenter: parent.horizontalCenter; visible: !!app.api.hasMore; text: "Показать ещё"; enabled: !app.api.busy; onClicked: sc.more() }
+                Action { anchors.horizontalCenter: parent.horizontalCenter; visible: !!app.api.hasMore; text: qsTr("Показать ещё"); enabled: !app.api.busy; onClicked: sc.more() }
             }
         }
     }
@@ -876,7 +885,7 @@ ApplicationWindow {
             objectName: "playbackDock"
             visible: !!app.api.current?.title
             x: 12; width: parent.width - 24; height: 72
-            Accessible.name: "Открыть плеер: " + (app.api.current?.title || "")
+            Accessible.name: qsTr("Открыть плеер: ") + (app.api.current?.title || "")
             onClicked: player.open()
             background: Rectangle {
                 radius: 22
@@ -912,7 +921,7 @@ ApplicationWindow {
                 AbstractButton {
                     id: miniPlay
                     Layout.preferredWidth: 44; Layout.preferredHeight: 44
-                    Accessible.name: app.api.playing ? "Пауза" : "Воспроизвести"
+                    Accessible.name: app.api.playing ? qsTr("Пауза") : qsTr("Воспроизвести")
                     onClicked: sc.togglePlayback()
                     scale: down ? 0.94 : 1
                     Behavior on scale { NumberAnimation { duration: prefs.motion ? 120 : 0 } }
@@ -961,9 +970,9 @@ ApplicationWindow {
                         anchors.fill: parent; anchors.margins: 5
                         Repeater {
                             model: [
-                                { title: "Главная", symbol: "home", page: 0 },
-                                { title: "Лента", symbol: "list", page: 1 },
-                                { title: "Медиатека", symbol: "music", page: 3 }
+                                { title: qsTr("Главная"), symbol: "home", page: 0 },
+                                { title: qsTr("Лента"), symbol: "list", page: 1 },
+                                { title: qsTr("Медиатека"), symbol: "music", page: 3 }
                             ]
                             AbstractButton {
                                 id: navigationTab
@@ -1000,7 +1009,7 @@ ApplicationWindow {
                 AbstractButton {
                     id: floatingSearch
                     Layout.preferredWidth: 62; Layout.preferredHeight: 62
-                    Accessible.name: "Поиск"
+                    Accessible.name: qsTr("Поиск")
                     scale: down ? 0.95 : 1
                     Behavior on scale { NumberAnimation { duration: prefs.motion ? 150 : 0; easing.type: Easing.OutCubic } }
                     background: Rectangle {
@@ -1071,10 +1080,10 @@ ApplicationWindow {
             spacing: 10
             RowLayout {
                 Layout.fillWidth: true
-                Action { text: "Свернуть"; symbol: "back"; Layout.preferredWidth: 48; Accessible.name: "Свернуть плеер"; onClicked: player.close() }
-                Action { text: "Дополнения плеера"; symbol: "grid"; Layout.preferredWidth: 48; visible: pluginManager.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
-                Caption { text: "СЕЙЧАС ИГРАЕТ"; font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-                Action { text: "Действия"; symbol: "menu"; Layout.preferredWidth: 48; Accessible.name: "Действия с треком"; onClicked: { app.selectedTrack = app.api.current; app.selectedQueue = -1; trackMenu.open() } }
+                Action { text: qsTr("Свернуть"); symbol: "back"; Layout.preferredWidth: 48; Accessible.name: qsTr("Свернуть плеер"); onClicked: player.close() }
+                Action { text: qsTr("Дополнения плеера"); symbol: "grid"; Layout.preferredWidth: 48; visible: pluginManager.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
+                Caption { text: qsTr("СЕЙЧАС ИГРАЕТ"); font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                Action { text: qsTr("Действия"); symbol: "menu"; Layout.preferredWidth: 48; Accessible.name: qsTr("Действия с треком"); onClicked: { app.selectedTrack = app.api.current; app.selectedQueue = -1; trackMenu.open() } }
             }
             Item { Layout.fillHeight: true }
             Rectangle {
@@ -1091,7 +1100,7 @@ ApplicationWindow {
                 property var displayedComment: ({})
                 readonly property string desiredKey: String(app.api.current.urn || "") + ":" + (app.playingComment.urn || "")
                 onDesiredKeyChanged: { commentArrival.stop(); commentArrival.start() }
-                Accessible.name: displayedComment.body ? "Комментарий: " + displayedComment.body + ". Открыть комментарии" : "Открыть комментарии к треку"
+                Accessible.name: displayedComment.body ? qsTr("Комментарий: ") + displayedComment.body + qsTr(". Открыть комментарии") : qsTr("Открыть комментарии к треку")
                 onClicked: { commentsSheet.followCurrent = true; commentsSheet.open() }
                 background: Rectangle { radius: 12; color: commentPreview.down ? Qt.alpha(app.ink, 0.05) : "transparent" }
                 SequentialAnimation {
@@ -1110,8 +1119,8 @@ ApplicationWindow {
                     Caption { text: commentPreview.displayedComment.body ? app.time(commentPreview.displayedComment.timestamp) : "···"; font.pixelSize: 11; color: app.muted }
                     ColumnLayout {
                         Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 2
-                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.user?.username || "Комментарии"; font.pixelSize: 10; color: app.muted }
-                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.body || "Обсудить этот трек"; textFormat: Text.PlainText; font.pixelSize: 12; maximumLineCount: 1 }
+                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.user?.username || qsTr("Комментарии"); font.pixelSize: 10; color: app.muted }
+                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.body || qsTr("Обсудить этот трек"); textFormat: Text.PlainText; font.pixelSize: 12; maximumLineCount: 1 }
                     }
                     AndroidGlyph { name: "arrow"; width: 16; height: 16; ink: app.muted }
                 }
@@ -1121,7 +1130,7 @@ ApplicationWindow {
             Caption { text: sc.displayArtist(app.api.current || {}) || ""; color: app.muted; Layout.fillWidth: true; TapHandler { enabled: !!app.api.current?.user?.urn && !sc.hasSeparateArtist(app.api.current || {}); onTapped: { player.close(); app.openProfile(app.api.current.user) } } }
             Caption {
                 Layout.fillWidth: true; visible: sc.hasSeparateArtist(app.api.current || {})
-                text: "Загрузил: " + (app.api.current?.user?.username || "SoundCloud"); color: app.muted; font.pixelSize: 12
+                text: qsTr("Загрузил: ") + (app.api.current?.user?.username || "SoundCloud"); color: app.muted; font.pixelSize: 12
                 TapHandler { enabled: !!app.api.current?.user?.urn; onTapped: { player.close(); app.openProfile(app.api.current.user) } }
             }
             TrackProgress {
@@ -1142,21 +1151,21 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true; spacing: 0
-                PlayerButton { text: "Перемешать"; symbol: "shuffle"; active: !!app.api.shuffle; onClicked: sc.setShuffle(!app.api.shuffle) }
+                PlayerButton { text: qsTr("Перемешать"); symbol: "shuffle"; active: !!app.api.shuffle; onClicked: sc.setShuffle(!app.api.shuffle) }
                 Item { Layout.fillWidth: true }
-                PlayerButton { text: "Предыдущий трек"; symbol: "previous"; onClicked: sc.previous() }
+                PlayerButton { text: qsTr("Предыдущий трек"); symbol: "previous"; onClicked: sc.previous() }
                 Item { Layout.fillWidth: true }
-                PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? "Пауза" : "Воспроизвести"; symbol: app.api.playing ? "pause" : "play"; main: true; onClicked: sc.togglePlayback() }
+                PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? qsTr("Пауза") : qsTr("Воспроизвести"); symbol: app.api.playing ? "pause" : "play"; main: true; onClicked: sc.togglePlayback() }
                 Item { Layout.fillWidth: true }
-                PlayerButton { text: "Следующий трек"; symbol: "next"; onClicked: sc.next() }
+                PlayerButton { text: qsTr("Следующий трек"); symbol: "next"; onClicked: sc.next() }
                 Item { Layout.fillWidth: true }
-                PlayerButton { ToolTip.visible: down; ToolTip.delay: 500; ToolTip.text: Accessible.name; text: ["Повтор выкл.", "Повтор трека", "Повтор очереди"][app.api.repeatMode || 0]; Accessible.name: ["Повтор выключен", "Повтор трека", "Повтор очереди"][app.api.repeatMode || 0]; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
+                PlayerButton { ToolTip.visible: down; ToolTip.delay: 500; ToolTip.text: Accessible.name; text: [qsTr("Повтор выкл."), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; Accessible.name: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
             }
             RowLayout {
                 Layout.fillWidth: true
                 EngagementAction { host: app; mobile: true; item: app.api.current || ({}); Layout.fillWidth: true }
                 FollowButton { user: app.api.current?.user || ({}); Layout.fillWidth: true }
-                Action { text: "Очередь"; Layout.fillWidth: true; onClicked: queue.open() }
+                Action { text: qsTr("Очередь"); Layout.fillWidth: true; onClicked: queue.open() }
             }
         }
     }
@@ -1168,9 +1177,9 @@ ApplicationWindow {
         contentItem: ColumnLayout {
             RowLayout {
                 Layout.margins: 20; Layout.fillWidth: true
-                Caption { text: "Очередь"; font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
-                Action { text: "Действия"; symbol: "menu"; implicitHeight: 48; Accessible.name: "Действия с очередью"; onClicked: queueOptions.open() }
-                Action { text: "Готово"; onClicked: queue.close() }
+                Caption { text: qsTr("Очередь"); font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
+                Action { text: qsTr("Действия"); symbol: "menu"; implicitHeight: 48; Accessible.name: qsTr("Действия с очередью"); onClicked: queueOptions.open() }
+                Action { text: qsTr("Готово"); onClicked: queue.close() }
             }
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
@@ -1192,10 +1201,10 @@ ApplicationWindow {
         contentItem: ColumnLayout {
             id: queueMenuContent
             spacing: 2
-            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "plus"; text: "Сохранить как плейлист"; enabled: sc.signedIn && (sc.queueTracks || []).length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
-            MenuRow { text: "Отменить изменение очереди"; enabled: !!app.api.queueUndoAvailable; onClicked: { sc.undoQueueEdit(); queueOptions.close() } }
-            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "list"; text: "Убрать повторы"; enabled: { const queue = sc.queueTracks; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
-            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "close"; text: "Очистить после текущего"; enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < (sc.queueTracks || []).length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
+            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "plus"; text: qsTr("Сохранить как плейлист"); enabled: sc.signedIn && (sc.queueTracks || []).length > 0 && !app.api.queuePlaylistBusy; onClicked: { queueOptions.close(); queueActionsMenu.begin() } }
+            MenuRow { text: qsTr("Отменить изменение очереди"); enabled: !!app.api.queueUndoAvailable; onClicked: { sc.undoQueueEdit(); queueOptions.close() } }
+            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "list"; text: qsTr("Убрать повторы"); enabled: { const queue = sc.queueTracks; return sc.queueHasDuplicates() } onClicked: { sc.deduplicateQueue(); queueOptions.close() } }
+            MenuRow { opacity: enabled ? 1 : 0.4; glyph: "close"; text: qsTr("Очистить после текущего"); enabled: app.api.queueIndex >= 0 && app.api.queueIndex + 1 < (sc.queueTracks || []).length; onClicked: { sc.clearQueueAfterCurrent(); queueOptions.close() } }
         }
     }
     component MenuRow: Button {
@@ -1256,28 +1265,28 @@ ApplicationWindow {
                     RoundedImage { source: app.cover(app.selectedTrack); radius: 12; Layout.preferredWidth: 54; Layout.preferredHeight: 54; placeholderInk: app.muted }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
-                        Caption { text: app.selectedTrack.title || "Без названия"; font.bold: true; Layout.fillWidth: true }
+                        Caption { text: app.selectedTrack.title || qsTr("Без названия"); font.bold: true; Layout.fillWidth: true }
                         Caption { text: sc.displayArtist(app.selectedTrack) || "SoundCloud"; color: app.muted; font.pixelSize: 12; Layout.fillWidth: true }
                     }
-                    PlayerButton { symbol: "close"; text: "Закрыть меню"; onClicked: trackMenu.close() }
+                    PlayerButton { symbol: "close"; text: qsTr("Закрыть меню"); onClicked: trackMenu.close() }
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Qt.alpha(app.muted, 0.15) }
-                    MenuRow { glyph: "list"; text: "Информация о треке"; onClicked: { trackInfoSheet.track = app.selectedTrack; trackMenu.close(); trackInfoSheet.open() } }
-                    MenuRow { glyph: "list"; text: "Комментарии"; onClicked: { commentsSheet.selectedTrack = app.selectedTrack; commentsSheet.followCurrent = app.selectedTrack.urn === app.api.current.urn; trackMenu.close(); commentsSheet.open() } }
-                    MenuRow { glyph: "list"; text: "Текст песни"; visible: (app.lyricState.lines || []).length > 0; onClicked: { trackMenu.close(); lyricsSheet.open() } }
+                    MenuRow { glyph: "list"; text: qsTr("Информация о треке"); onClicked: { trackInfoSheet.track = app.selectedTrack; trackMenu.close(); trackInfoSheet.open() } }
+                    MenuRow { glyph: "list"; text: qsTr("Комментарии"); onClicked: { commentsSheet.selectedTrack = app.selectedTrack; commentsSheet.followCurrent = app.selectedTrack.urn === app.api.current.urn; trackMenu.close(); commentsSheet.open() } }
+                    MenuRow { glyph: "list"; text: qsTr("Текст песни"); visible: (app.lyricState.lines || []).length > 0; onClicked: { trackMenu.close(); lyricsSheet.open() } }
                     EngagementAction { host: app; mobile: true; Layout.fillWidth: true; item: app.selectedTrack; repost: true }
                     EngagementAction { host: app; mobile: true; item: app.selectedTrack; Layout.fillWidth: true }
-                MenuRow { glyph: "close"; text: "Не предлагать этот трек"; enabled: !!app.selectedTrack.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, false); trackMenu.close() } }
-                MenuRow { multiline: true; glyph: "close"; text: "Не предлагать треки этого аккаунта: " + (app.selectedTrack.user?.username || app.selectedTrack.user?.urn || "SoundCloud"); enabled: !!app.selectedTrack.user?.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, true); trackMenu.close() } }
-                    MenuRow { glyph: "next"; visible: app.selectedQueue >= 0; text: "Играть следующим"; Layout.fillWidth: true; onClicked: { sc.queueNext(app.selectedQueue); trackMenu.close() } }
-                    MenuRow { glyph: "close"; visible: app.selectedQueue >= 0; text: "Удалить из очереди"; Layout.fillWidth: true; onClicked: { sc.removeQueue(app.selectedQueue); trackMenu.close() } }
-                    MenuRow { glyph: "plus"; text: "Добавить в очередь"; Layout.fillWidth: true; onClicked: { sc.enqueue(app.selectedTrack); trackMenu.close() } }
-                    MenuRow { glyph: "music"; text: "Сохранить в плейлист"; Layout.fillWidth: true; onClicked: { sc.listDestinations(); destinations.open(); trackMenu.close() } }
-                    MenuRow { glyph: "profile"; text: sc.hasSeparateArtist(app.selectedTrack) ? "Загрузил: " + (app.selectedTrack.user?.username || "SoundCloud") : "Профиль исполнителя"; Layout.fillWidth: true; onClicked: { app.openProfile(app.selectedTrack.user); trackMenu.close(); playlistView.close(); player.close() } }
-                    MenuRow { glyph: "play"; text: app.selectedTrack.station_urn ? "Станция по треку" : "Похожие треки"; Layout.fillWidth: true; onClicked: { trackMenu.close(); playlistView.beginStation(app.selectedTrack, false) } }
-                    MenuRow { glyph: "cloud"; text: "Открыть в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.openExternal(app.selectedTrack.permalink_url); trackMenu.close() } }
-                    MenuRow { glyph: "list"; text: "Копировать название и исполнителя"; Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || "Без названия") + " — " + (sc.displayArtist(app.selectedTrack) || "SoundCloud")); trackMenu.close() } }
-                    MenuRow { glyph: "arrow"; text: "Копировать ссылку"; enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
+                MenuRow { glyph: "close"; text: qsTr("Не предлагать этот трек"); enabled: !!app.selectedTrack.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, false); trackMenu.close() } }
+                MenuRow { multiline: true; glyph: "close"; text: qsTr("Не предлагать треки этого аккаунта: ") + (app.selectedTrack.user?.username || app.selectedTrack.user?.urn || "SoundCloud"); enabled: !!app.selectedTrack.user?.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, true); trackMenu.close() } }
+                    MenuRow { glyph: "next"; visible: app.selectedQueue >= 0; text: qsTr("Играть следующим"); Layout.fillWidth: true; onClicked: { sc.queueNext(app.selectedQueue); trackMenu.close() } }
+                    MenuRow { glyph: "close"; visible: app.selectedQueue >= 0; text: qsTr("Удалить из очереди"); Layout.fillWidth: true; onClicked: { sc.removeQueue(app.selectedQueue); trackMenu.close() } }
+                    MenuRow { glyph: "plus"; text: qsTr("Добавить в очередь"); Layout.fillWidth: true; onClicked: { sc.enqueue(app.selectedTrack); trackMenu.close() } }
+                    MenuRow { glyph: "music"; text: qsTr("Сохранить в плейлист"); Layout.fillWidth: true; onClicked: { sc.listDestinations(); destinations.open(); trackMenu.close() } }
+                    MenuRow { glyph: "profile"; text: sc.hasSeparateArtist(app.selectedTrack) ? qsTr("Загрузил: ") + (app.selectedTrack.user?.username || "SoundCloud") : qsTr("Профиль исполнителя"); Layout.fillWidth: true; onClicked: { app.openProfile(app.selectedTrack.user); trackMenu.close(); playlistView.close(); player.close() } }
+                    MenuRow { glyph: "play"; text: app.selectedTrack.station_urn ? qsTr("Станция по треку") : qsTr("Похожие треки"); Layout.fillWidth: true; onClicked: { trackMenu.close(); playlistView.beginStation(app.selectedTrack, false) } }
+                    MenuRow { glyph: "cloud"; text: qsTr("Открыть в SoundCloud"); Layout.fillWidth: true; onClicked: { sc.openExternal(app.selectedTrack.permalink_url); trackMenu.close() } }
+                    MenuRow { glyph: "list"; text: qsTr("Копировать название и исполнителя"); Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || qsTr("Без названия")) + " — " + (sc.displayArtist(app.selectedTrack) || "SoundCloud")); trackMenu.close() } }
+                    MenuRow { glyph: "arrow"; text: qsTr("Копировать ссылку"); enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
             }
         }
     }
@@ -1297,8 +1306,8 @@ ApplicationWindow {
             spacing: 16
             RowLayout {
                 Layout.fillWidth: true
-                Label { text: "Информация о треке"; color: app.ink; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
-                PlayerButton { symbol: "close"; text: "Закрыть сведения"; onClicked: trackInfoSheet.close() }
+                Label { text: qsTr("Информация о треке"); color: app.ink; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                PlayerButton { symbol: "close"; text: qsTr("Закрыть сведения"); onClicked: trackInfoSheet.close() }
             }
             Flickable {
                 id: infoScroll
@@ -1334,7 +1343,7 @@ ApplicationWindow {
             spacing: 8
             RowLayout {
                 Layout.fillWidth: true
-                PlayerButton { symbol: "back"; text: "Закрыть комментарии"; onClicked: commentsSheet.close() }
+                PlayerButton { symbol: "back"; text: qsTr("Закрыть комментарии"); onClicked: commentsSheet.close() }
                 Caption { Layout.fillWidth: true; text: commentsSheet.track.title || ""; font.pixelSize: 13; color: app.muted; textFormat: Text.PlainText }
             }
             CommentsPane {
@@ -1363,10 +1372,10 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 ColumnLayout {
                     Layout.fillWidth: true; spacing: 4
-                    Caption { text: "Текст песни"; font.pixelSize: 24; font.bold: true; Layout.fillWidth: true }
+                    Caption { text: qsTr("Текст песни"); font.pixelSize: 24; font.bold: true; Layout.fillWidth: true }
                     Caption { text: (app.lyricTrack.title || "") + " · " + (sc.displayArtist(app.lyricTrack) || ""); color: app.muted; font.pixelSize: 12; Layout.fillWidth: true }
                 }
-                PlayerButton { symbol: "close"; text: "Закрыть текст песни"; onClicked: lyricsSheet.close() }
+                PlayerButton { symbol: "close"; text: qsTr("Закрыть текст песни"); onClicked: lyricsSheet.close() }
             }
             Flickable {
                 id: lyricScroll
@@ -1408,7 +1417,7 @@ ApplicationWindow {
                     contentItem: Rectangle { implicitWidth: 3; radius: 1.5; color: app.muted; opacity: lyricScroll.moving ? 0.65 : 0.25; Behavior on opacity { NumberAnimation { duration: 180 } } }
                 }
             }
-            Caption { text: app.lyricState.custom ? "Сохранённый текст" : "Источник: " + (app.lyricState.source || ""); color: app.muted; font.pixelSize: 11; Layout.fillWidth: true }
+            Caption { text: app.lyricState.custom ? qsTr("Сохранённый текст") : qsTr("Источник: ") + (app.lyricState.source || ""); color: app.muted; font.pixelSize: 11; Layout.fillWidth: true }
         }
     }
     Sheet {
@@ -1428,11 +1437,11 @@ ApplicationWindow {
         }
         contentItem: ColumnLayout {
             spacing: 16
-            Caption { text: "Новый плейлист"; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true }
+            Caption { text: qsTr("Новый плейлист"); font.pixelSize: 20; font.bold: true; Layout.fillWidth: true }
             TextField {
                 id: playlistTitle
                 Layout.fillWidth: true; implicitHeight: 48
-                placeholderText: "Название плейлиста"; maximumLength: 200
+                placeholderText: qsTr("Название плейлиста"); maximumLength: 200
                 font.pixelSize: 14; color: app.ink; placeholderTextColor: (app.dark ? "#aaaaaa" : "#77717a")
                 selectionColor: app.accent; selectedTextColor: app.foreground(app.accent); leftPadding: 14
                 background: Rectangle { radius: 16; color: (app.dark ? "#242424" : "#eeeeee"); border.width: playlistTitle.activeFocus ? 1 : 0; border.color: Qt.alpha(app.accent, 0.5) }
@@ -1440,8 +1449,8 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true; spacing: 10
-                Action { text: "Отмена"; Layout.fillWidth: true; onClicked: createPlaylist.close() }
-                Action { text: "Создать"; primary: true; Layout.fillWidth: true; enabled: !!playlistTitle.text.trim(); onClicked: createPlaylist.submit() }
+                Action { text: qsTr("Отмена"); Layout.fillWidth: true; onClicked: createPlaylist.close() }
+                Action { text: qsTr("Создать"); primary: true; Layout.fillWidth: true; enabled: !!playlistTitle.text.trim(); onClicked: createPlaylist.submit() }
             }
         }
     }
@@ -1451,8 +1460,8 @@ ApplicationWindow {
         modal: true; padding: 20
         background: Rectangle { radius: 24; color: app.panel }
         contentItem: ColumnLayout {
-            Caption { text: "Сохранить в плейлист"; font.bold: true; font.pixelSize: 22 }
-            Label { visible: !!app.api.loadingDestinations; text: "Загрузка…"; color: app.muted }
+            Caption { text: qsTr("Сохранить в плейлист"); font.bold: true; font.pixelSize: 22 }
+            Label { visible: !!app.api.loadingDestinations; text: qsTr("Загрузка…"); color: app.muted }
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 model: app.api.destinations || []
@@ -1462,9 +1471,9 @@ ApplicationWindow {
                     width: ListView.view.width; height: 56; text: modelData.title
                     onClicked: { sc.saveToPlaylist(app.selectedTrack.urn, modelData.urn, ""); destinations.close() }
                 }
-                footer: Action { visible: !!app.api.destinationNext; text: "Ещё"; onClicked: sc.listDestinations(app.api.destinationNext) }
+                footer: Action { visible: !!app.api.destinationNext; text: qsTr("Ещё"); onClicked: sc.listDestinations(app.api.destinationNext) }
             }
-            Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: destinations.close() }
+            Action { text: qsTr("Закрыть"); Layout.fillWidth: true; onClicked: destinations.close() }
         }
     }
     Sheet {
@@ -1473,9 +1482,9 @@ ApplicationWindow {
         background: Rectangle { color: app.panel; radius: 24 }
         contentItem: ColumnLayout {
             Caption { text: app.api.profile?.username || "Sange"; font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
-            Label { text: "SoundCloud для твоего ритма"; color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
-            Action { text: sc.signedIn ? "Выйти из аккаунта" : "Войти в SoundCloud"; Layout.fillWidth: true; onClicked: { sc.signedIn ? sc.logout() : sc.login(); account.close() } }
-            Action { text: "Закрыть"; Layout.fillWidth: true; onClicked: account.close() }
+            Label { text: qsTr("SoundCloud для твоего ритма"); color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Action { text: sc.signedIn ? qsTr("Выйти из аккаунта") : qsTr("Войти в SoundCloud"); Layout.fillWidth: true; onClicked: { sc.signedIn ? sc.logout() : sc.login(); account.close() } }
+            Action { text: qsTr("Закрыть"); Layout.fillWidth: true; onClicked: account.close() }
         }
     }
     PluginToolsPopup { dark: app.dark; ink: app.ink; muted: app.muted; id: pluginTools; manager: pluginManager }
@@ -1512,7 +1521,7 @@ ApplicationWindow {
 
                 }
                 Caption { anchors.horizontalCenter: parent.horizontalCenter; text: "Sange"; font.pixelSize: 25; font.bold: true }
-                Caption { anchors.horizontalCenter: parent.horizontalCenter; text: "Твоя музыка рядом"; color: app.muted; font.pixelSize: 13 }
+                Caption { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Твоя музыка рядом"); color: app.muted; font.pixelSize: 13 }
             }
         }
         Timer { interval: 900; running: startup.opened; onTriggered: startup.close() }

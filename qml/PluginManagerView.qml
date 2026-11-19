@@ -17,13 +17,13 @@ Column {
     property color muted: "#707075"
     spacing: 12
     function permissionLabel(id) {
-        return ({"code.execute":"Исполнение QML/JavaScript: полный доступ к приложению, данным и сети; без изоляции", "ui.panels":"Панели и кнопки", "ui.theme":"Изменение оформления", "player.observe":"Названия и исполнители треков, состояние плеера (персональные данные)", "player.control":"Управление воспроизведением", "navigation":"Переходы между страницами", "storage":"Собственные данные", "timers":"Одноразовые таймеры"})[id] || id
+        return ({"code.execute":qsTr("Исполнение QML/JavaScript: полный доступ к приложению, данным и сети; без изоляции"), "ui.panels":qsTr("Панели и кнопки"), "ui.theme":qsTr("Изменение оформления"), "player.observe":qsTr("Названия и исполнители треков, состояние плеера (персональные данные)"), "player.control":qsTr("Управление воспроизведением"), "navigation":qsTr("Переходы между страницами"), "storage":qsTr("Собственные данные"), "timers":qsTr("Одноразовые таймеры")})[id] || id
     }
-    function showResult(error) { message = error || "Изменения сохранены" }
+    function showResult(error) { message = error || qsTr("Изменения сохранены") }
     Dialogs.FileDialog {
         id: picker
-        title: "Установить или обновить плагин"
-        nameFilters: ["Плагины SCrip (*.json)"]
+        title: qsTr("Установить или обновить плагин")
+        nameFilters: [qsTr("Плагины SCrip (*.json)")]
         onAccepted: {
             const result = root.manager.prepareInstall(selectedFile)
             if (result.error) { root.message = result.error; return }
@@ -52,17 +52,17 @@ Column {
         palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
         palette.windowText: root.ink
         palette.text: root.ink
-        title: "Проверка плагина"
+        title: qsTr("Проверка плагина")
         closePolicy: Popup.CloseOnEscape
         onClosed: { if (root.operationId && root.manager) root.manager.cancelInstall(root.operationId); root.operationId = "" }
         contentItem: ScrollView {
             clip: true; contentWidth: availableWidth
             Column {
                 width: parent.width; spacing: 12
-                Label { width: parent.width; text: root.preview.plugin ? root.preview.plugin.name + " · " + root.preview.plugin.version : "Читаем и проверяем файл…"; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true }
+                Label { width: parent.width; text: root.preview.plugin ? root.preview.plugin.name + " · " + root.preview.plugin.version : qsTr("Читаем и проверяем файл…"); textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true }
                 Label { width: parent.width; text: root.preview.plugin?.description || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text }
-                Label { width: parent.width; text: root.preview.previousVersion ? "Предыдущая версия: " + root.preview.previousVersion : "Новый плагин будет установлен выключенным."; textFormat: Text.PlainText; wrapMode: Text.Wrap }
-                Label { width: parent.width; text: "Файл не подписан. Совпадение ID не подтверждает автора. Устанавливайте пакеты из источника, которому доверяете."; wrapMode: Text.Wrap }
+                Label { width: parent.width; text: root.preview.previousVersion ? qsTr("Предыдущая версия: ") + root.preview.previousVersion : qsTr("Новый плагин будет установлен выключенным."); textFormat: Text.PlainText; wrapMode: Text.Wrap }
+                Label { width: parent.width; text: qsTr("Файл не подписан. Совпадение ID не подтверждает автора. Устанавливайте пакеты из источника, которому доверяете."); wrapMode: Text.Wrap }
                 Label { width: parent.width; text: "SHA-256: " + (root.preview.sha256 || "…"); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; font.pixelSize: 11 }
                 Repeater {
                     model: root.preview.permissions || []
@@ -76,13 +76,13 @@ Column {
                     id: consent
                     width: parent.width
                     enabled: !!root.preview.plugin
-                    text: "Подтверждаю замену и перечисленные разрешения"
+                    text: qsTr("Подтверждаю замену и перечисленные разрешения")
                     contentItem: Label { text: consent.text; color: root.ink; wrapMode: Text.Wrap; leftPadding: consent.indicator.width + consent.spacing; verticalAlignment: Text.AlignVCenter }
                 }
                 Flow {
                     width: parent.width; spacing: 8
                     PluginAction {
-                        text: "Установить"
+                        text: qsTr("Установить")
                         enabled: consent.checked && !!root.preview.plugin
                         onClicked: {
                             root.showResult(root.manager.commitInstall(root.operationId, root.preview.permissions || []))
@@ -90,7 +90,7 @@ Column {
                             review.close()
                         }
                     }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Отмена"; onClicked: review.close() }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Отмена"); onClicked: review.close() }
                 }
             }
         }
@@ -104,20 +104,20 @@ Column {
         palette.window: (root.dark ? "#1c1c1c" : "#fafafa")
         palette.windowText: root.ink
         palette.text: root.ink
-        title: "Удаление плагина"
+        title: qsTr("Удаление плагина")
         standardButtons: Dialog.Ok | Dialog.Cancel
         contentItem: Column {
             spacing: 12
-            Label { width: parent.width; text: "Удалить «" + root.removalId + "»? Его зависимые плагины будут отключены.\n" + (root.manager ? root.manager.dependents(root.removalId).join(", ") : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap }
-            CheckBox { id: keep; text: "Сохранить настройки и данные" }
+            Label { width: parent.width; text: qsTr("Удалить «") + root.removalId + qsTr("»? Его зависимые плагины будут отключены.\n") + (root.manager ? root.manager.dependents(root.removalId).join(", ") : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap }
+            CheckBox { id: keep; text: qsTr("Сохранить настройки и данные") }
         }
         onAccepted: root.showResult(root.manager.remove(root.removalId, keep.checked))
     }
     Flow {
         width: parent.width; spacing: 8
-        PluginAction { width: Math.min(implicitWidth, parent.width); text: "Установить / обновить из файла…"; enabled: !!root.manager && !root.manager.error; onClicked: picker.open() }
+        PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Установить / обновить из файла…"); enabled: !!root.manager && !root.manager.error; onClicked: picker.open() }
     }
-    Label { width: parent.width; text: root.manager ? root.manager.error : "Менеджер недоступен"; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: (root.dark ? "#ff8a97" : "#a22c39") }
+    Label { width: parent.width; text: root.manager ? root.manager.error : qsTr("Менеджер недоступен"); textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: (root.dark ? "#ff8a97" : "#a22c39") }
     Label { width: parent.width; text: root.message; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
     Repeater {
         model: root.manager ? root.manager.installed : []
@@ -134,19 +134,19 @@ Column {
                 x: 10; y: 10; width: parent.width - 20; spacing: 7
                 Label { width: parent.width; text: card.modelData.plugin.name + " · " + card.modelData.version; textFormat: Text.PlainText; wrapMode: Text.Wrap; font.bold: true; color: root.ink }
                 Label { width: parent.width; text: card.modelData.plugin.description || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.ink }
-                Label { width: parent.width; text: ({"active":"Работает", "disabled":"Отключён", "removed":"Пакет удалён, конфигурация сохранена", "awaiting-permissions":"Нужны разрешения", "blocked":"Заблокирован", "error":"Ошибка"})[card.modelData.status] + (card.modelData.reason ? ": " + card.modelData.reason : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
+                Label { width: parent.width; text: ({"active":qsTr("Работает"), "disabled":qsTr("Отключён"), "removed":qsTr("Пакет удалён, конфигурация сохранена"), "awaiting-permissions":qsTr("Нужны разрешения"), "blocked":qsTr("Заблокирован"), "error":qsTr("Ошибка")})[card.modelData.status] + (card.modelData.reason ? ": " + card.modelData.reason : ""); textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
                 Label { width: parent.width; text: card.modelData.lastError || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: (root.dark ? "#ff8a97" : "#a22c39") }
                 Label { width: parent.width; text: card.modelData.themeStatus || ""; textFormat: Text.PlainText; wrapMode: Text.Wrap; visible: !!text; color: root.muted }
                 Flow {
                     width: parent.width; spacing: 8
-                    PluginAction { width: Math.min(implicitWidth, parent.width); visible: card.modelData.status !== "removed"; text: card.modelData.enabled ? "Отключить" : "Включить"; onClicked: root.showResult(root.manager.enable(card.modelData.plugin.id, !card.modelData.enabled)) }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Обновить из файла"; onClicked: picker.open() }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Удалить"; onClicked: { root.removalId = card.modelData.plugin.id; keep.checked = false; removal.open() } }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Перезагрузить код"; visible: card.modelData.plugin.kind === "qml" && card.modelData.enabled; onClicked: root.manager.reloadRuntime(card.modelData.plugin.id) }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить журнал"; visible: !!card.modelData.lastError; onClicked: root.manager.clearError(card.modelData.plugin.id) }
-                    PluginAction { width: Math.min(implicitWidth, parent.width); text: "Копировать ошибку"; visible: !!card.modelData.lastError; onClicked: sc.copyText(String(card.modelData.lastError)) }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); visible: card.modelData.status !== "removed"; text: card.modelData.enabled ? qsTr("Отключить") : qsTr("Включить"); onClicked: root.showResult(root.manager.enable(card.modelData.plugin.id, !card.modelData.enabled)) }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Обновить из файла"); onClicked: picker.open() }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Удалить"); onClicked: { root.removalId = card.modelData.plugin.id; keep.checked = false; removal.open() } }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Перезагрузить код"); visible: card.modelData.plugin.kind === "qml" && card.modelData.enabled; onClicked: root.manager.reloadRuntime(card.modelData.plugin.id) }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Очистить журнал"); visible: !!card.modelData.lastError; onClicked: root.manager.clearError(card.modelData.plugin.id) }
+                    PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Копировать ошибку"); visible: !!card.modelData.lastError; onClicked: sc.copyText(String(card.modelData.lastError)) }
                 }
-                PluginAction { text: "Разрешения · " + (card.modelData.permissionRows || []).length; onClicked: card.permissionsOpen = !card.permissionsOpen }
+                PluginAction { text: qsTr("Разрешения · ") + (card.modelData.permissionRows || []).length; onClicked: card.permissionsOpen = !card.permissionsOpen }
                 Repeater {
                     model: card.modelData.permissionRows || []
                     CheckBox {
@@ -160,7 +160,7 @@ Column {
                         onToggled: root.showResult(root.manager.setPermission(card.modelData.plugin.id, modelData.id, checked))
                     }
                 }
-                PluginAction { text: "Настройки · " + (card.modelData.settingRows || []).length; onClicked: card.settingsOpen = !card.settingsOpen }
+                PluginAction { text: qsTr("Настройки · ") + (card.modelData.settingRows || []).length; onClicked: card.settingsOpen = !card.settingsOpen }
                 Repeater {
                     model: card.modelData.settingRows || []
                     Column {
@@ -169,22 +169,22 @@ Column {
                         width: body.width; spacing: 4
                         visible: card.settingsOpen
                         Label { width: parent.width; text: setting.modelData.label; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.ink }
-                        Switch { palette.windowText: root.ink; visible: setting.modelData.type === "boolean"; checked: setting.modelData.value === true; text: "Включено"; onToggled: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, checked)) }
+                        Switch { palette.windowText: root.ink; visible: setting.modelData.type === "boolean"; checked: setting.modelData.value === true; text: qsTr("Включено"); onToggled: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, checked)) }
                         SpinBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "integer"; from: setting.modelData.min || 0; to: setting.modelData.max || 0; value: setting.modelData.type === "integer" ? setting.modelData.value : 0; editable: true; onValueModified: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, value)) }
                         ComboBox { palette.base: (root.dark ? "#111111" : "#ffffff"); palette.text: root.ink; palette.button: (root.dark ? "#2c2c2c" : "#ebebeb"); palette.buttonText: root.ink; visible: setting.modelData.type === "enum"; width: Math.min(280, parent.width); model: setting.modelData.options || []; currentIndex: (setting.modelData.options || []).indexOf(setting.modelData.value); onActivated: root.showResult(root.manager.setSetting(card.modelData.plugin.id, setting.modelData.id, currentText)) }
                     }
                 }
-                Label { width: parent.width; text: "Собственные данные: " + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }
-                PluginAction { width: Math.min(implicitWidth, parent.width); text: "Очистить данные"; onClicked: { root.removalId = card.modelData.plugin.id; clearDataDialog.open() } }
+                Label { width: parent.width; text: qsTr("Собственные данные: ") + JSON.stringify(card.modelData.data || {}); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; visible: Object.keys(card.modelData.data || {}).length > 0; color: root.muted; maximumLineCount: 6; elide: Text.ElideRight }
+                PluginAction { width: Math.min(implicitWidth, parent.width); text: qsTr("Очистить данные"); onClicked: { root.removalId = card.modelData.plugin.id; clearDataDialog.open() } }
             }
         }
     }
     Dialog {
         id: clearDataDialog
         parent: Overlay.overlay; anchors.centerIn: parent; width: Math.min(380, parent.width - 24); height: 120
-        modal: true; title: "Очистить данные плагина"; standardButtons: Dialog.Ok | Dialog.Cancel
-        contentItem: Label { text: "Удалить пользовательские данные плагина «" + root.removalId + "» и настройки удалённых параметров? Текущие настройки плагина останутся."; textFormat: Text.PlainText; wrapMode: Text.Wrap; padding: 16 }
+        modal: true; title: qsTr("Очистить данные плагина"); standardButtons: Dialog.Ok | Dialog.Cancel
+        contentItem: Label { text: qsTr("Удалить пользовательские данные плагина «") + root.removalId + qsTr("» и настройки удалённых параметров? Текущие настройки плагина останутся."); textFormat: Text.PlainText; wrapMode: Text.Wrap; padding: 16 }
         onAccepted: root.showResult(root.manager.clearData(root.removalId))
     }
-    Label { text: "Пока нет установленных плагинов"; visible: !!root.manager && !root.manager.installed.length; color: root.muted }
+    Label { text: qsTr("Пока нет установленных плагинов"); visible: !!root.manager && !root.manager.installed.length; color: root.muted }
 }

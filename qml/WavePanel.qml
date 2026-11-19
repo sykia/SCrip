@@ -37,14 +37,14 @@ Rectangle {
         width: Math.min(parent.width - 28, 480)
         height: stacked ? 152 : 52
         stacked: width < 250
-        segments: ["Больше знакомого", "Баланс", "Больше открытий"]
-        Accessible.name: "Подбор музыки"
+        segments: [qsTr("Больше знакомого"), qsTr("Баланс"), qsTr("Больше открытий")]
+        Accessible.name: qsTr("Подбор музыки")
         value: root.api.recommendationPreference === undefined ? 1 : root.api.recommendationPreference
         ink: root.inkColor; surface: Qt.alpha(root.inkColor, 0.055); accent: root.waveColor
         selectedInk: root.waveColor.hslLightness > 0.6 ? "#242426" : "white"
         motion: root.motion ? 150 : 0
         onEdited: value => root.backend.chooseWavePreference(value)
-        Accessible.description: "Изменить подбор и включить другой трек"
+        Accessible.description: qsTr("Изменить подбор и включить другой трек")
     }
     AbstractButton {
         InteractionFeedback {}
@@ -55,8 +55,8 @@ Rectangle {
         anchors.left: parent.left; anchors.right: parent.right
         hoverEnabled: true
         enabled: !root.loading
-        Accessible.name: root.failed ? "Повторить загрузку волны" : root.playing ? "Приостановить волну" : "Слушать волну"
-        Accessible.description: root.failed ? root.api.waveError : root.discovery && root.api.current?.recommendationSource ? "Похоже на «" + root.api.current.recommendationSource + "» · SoundCloud" : (root.discovery ? "Больше открытий" : "Больше знакомого")
+        Accessible.name: root.failed ? qsTr("Повторить загрузку волны") : root.playing ? qsTr("Приостановить волну") : qsTr("Слушать волну")
+        Accessible.description: root.failed ? root.api.waveError : root.discovery && root.api.current?.recommendationSource ? qsTr("Похоже на «") + root.api.current.recommendationSource + "» · SoundCloud" : (root.discovery ? qsTr("Больше открытий") : qsTr("Больше знакомого"))
         ToolTip.visible: hovered && (root.failed || (root.discovery && !!root.api.current?.recommendationSource))
         ToolTip.text: Accessible.description
         background: Item {}

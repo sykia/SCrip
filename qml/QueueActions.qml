@@ -32,13 +32,13 @@ Popup {
     }
     contentItem: ColumnLayout {
         spacing: 8
-        Copy { text: "Сохранить очередь"; font.pixelSize: 20; font.weight: Font.DemiBold; Layout.fillWidth: true; Layout.bottomMargin: 8 }
+        Copy { text: qsTr("Сохранить очередь"); font.pixelSize: 20; font.weight: Font.DemiBold; Layout.fillWidth: true; Layout.bottomMargin: 8 }
         ColumnLayout {
             Layout.fillWidth: true; spacing: 12
             TextField {
                 id: title; objectName: "queuePlaylistTitle"
                 Layout.fillWidth: true; implicitHeight: 48; maximumLength: 255
-                placeholderText: "Название плейлиста"; color: popup.host.ink
+                placeholderText: qsTr("Название плейлиста"); color: popup.host.ink
                 placeholderTextColor: popup.host.muted; selectionColor: popup.host.accent
                 enabled: !popup.busy
                 background: Rectangle { color: popup.host.raised; radius: 10 }
@@ -47,8 +47,8 @@ Popup {
             Copy { text: popup.state.queuePlaylistError || ""; visible: !!text; Layout.fillWidth: true; font.pixelSize: 12 }
             RowLayout {
                 Layout.fillWidth: true
-                Action { text: "Отмена"; enabled: !popup.busy; onClicked: popup.close() }
-                Action { text: popup.busy ? "Сохранение…" : "Сохранить"; primary: true; enabled: !!title.text.trim() && !popup.busy && sc.signedIn && sc.queueTracks.length > 0; onClicked: sc.saveQueueAsPlaylist(title.text) }
+                Action { text: qsTr("Отмена"); enabled: !popup.busy; onClicked: popup.close() }
+                Action { text: popup.busy ? qsTr("Сохранение…") : qsTr("Сохранить"); primary: true; enabled: !!title.text.trim() && !popup.busy && sc.signedIn && sc.queueTracks.length > 0; onClicked: sc.saveQueueAsPlaylist(title.text) }
             }
         }
     }

@@ -115,7 +115,7 @@ ColumnLayout {
             implicitHeight: tools.mobile ? 44 : 34
             leftPadding: 12; rightPadding: 12; selectByMouse: true; font.pixelSize: 13
             text: tools.query; onTextEdited: tools.query = text
-            placeholderText: "Поиск в коллекции"; Accessible.name: placeholderText
+            placeholderText: qsTr("Поиск в коллекции"); Accessible.name: placeholderText
             color: tools.host.ink; placeholderTextColor: tools.host.muted
             selectionColor: tools.host.accent
             background: Rectangle {
@@ -128,7 +128,7 @@ ColumnLayout {
         Action {
             id: optionsButton; objectName: "collectionOptionsButton"
             leftPadding: 0; rightPadding: 0
-            text: "Действия с коллекцией"; Accessible.name: text
+            text: qsTr("Действия с коллекцией"); Accessible.name: text
             implicitWidth: tools.mobile ? 44 : 32; implicitHeight: tools.mobile ? 44 : 32
             contentItem: Canvas {
                 property color ink: tools.host.ink
@@ -147,11 +147,11 @@ ColumnLayout {
     Copy {
         Layout.fillWidth: true; color: tools.host.muted; font.pixelSize: 11
         visible: !tools.catalogue && (!!tools.query || tools.sortKey !== "source" || !!tools.state.collectionSearching || !!tools.state.collectionSearchStatus)
-        text: tools.state.collectionSearching ? "Загружено " + tools.sourceRows.length + " · поиск по всей коллекции"
-              : (tools.state.collectionSearchStatus === "error" || (tools.playlistContext ? !!tools.state.playlistError : tools.state.collectionStatus === "error" || tools.state.collectionStatus === "unavailable")) ? "Поиск прерван · показана загруженная часть"
-              : tools.state.collectionSearchStatus === "limit" ? "Поиск приостановлен · можно продолжить"
-              : tools.hasMore || tools.busy ? "По загруженной части · " + tools.sourceRows.length
-              : "Вся коллекция · " + tools.sourceRows.length
+        text: tools.state.collectionSearching ? qsTr("Загружено ") + tools.sourceRows.length + qsTr(" · поиск по всей коллекции")
+              : (tools.state.collectionSearchStatus === "error" || (tools.playlistContext ? !!tools.state.playlistError : tools.state.collectionStatus === "error" || tools.state.collectionStatus === "unavailable")) ? qsTr("Поиск прерван · показана загруженная часть")
+              : tools.state.collectionSearchStatus === "limit" ? qsTr("Поиск приостановлен · можно продолжить")
+              : tools.hasMore || tools.busy ? qsTr("По загруженной части · ") + tools.sourceRows.length
+              : qsTr("Вся коллекция · ") + tools.sourceRows.length
     }
     Popup {
         id: options
@@ -170,16 +170,16 @@ ColumnLayout {
             ScrollBar.vertical: ScrollBar {}
             ColumnLayout {
                 id: optionRows; width: parent.width; spacing: 2
-                MenuAction { text: tools.state.collectionSearching ? "Остановить поиск" : "Искать по всей коллекции"; visible: !tools.catalogue; enabled: !!tools.state.collectionSearching || (tools.hasMore && !tools.busy); onClicked: { options.close(); tools.state.collectionSearching ? tools.backend.cancelCollectionSearch() : tools.backend.searchWholeCollection(tools.playlistContext) } }
+                MenuAction { text: tools.state.collectionSearching ? qsTr("Остановить поиск") : qsTr("Искать по всей коллекции"); visible: !tools.catalogue; enabled: !!tools.state.collectionSearching || (tools.hasMore && !tools.busy); onClicked: { options.close(); tools.state.collectionSearching ? tools.backend.cancelCollectionSearch() : tools.backend.searchWholeCollection(tools.playlistContext) } }
                 Rectangle { visible: !tools.catalogue; Layout.fillWidth: true; Layout.topMargin: 6; Layout.bottomMargin: 6; height: 1; color: Qt.alpha(tools.host.ink, 0.08) }
                 Repeater {
-                    model: tools.catalogue ? [] : [{key:"source", title:"Порядок источника"}, {key:"title", title:"По названию"}, {key:"artist", title:"По исполнителю"}, {key:"duration", title:"По длительности"}, {key:"created_at", title:"По дате загрузки"}].filter(v => v.key !== "created_at" || tools.sourceRows.some(t => Number.isFinite(Date.parse(t.created_at))))
+                    model: tools.catalogue ? [] : [{key:"source", title:qsTr("Порядок источника")}, {key:"title", title:qsTr("По названию")}, {key:"artist", title:qsTr("По исполнителю")}, {key:"duration", title:qsTr("По длительности")}, {key:"created_at", title:qsTr("По дате загрузки")}].filter(v => v.key !== "created_at" || tools.sourceRows.some(t => Number.isFinite(Date.parse(t.created_at))))
                     MenuAction { required property var modelData; text: modelData.title; marked: tools.sortKey === modelData.key; onClicked: { tools.sortKey = modelData.key; options.close() } }
                 }
-                MenuAction { text: "Обратный порядок"; visible: !tools.catalogue; enabled: tools.sortKey !== "source"; marked: tools.descending; onClicked: { tools.descending = !tools.descending; options.close() } }
+                MenuAction { text: qsTr("Обратный порядок"); visible: !tools.catalogue; enabled: tools.sortKey !== "source"; marked: tools.descending; onClicked: { tools.descending = !tools.descending; options.close() } }
                 Rectangle { visible: !tools.catalogue; Layout.fillWidth: true; Layout.topMargin: 6; Layout.bottomMargin: 6; height: 1; color: Qt.alpha(tools.host.ink, 0.08) }
-                MenuAction { text: "Сохранить поиск…"; onClicked: { options.close(); tools.editingId = ""; presetName.text = ""; presetDialog.open(); presetName.forceActiveFocus() } }
-                MenuAction { text: "Сохранённые поиски"; enabled: tools.presets.length > 0; onClicked: { options.close(); savedDialog.open() } }
+                MenuAction { text: qsTr("Сохранить поиск…"); onClicked: { options.close(); tools.editingId = ""; presetName.text = ""; presetDialog.open(); presetName.forceActiveFocus() } }
+                MenuAction { text: qsTr("Сохранённые поиски"); enabled: tools.presets.length > 0; onClicked: { options.close(); savedDialog.open() } }
             }
         }
     }
@@ -187,20 +187,20 @@ ColumnLayout {
         id: presetDialog
         contentItem: ColumnLayout {
             spacing: 16
-            Copy { Layout.fillWidth: true; text: tools.editingId ? "Название поиска" : "Сохранить поиск"; font.pixelSize: 20; font.weight: Font.DemiBold }
+            Copy { Layout.fillWidth: true; text: tools.editingId ? qsTr("Название поиска") : qsTr("Сохранить поиск"); font.pixelSize: 20; font.weight: Font.DemiBold }
             TextField {
                 id: presetName; objectName: "savedSearchName"
                 Layout.fillWidth: true; implicitHeight: 48; maximumLength: 80
                 leftPadding: 14; rightPadding: 14; font.pixelSize: 14; selectByMouse: true
-                placeholderText: "Название"; color: tools.host.ink; placeholderTextColor: tools.host.muted
+                placeholderText: qsTr("Название"); color: tools.host.ink; placeholderTextColor: tools.host.muted
                 selectionColor: tools.host.accent; onAccepted: tools.savePreset()
                 background: Rectangle { color: tools.host.raised; radius: 10; border.color: parent.activeFocus ? Qt.alpha(tools.host.accent, 0.5) : "transparent" }
             }
             RowLayout {
                 Layout.fillWidth: true
-                Action { text: "Отмена"; onClicked: presetDialog.close() }
+                Action { text: qsTr("Отмена"); onClicked: presetDialog.close() }
                 Item { Layout.fillWidth: true }
-                Action { text: "Сохранить"; primary: true; enabled: !!presetName.text.trim(); onClicked: tools.savePreset() }
+                Action { text: qsTr("Сохранить"); primary: true; enabled: !!presetName.text.trim(); onClicked: tools.savePreset() }
             }
         }
     }
@@ -210,8 +210,8 @@ ColumnLayout {
             spacing: 16
             RowLayout {
                 Layout.fillWidth: true
-                Copy { text: "Сохранённые поиски"; font.pixelSize: 20; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                Action { text: "Закрыть"; onClicked: savedDialog.close() }
+                Copy { text: qsTr("Сохранённые поиски"); font.pixelSize: 20; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                Action { text: qsTr("Закрыть"); onClicked: savedDialog.close() }
             }
             ListView {
                 Layout.fillWidth: true; Layout.preferredHeight: Math.min(320, contentHeight)
@@ -220,7 +220,7 @@ ColumnLayout {
                     required property var modelData
                     width: ListView.view.width; height: tools.mobile ? 52 : 44; spacing: 4
                     MenuAction { text: modelData.name; onClicked: tools.applyPreset(modelData) }
-                    Action { text: "···"; Accessible.name: "Действия с поиском"; implicitWidth: 44; onClicked: { tools.selectedPreset = modelData; presetActions.open() } }
+                    Action { text: "···"; Accessible.name: qsTr("Действия с поиском"); implicitWidth: 44; onClicked: { tools.selectedPreset = modelData; presetActions.open() } }
                 }
             }
         }
@@ -229,8 +229,8 @@ ColumnLayout {
         id: presetActions; width: Math.min(320, parent.width - 32); padding: 12
         contentItem: ColumnLayout {
             spacing: 2
-            MenuAction { text: "Переименовать"; onClicked: { presetActions.close(); tools.editingId = tools.selectedPreset.id; presetName.text = tools.selectedPreset.name; presetDialog.open(); presetName.forceActiveFocus() } }
-            MenuAction { text: "Удалить"; destructive: true; onClicked: { tools.writePreset(tools.selectedPreset.id, null); presetActions.close() } }
+            MenuAction { text: qsTr("Переименовать"); onClicked: { presetActions.close(); tools.editingId = tools.selectedPreset.id; presetName.text = tools.selectedPreset.name; presetDialog.open(); presetName.forceActiveFocus() } }
+            MenuAction { text: qsTr("Удалить"); destructive: true; onClicked: { tools.writePreset(tools.selectedPreset.id, null); presetActions.close() } }
         }
     }
 }

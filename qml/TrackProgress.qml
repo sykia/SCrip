@@ -23,8 +23,8 @@ Control {
     enabled: duration > 0
     focusPolicy: Qt.StrongFocus
     Accessible.role: Accessible.Slider
-    Accessible.name: "Позиция воспроизведения"
-    Accessible.description: Math.round(value / 1000) + " из " + Math.round(duration / 1000) + " секунд. Стрелки: 5 секунд, Home и End: начало и конец"
+    Accessible.name: qsTr("Позиция воспроизведения")
+    Accessible.description: Math.round(value / 1000) + qsTr(" из ") + Math.round(duration / 1000) + qsTr(" секунд. Стрелки: 5 секунд, Home и End: начало и конец")
     Accessible.onIncreaseAction: seekTo(value + stepSize)
     Accessible.onDecreaseAction: seekTo(value - stepSize)
     onSelectionKeyChanged: { adjusting = false; pointer.validGesture = false }

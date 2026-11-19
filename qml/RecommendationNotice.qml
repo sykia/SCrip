@@ -21,8 +21,8 @@ Popup {
     closePolicy: Popup.NoAutoClose
     background: Rectangle { color: notice.surface; radius: 12; border.color: Qt.alpha(notice.ink, 0.15) }
     contentItem: RowLayout {
-        Label { text: "Исключено из рекомендаций"; color: notice.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
-        SurfaceButton { host: appearance; quiet: true; mobile: true; text: "Отменить"; Layout.minimumHeight: 44; onClicked: { notice.backend.undoRecommendationExclusion(); notice.close() } }
+        Label { text: qsTr("Исключено из рекомендаций"); color: notice.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        SurfaceButton { host: appearance; quiet: true; mobile: true; text: qsTr("Отменить"); Layout.minimumHeight: 44; onClicked: { notice.backend.undoRecommendationExclusion(); notice.close() } }
     }
     Timer { id: timeout; interval: 6000; onTriggered: notice.close() }
     Connections {

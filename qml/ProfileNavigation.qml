@@ -46,7 +46,7 @@ Item {
             Repeater {
                 id: buttons
                 onItemAdded: Qt.callLater(navigation.updateIndicator)
-                model: ["Треки", "Плейлисты", "Избранное", "Репосты"]
+                model: [qsTr("Треки"), qsTr("Плейлисты"), qsTr("Избранное"), qsTr("Репосты")]
                 AbstractButton {
                     id: tab
                     required property int index
@@ -54,7 +54,7 @@ Item {
                     objectName: "profileSection" + index
                     width: label.implicitWidth + (index > 1 ? 16 : 0)
                     height: 44
-                    Accessible.name: modelData + (index > 1 ? ": выбрать вид коллекции" : "")
+                    Accessible.name: modelData + (index > 1 ? qsTr(": выбрать вид коллекции") : "")
                     onClicked: {
                         if (index === 2) likesMenu.popup(tab, 0, height)
                         else if (index === 3) repostsMenu.popup(tab, 0, height)
@@ -102,16 +102,16 @@ Item {
         objectName: "profileLikesMenu"
         width: 210; padding: 4
         background: Rectangle { radius: 10; color: host.panel; border.color: host.raised }
-        Choice { text: "Любимые треки"; checked: navigation.likes === "likes"; onTriggered: navigation.navigate(2, "likes") }
-        Choice { text: "Любимые плейлисты"; checked: navigation.likes === "likedPlaylists"; onTriggered: navigation.navigate(2, "likedPlaylists") }
-        Choice { text: "Любимые станции"; checked: navigation.likes === "likedStations"; onTriggered: navigation.navigate(2, "likedStations") }
+        Choice { text: qsTr("Любимые треки"); checked: navigation.likes === "likes"; onTriggered: navigation.navigate(2, "likes") }
+        Choice { text: qsTr("Любимые плейлисты"); checked: navigation.likes === "likedPlaylists"; onTriggered: navigation.navigate(2, "likedPlaylists") }
+        Choice { text: qsTr("Любимые станции"); checked: navigation.likes === "likedStations"; onTriggered: navigation.navigate(2, "likedStations") }
     }
     Menu {
         id: repostsMenu
         objectName: "profileRepostsMenu"
         width: 210; padding: 4
         background: Rectangle { radius: 10; color: host.panel; border.color: host.raised }
-        Choice { text: "Репосты треков"; checked: navigation.reposts === "reposts"; onTriggered: navigation.navigate(3, "reposts") }
-        Choice { text: "Репосты плейлистов"; checked: navigation.reposts === "repostedPlaylists"; onTriggered: navigation.navigate(3, "repostedPlaylists") }
+        Choice { text: qsTr("Репосты треков"); checked: navigation.reposts === "reposts"; onTriggered: navigation.navigate(3, "reposts") }
+        Choice { text: qsTr("Репосты плейлистов"); checked: navigation.reposts === "repostedPlaylists"; onTriggered: navigation.navigate(3, "repostedPlaylists") }
     }
 }

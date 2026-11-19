@@ -48,7 +48,7 @@ QtObject {
     function finish(token, success, error) {
         if (!pending || token !== pending) return
         busy = false; pending = ""
-        if (success) { reset(); message = "Добавлено" }
+        if (success) { reset(); message = qsTr("Добавлено") }
         else message = error
     }
 }

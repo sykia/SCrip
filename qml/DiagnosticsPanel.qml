@@ -10,14 +10,14 @@ ColumnLayout {
     property color muted: host.muted
     spacing: 10
     Label {
-        text: "Нашли ошибку?"
+        text: qsTr("Нашли ошибку?")
         color: root.ink
         font.pixelSize: 14
         font.weight: Font.DemiBold
         Layout.fillWidth: true
     }
     Label {
-        text: "Скопируйте лог и приложите его к сообщению на GitHub. Напишите, что произошло и как повторить ошибку."
+        text: qsTr("Скопируйте лог и приложите его к сообщению на GitHub. Напишите, что произошло и как повторить ошибку.")
         color: root.muted
         font.pixelSize: 12
         wrapMode: Text.WordWrap
@@ -29,14 +29,14 @@ ColumnLayout {
         SurfaceButton {
             host: root.host; mobile: root.mobile
             objectName: "copyDiagnosticLog"
-            text: "Скопировать последний лог"
+            text: qsTr("Скопировать последний лог")
             width: Math.min(implicitWidth, parent.width)
             onClicked: diagnostics.copyReport()
         }
         SurfaceButton {
             host: root.host; mobile: root.mobile
             objectName: "openDiagnosticIssue"
-            text: "Открыть GitHub Issues ↗"
+            text: qsTr("Открыть GitHub Issues ↗")
             width: Math.min(implicitWidth, parent.width)
             onClicked: diagnostics.openIssue()
         }
@@ -51,7 +51,7 @@ ColumnLayout {
         Accessible.role: Accessible.StaticText
     }
     Label {
-        text: "Перед публикацией проверьте лог: отчёты на GitHub видны всем."
+        text: qsTr("Перед публикацией проверьте лог: отчёты на GitHub видны всем.")
         color: root.muted
         font.pixelSize: 11
         wrapMode: Text.WordWrap

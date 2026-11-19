@@ -36,7 +36,7 @@ Column {
                         spacing: 8
                         Label {
                             width: stateItem.width
-                            text: stateItem.modelData.label + ": " + (stateItem.modelData.available ? (stateItem.modelData.valueType === "boolean" ? (stateItem.modelData.value ? "Включено" : "Выключено") : String(stateItem.modelData.value)) : "—")
+                            text: stateItem.modelData.label + ": " + (stateItem.modelData.available ? (stateItem.modelData.valueType === "boolean" ? (stateItem.modelData.value ? qsTr("Включено") : qsTr("Выключено")) : String(stateItem.modelData.value)) : "—")
                             textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; color: root.ink
                         }
                     }

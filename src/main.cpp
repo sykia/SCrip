@@ -1,4 +1,5 @@
 #include "diagnostics.h"
+#include "languagecontroller.h"
 #include "pluginruntime.h"
 #include "plugins.h"
 #include "playercommand.h"
@@ -159,7 +160,11 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_ANDROID
     AndroidMedia androidMedia(&soundcloud, &artwork);
 #endif
+    LanguageController language;
+    app.installTranslator(&language);
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("uiLanguage", &language);
+    QObject::connect(&language, &LanguageController::languageChanged, &engine, &QQmlApplicationEngine::retranslate);
     engine.setNetworkAccessManagerFactory(&artwork);
     artwork.prepare(&app, [] {});
     engine.rootContext()->setContextProperty("diagnostics", &diagnostics);
@@ -266,37 +271,53 @@ int main(int argc, char *argv[])
     app.setQuitOnLastWindowClosed(false);
     QMenuBar menuBar;
     auto *applicationMenu = menuBar.addMenu("Sange");
-    applicationMenu->addAction("Открыть Sange", restore);
-    auto *quitAction = applicationMenu->addAction("Выход", &app, [&] { window->removeEventFilter(&filter); app.quit(); });
+    applicationMenu->addAction(QCoreApplication::translate("NativeMenu", "Открыть Sange"), restore);
+    auto *quitAction = applicationMenu->addAction(QCoreApplication::translate("NativeMenu", "Выход"), &app, [&] { window->removeEventFilter(&filter); app.quit(); });
     quitAction->setMenuRole(QAction::QuitRole);
     quitAction->setShortcut(QKeySequence::Quit);
     QObject::connect(&app, &QGuiApplication::applicationStateChanged, &app, [restore, window](Qt::ApplicationState state) {
         if (state == Qt::ApplicationActive && !window->isVisible()) restore();
     });
 #endif
-    menu.addAction("Открыть Sange", restore);
+    menu.addAction(QCoreApplication::translate("NativeMenu", "Открыть Sange"), restore);
     menu.addSeparator();
-    auto *play = menu.addAction("Воспроизвести", &soundcloud, &SoundCloud::togglePlayback);
-    auto *previous = menu.addAction("Предыдущий трек", &soundcloud, &SoundCloud::previous);
-    auto *next = menu.addAction("Следующий трек", &soundcloud, &SoundCloud::next);
-    auto *like = menu.addAction("Поставить лайк", [&] {
+    auto *play = menu.addAction(QCoreApplication::translate("NativeMenu", "Воспроизвести"), &soundcloud, &SoundCloud::togglePlayback);
+    auto *previous = menu.addAction(QCoreApplication::translate("NativeMenu", "Предыдущий трек"), &soundcloud, &SoundCloud::previous);
+    auto *next = menu.addAction(QCoreApplication::translate("NativeMenu", "Следующий трек"), &soundcloud, &SoundCloud::next);
+    auto *like = menu.addAction(QCoreApplication::translate("NativeMenu", "Поставить лайк"), [&] {
         soundcloud.like(soundcloud.state().value("current").toMap());
     });
     menu.addSeparator();
-    menu.addAction("Выход", &app, [&] { window->removeEventFilter(&filter); app.quit(); });
+    menu.addAction(QCoreApplication::translate("NativeMenu", "Выход"), &app, [&] { window->removeEventFilter(&filter); app.quit(); });
     QObject::connect(&menu, &QMenu::aboutToShow, &app, [&] {
         const auto state = soundcloud.state();
         const auto current = state.value("current").toMap();
-        play->setText(state.value("playing").toBool() ? "Пауза" : "Воспроизвести");
+        play->setText(state.value("playing").toBool() ? QCoreApplication::translate("NativeMenu", "Пауза") : QCoreApplication::translate("NativeMenu", "Воспроизвести"));
         play->setEnabled(!current.isEmpty());
         previous->setEnabled(!current.isEmpty());
         next->setEnabled(!state.value("queue").toList().isEmpty());
         like->setEnabled(soundcloud.signedIn() && !current.isEmpty());
-        like->setText(current.value("user_favorite").toBool() ? "Снять лайк" : "Поставить лайк");
+        like->setText(current.value("user_favorite").toBool() ? QCoreApplication::translate("NativeMenu", "Снять лайк") : QCoreApplication::translate("NativeMenu", "Поставить лайк"));
     });
     QObject::connect(&tray, &QSystemTrayIcon::activated, &app, [restore](QSystemTrayIcon::ActivationReason reason) {
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) restore();
     });
+    const auto nativeOpen = QByteArray("Открыть Sange");
+    const auto nativeQuit = QByteArray("Выход");
+    auto refreshNativeMenus = [&] {
+        previous->setText(QCoreApplication::translate("NativeMenu", "Предыдущий трек"));
+        next->setText(QCoreApplication::translate("NativeMenu", "Следующий трек"));
+        const auto state = soundcloud.state();
+        play->setText(QCoreApplication::translate("NativeMenu", state.value("playing").toBool() ? "Пауза" : "Воспроизвести"));
+        like->setText(QCoreApplication::translate("NativeMenu", state.value("current").toMap().value("user_favorite").toBool() ? "Снять лайк" : "Поставить лайк"));
+        menu.actions().first()->setText(QCoreApplication::translate("NativeMenu", nativeOpen.constData()));
+        menu.actions().last()->setText(QCoreApplication::translate("NativeMenu", nativeQuit.constData()));
+#ifdef Q_OS_MACOS
+        applicationMenu->actions().first()->setText(QCoreApplication::translate("NativeMenu", nativeOpen.constData()));
+        quitAction->setText(QCoreApplication::translate("NativeMenu", nativeQuit.constData()));
+#endif
+    };
+    QObject::connect(&language, &LanguageController::languageChanged, &menu, refreshNativeMenus);
     tray.setContextMenu(&menu);
     tray.setToolTip("Sange");
     tray.show();

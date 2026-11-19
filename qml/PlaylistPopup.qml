@@ -37,15 +37,15 @@ Popup {
             return
         }
         begin({urn: seed.urn, preview_type: "station", seed: seed,
-               title: "Подборка SCrip · " + (seed.title || seed.user?.username || "Похожие треки"),
+               title: qsTr("Подборка SCrip · ") + (seed.title || seed.user?.username || qsTr("Похожие треки")),
                artwork_url: artist ? seed.user?.avatar_url || seed.artwork_url : seed.artwork_url,
-               user: {username: "Похожие треки · SoundCloud"}})
+               user: {username: qsTr("Похожие треки · SoundCloud")}})
     }
     function beginMix(collection, tracks) {
-        begin({preview_type: "mix", title: collection.title || "Подборка",
+        begin({preview_type: "mix", title: collection.title || qsTr("Подборка"),
                tracks: tracks, track_count: tracks.length,
                artwork_url: collection.artwork_url || tracks[0]?.artwork_url,
-               user: {username: collection.subtitle || "Подборка SCrip"}})
+               user: {username: collection.subtitle || qsTr("Подборка SCrip")}})
     }
     TrackSelection { id: popupSelection; rows: popup.songs; context: (collectionTools.transformed ? collectionTools.sourceRows.length : "") + ":" + collectionTools.sortKey + ":" + collectionTools.descending + ":" + collectionTools.query + ":" + (popup.playlist.urn || popup.playlist.title || "") + ":" + (popup.state.profile?.urn || "") + ":" + sc.signedIn }
     function selectionBack() { return visible && selectionBar.back() }
@@ -127,10 +127,10 @@ Popup {
         contentItem: ColumnLayout {
             spacing: 8
             EngagementAction { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; item: popup.playlist; repost: true }
-            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: "Редактировать плейлист"; visible: popup.owned; onClicked: { playlistMenu.close(); editor.begin(popup.playlist) } }
-            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: "Профиль автора"; visible: !!popup.playlist.user?.urn; onClicked: { playlistMenu.close(); popup.close(); popup.host.openProfile(popup.playlist.user) } }
-            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: "Копировать ссылку"; visible: !!popup.playlist.permalink_url; onClicked: { sc.copyText(popup.playlist.permalink_url); playlistMenu.close() } }
-            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: "Закрыть"; onClicked: playlistMenu.close() }
+            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: qsTr("Редактировать плейлист"); visible: popup.owned; onClicked: { playlistMenu.close(); editor.begin(popup.playlist) } }
+            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: qsTr("Профиль автора"); visible: !!popup.playlist.user?.urn; onClicked: { playlistMenu.close(); popup.close(); popup.host.openProfile(popup.playlist.user) } }
+            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: qsTr("Копировать ссылку"); visible: !!popup.playlist.permalink_url; onClicked: { sc.copyText(popup.playlist.permalink_url); playlistMenu.close() } }
+            SurfaceButton { host: popup.host; mobile: popup.mobile; Layout.fillWidth: true; text: qsTr("Закрыть"); onClicked: playlistMenu.close() }
         }
     }
     contentItem: ColumnLayout {
@@ -148,9 +148,9 @@ Popup {
                 id: previewHeader; width: parent.width; spacing: 16
                 RowLayout {
                     Layout.fillWidth: true
-                    Copy { Layout.fillWidth: true; text: (popup.playlist.urn || "").startsWith("soundcloud:system-playlists:") ? "СТАНЦИЯ SOUNDCLOUD" : popup.playlist.preview_type === "station" || popup.playlist.preview_type === "mix" ? "ПОДБОРКА SCrip" : popup.playlist.is_album || popup.playlist.playlist_type === "album" ? "АЛЬБОМ" : "ПЛЕЙЛИСТ"; font.pixelSize: 11; font.letterSpacing: 1.5; color: host.muted }
-                    Command { text: "Ещё"; visible: !!popup.playlist.urn; onClicked: playlistMenu.open() }
-                    Command { text: "Закрыть"; onClicked: popup.close() }
+                    Copy { Layout.fillWidth: true; text: (popup.playlist.urn || "").startsWith("soundcloud:system-playlists:") ? qsTr("СТАНЦИЯ SOUNDCLOUD") : popup.playlist.preview_type === "station" || popup.playlist.preview_type === "mix" ? qsTr("ПОДБОРКА SCrip") : popup.playlist.is_album || popup.playlist.playlist_type === "album" ? qsTr("АЛЬБОМ") : qsTr("ПЛЕЙЛИСТ"); font.pixelSize: 11; font.letterSpacing: 1.5; color: host.muted }
+                    Command { text: qsTr("Ещё"); visible: !!popup.playlist.urn; onClicked: playlistMenu.open() }
+                    Command { text: qsTr("Закрыть"); onClicked: popup.close() }
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -166,23 +166,23 @@ Popup {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 8
-                        Copy { Layout.fillWidth: true; text: popup.playlist.title || "Без названия"; font.pixelSize: mobile ? 20 : 26; font.weight: Font.DemiBold; wrapMode: Text.Wrap; maximumLineCount: 3 }
+                        Copy { Layout.fillWidth: true; text: popup.playlist.title || qsTr("Без названия"); font.pixelSize: mobile ? 20 : 26; font.weight: Font.DemiBold; wrapMode: Text.Wrap; maximumLineCount: 3 }
                         Copy { Layout.fillWidth: true; text: popup.playlist.user?.username || "SoundCloud"; color: host.muted }
-                        Copy { Layout.fillWidth: true; text: (popup.playlist.track_count ?? popup.songs.length) + " треков"; font.pixelSize: 12; color: host.muted }
+                        Copy { Layout.fillWidth: true; text: (popup.playlist.track_count ?? popup.songs.length) + qsTr(" треков"); font.pixelSize: 12; color: host.muted }
                     }
                 }
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
-                    Command { Layout.fillWidth: mobile; text: "Слушать"; primary: true; enabled: popup.songs.length > 0 && !popup.state.playlistError && !popup.state.playlistBusy; onClicked: popup.playAt(0) }
-                    Command { Layout.fillWidth: mobile; text: "Перемешать"; enabled: popup.songs.length > 0 && !popup.state.playlistError && !popup.state.playlistBusy; onClicked: { const shuffled = popup.songs.slice(); for (let i = shuffled.length - 1; i > 0; --i) { const j = Math.floor(Math.random() * (i + 1)); const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t } sc.playMix(shuffled, 0) } }
+                    Command { Layout.fillWidth: mobile; text: qsTr("Слушать"); primary: true; enabled: popup.songs.length > 0 && !popup.state.playlistError && !popup.state.playlistBusy; onClicked: popup.playAt(0) }
+                    Command { Layout.fillWidth: mobile; text: qsTr("Перемешать"); enabled: popup.songs.length > 0 && !popup.state.playlistError && !popup.state.playlistBusy; onClicked: { const shuffled = popup.songs.slice(); for (let i = shuffled.length - 1; i > 0; --i) { const j = Math.floor(Math.random() * (i + 1)); const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t } sc.playMix(shuffled, 0) } }
                     Item { visible: !mobile; Layout.fillWidth: true }
-                    Command { visible: !mobile && !!popup.playlist.permalink_url; text: "Поделиться"; onClicked: sc.copyText(popup.playlist.permalink_url) }
+                    Command { visible: !mobile && !!popup.playlist.permalink_url; text: qsTr("Поделиться"); onClicked: sc.copyText(popup.playlist.permalink_url) }
                 }
                 RowLayout {
                     Layout.fillWidth: true
                     EngagementAction { host: popup.host; mobile: popup.mobile; item: popup.playlist }
-                    Copy { Layout.fillWidth: true; visible: popup.playlist.sharing === "private"; text: "Приватный плейлист"; color: host.muted; font.pixelSize: 12 }
+                    Copy { Layout.fillWidth: true; visible: popup.playlist.sharing === "private"; text: qsTr("Приватный плейлист"); color: host.muted; font.pixelSize: 12 }
                     Item { Layout.fillWidth: true }
                 }
                 Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: host.raised }
@@ -220,7 +220,7 @@ Popup {
                     Copy { Layout.preferredWidth: 24; text: row.current ? "♪" : row.index + 1; color: row.current ? host.accent : host.muted; horizontalAlignment: Text.AlignHCenter }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
-                        Copy { Layout.fillWidth: true; text: row.modelData.title || "Без названия"; color: row.current ? host.accent : host.ink; font.weight: Font.Medium }
+                        Copy { Layout.fillWidth: true; text: row.modelData.title || qsTr("Без названия"); color: row.current ? host.accent : host.ink; font.weight: Font.Medium }
                         Copy { Layout.fillWidth: true; text: sc.displayArtist(row.modelData) || "SoundCloud"; color: host.muted; font.pixelSize: 12 }
                     }
                     Copy { visible: !mobile; text: host.time(row.modelData.duration); color: host.muted; font.pixelSize: 12 }
@@ -228,7 +228,7 @@ Popup {
                         objectName: "previewTrackActions" + row.index
                         implicitWidth: mobile ? 48 : 38; implicitHeight: mobile ? 48 : 38
                         hoverEnabled: true
-                        Accessible.name: "Действия с треком"
+                        Accessible.name: qsTr("Действия с треком")
                         onClicked: host.openTrackActions(row.modelData)
                         background: Rectangle { radius: 10; color: parent.down || parent.hovered ? Qt.alpha(host.ink, 0.1) : host.raised }
                         contentItem: Canvas {
@@ -249,9 +249,9 @@ Popup {
                 width: list.width
                 spacing: 8
                 Copy { width: parent.width; visible: !!popup.state.playlistError; text: popup.state.playlistError || ""; wrapMode: Text.Wrap; elide: Text.ElideNone; color: host.muted }
-                Command { anchors.horizontalCenter: parent.horizontalCenter; visible: !popup.state.playlistBusy && (!!popup.state.playlistError || !!popup.state.playlistHasMore); text: popup.state.playlistError ? "Повторить" : "Загрузить ещё"; onClicked: sc.loadPlaylist(popup.playlist, !!popup.state.playlistHasMore) }
+                Command { anchors.horizontalCenter: parent.horizontalCenter; visible: !popup.state.playlistBusy && (!!popup.state.playlistError || !!popup.state.playlistHasMore); text: popup.state.playlistError ? qsTr("Повторить") : qsTr("Загрузить ещё"); onClicked: sc.loadPlaylist(popup.playlist, !!popup.state.playlistHasMore) }
                 BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; visible: running; running: !!popup.state.playlistBusy; height: 44 }
-                Copy { width: parent.width; horizontalAlignment: Text.AlignHCenter; visible: !popup.state.playlistBusy && !popup.state.playlistError && !popup.songs.length; text: collectionTools.query.trim() ? (popup.state.playlistHasMore || popup.state.collectionSearchStatus === "error" || popup.state.collectionSearchStatus === "limit" ? "В загруженной части совпадений нет" : "Ничего не найдено") : "В этом плейлисте пока нет треков"; color: host.muted }
+                Copy { width: parent.width; horizontalAlignment: Text.AlignHCenter; visible: !popup.state.playlistBusy && !popup.state.playlistError && !popup.songs.length; text: collectionTools.query.trim() ? (popup.state.playlistHasMore || popup.state.collectionSearchStatus === "error" || popup.state.collectionSearchStatus === "limit" ? qsTr("В загруженной части совпадений нет") : qsTr("Ничего не найдено")) : qsTr("В этом плейлисте пока нет треков"); color: host.muted }
             }
         }
     }

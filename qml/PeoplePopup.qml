@@ -34,10 +34,10 @@ Popup {
             Layout.fillWidth: true
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
-                Label { Layout.fillWidth: true; text: popup.kind === "followers" ? "Подписчики" : popup.kind === "followings" ? "Подписки" : popup.kind === "favoriters" ? "Поставили лайк" : popup.kind === "reposters" ? "Сделали репост" : "Похожие исполнители"; color: popup.host.ink; font.pixelSize: 22; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                Label { Layout.fillWidth: true; text: popup.kind === "followers" ? qsTr("Подписчики") : popup.kind === "followings" ? qsTr("Подписки") : popup.kind === "favoriters" ? qsTr("Поставили лайк") : popup.kind === "reposters" ? qsTr("Сделали репост") : qsTr("Похожие исполнители"); color: popup.host.ink; font.pixelSize: 22; font.weight: Font.DemiBold; elide: Text.ElideRight }
                 Label { Layout.fillWidth: true; text: popup.user.title || popup.user.username || "SoundCloud"; textFormat: Text.PlainText; color: popup.host.muted; font.pixelSize: 12; elide: Text.ElideRight }
             }
-            SurfaceButton { host: popup.host; mobile: popup.mobile; text: "×"; quiet: true; implicitWidth: 40; Accessible.name: "Закрыть список"; onClicked: popup.close() }
+            SurfaceButton { host: popup.host; mobile: popup.mobile; text: "×"; quiet: true; implicitWidth: 40; Accessible.name: qsTr("Закрыть список"); onClicked: popup.close() }
         }
         ListView {
             id: list
@@ -58,26 +58,26 @@ Popup {
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
                         Label { Layout.fillWidth: true; text: person.modelData.username || "SoundCloud"; textFormat: Text.PlainText; elide: Text.ElideRight; font.weight: Font.Medium; color: popup.host.ink }
-                        Label { Layout.fillWidth: true; text: Number(person.modelData.followers_count || 0).toLocaleString(Qt.locale(), "f", 0) + " подписчиков"; font.pixelSize: 11; color: popup.host.muted; elide: Text.ElideRight }
+                        Label { Layout.fillWidth: true; text: Number(person.modelData.followers_count || 0).toLocaleString(Qt.locale(), "f", 0) + qsTr(" подписчиков"); font.pixelSize: 11; color: popup.host.muted; elide: Text.ElideRight }
                     }
                     SurfaceButton {
                         host: popup.host; mobile: popup.mobile
                         readonly property string urn: person.modelData.urn || ""
                         readonly property bool followed: !!popup.state.followings?.[urn]
                         visible: urn !== (popup.state.profile?.urn || "")
-                        text: popup.state.followingPending?.[urn] ? "…" : followed ? "Вы подписаны" : popup.state.followingsLoading ? "…" : "Подписаться"
+                        text: popup.state.followingPending?.[urn] ? "…" : followed ? qsTr("Вы подписаны") : popup.state.followingsLoading ? "…" : qsTr("Подписаться")
                         selected: followed
                         enabled: !popup.state.followingsLoading && !popup.state.followingPending?.[urn]
-                        Accessible.name: (followed ? "Отписаться от " : "Подписаться на ") + person.modelData.username
+                        Accessible.name: (followed ? qsTr("Отписаться от ") : qsTr("Подписаться на ")) + person.modelData.username
                         onClicked: sc.toggleFollow(person.modelData)
                     }
                 }
             }
             footer: Column {
                 width: list.width; spacing: 12
-                Label { width: parent.width; topPadding: 24; text: popup.state.peopleError || (!list.count && !popup.state.peopleBusy ? (popup.kind === "related" ? "SoundCloud пока не предложил похожих исполнителей" : "Этот список пока пуст") : ""); visible: !!text; color: popup.host.muted; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
+                Label { width: parent.width; topPadding: 24; text: popup.state.peopleError || (!list.count && !popup.state.peopleBusy ? (popup.kind === "related" ? qsTr("SoundCloud пока не предложил похожих исполнителей") : qsTr("Этот список пока пуст")) : ""); visible: !!text; color: popup.host.muted; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
                 BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: !!popup.state.peopleBusy; visible: running }
-                SurfaceButton { anchors.horizontalCenter: parent.horizontalCenter; host: popup.host; mobile: popup.mobile; visible: !!popup.state.peopleError || !!popup.state.peopleHasMore; enabled: !popup.state.peopleBusy; text: popup.state.peopleError ? "Повторить" : "Показать ещё"; onClicked: sc.loadPeople(popup.user, popup.kind, !!popup.state.peopleHasMore) }
+                SurfaceButton { anchors.horizontalCenter: parent.horizontalCenter; host: popup.host; mobile: popup.mobile; visible: !!popup.state.peopleError || !!popup.state.peopleHasMore; enabled: !popup.state.peopleBusy; text: popup.state.peopleError ? qsTr("Повторить") : qsTr("Показать ещё"); onClicked: sc.loadPeople(popup.user, popup.kind, !!popup.state.peopleHasMore) }
             }
         }
     }

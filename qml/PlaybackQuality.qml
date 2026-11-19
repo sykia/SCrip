@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 Control {
     id: control
-    property var segments: ["Стандартное", "Экономия трафика"]
+    property var segments: [qsTr("Стандартное"), qsTr("Экономия трафика")]
     property bool stacked: false
     property int value: 0
     property color ink: "#eeeeee"
@@ -16,7 +16,7 @@ Control {
     implicitHeight: 44
     padding: 4
     Accessible.role: Accessible.Grouping
-    Accessible.name: "Качество воспроизведения"
+    Accessible.name: qsTr("Качество воспроизведения")
     background: Rectangle {
         radius: 12
         color: control.surface

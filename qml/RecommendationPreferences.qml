@@ -51,27 +51,27 @@ Popup {
         Keys.onReleased: event => { if (event.key === Qt.Key_Back) { popup.close(); event.accepted = true } }
         RowLayout {
             Layout.fillWidth: true
-            Label { text: "Исключения рекомендаций"; color: popup.ink; font.pixelSize: 18; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { text: qsTr("Исключения рекомендаций"); color: popup.ink; font.pixelSize: 18; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true }
             SurfaceButton {
                 host: appearance; mobile: true; quiet: true; implicitWidth: 44;
-                text: "⋯"; Accessible.name: "Дополнительные действия"
+                text: "⋯"; Accessible.name: qsTr("Дополнительные действия")
                 onClicked: more.open()
                 Menu {
                     id: more
-                    MenuItem { text: "Сбросить все исключения"; enabled: (popup.api.recommendationExclusions || []).length > 0; onTriggered: confirmation.open() }
+                    MenuItem { text: qsTr("Сбросить все исключения"); enabled: (popup.api.recommendationExclusions || []).length > 0; onTriggered: confirmation.open() }
                 }
             }
-            SurfaceButton { host: appearance; mobile: true; quiet: true; implicitWidth: 44; text: "×"; Accessible.name: "Закрыть"; onClicked: popup.close() }
+            SurfaceButton { host: appearance; mobile: true; quiet: true; implicitWidth: 44; text: "×"; Accessible.name: qsTr("Закрыть"); onClicked: popup.close() }
         }
         TextField {
             id: search; Layout.fillWidth: true
             implicitHeight: 44; leftPadding: 12; rightPadding: 12
-            placeholderText: "Поиск"; Accessible.name: "Поиск исключений"
+            placeholderText: qsTr("Поиск"); Accessible.name: qsTr("Поиск исключений")
             color: popup.ink; placeholderTextColor: Qt.alpha(popup.ink, 0.6); selectionColor: popup.accent
             background: Rectangle { radius: 10; color: Qt.alpha(popup.ink, 0.07) }
         }
-        Label { visible: !(popup.api.recommendationExclusions || []).length; text: "Исключений пока нет"; color: popup.ink }
-        Label { visible: (popup.api.recommendationExclusions || []).length > 0 && !popup.entries.length; text: "Ничего не найдено"; color: popup.ink }
+        Label { visible: !(popup.api.recommendationExclusions || []).length; text: qsTr("Исключений пока нет"); color: popup.ink }
+        Label { visible: (popup.api.recommendationExclusions || []).length > 0 && !popup.entries.length; text: qsTr("Ничего не найдено"); color: popup.ink }
         ListView {
             visible: popup.entries.length > 0
             Layout.fillWidth: true
@@ -86,7 +86,7 @@ Popup {
                 spacing: 0
                 Label {
                     visible: index === 0 || popup.entries[index - 1].account !== modelData.account
-                    text: modelData.account ? "Аккаунты" : "Треки"
+                    text: modelData.account ? qsTr("Аккаунты") : qsTr("Треки")
                     color: popup.ink; font.bold: true
                     Layout.fillWidth: true; Layout.preferredHeight: visible ? 36 : 0
                     verticalAlignment: Text.AlignVCenter
@@ -94,7 +94,7 @@ Popup {
                 Label { text: modelData.name || modelData.urn; textFormat: Text.PlainText; color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
                 SurfaceButton {
                     host: appearance; mobile: true; quiet: true
-                    text: "Вернуть в рекомендации"
+                    text: qsTr("Вернуть в рекомендации")
                     Accessible.name: text + ": " + (modelData.name || modelData.urn)
                     onClicked: popup.backend.restoreRecommendation(modelData.urn, modelData.account)
                     Layout.minimumHeight: 44
@@ -113,10 +113,10 @@ Popup {
         background: Rectangle { radius: 22; color: popup.surface }
         contentItem: ColumnLayout {
             spacing: 16
-            Label { text: "Сбросить все исключения?"; color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { text: qsTr("Сбросить все исключения?"); color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
             RowLayout {
-                SurfaceButton { host: appearance; mobile: true; text: "Отмена"; onClicked: confirmation.close() }
-                SurfaceButton { host: appearance; mobile: true; text: "Сбросить"; destructive: true; onClicked: { popup.backend.clearRecommendationExclusions(); confirmation.close() } }
+                SurfaceButton { host: appearance; mobile: true; text: qsTr("Отмена"); onClicked: confirmation.close() }
+                SurfaceButton { host: appearance; mobile: true; text: qsTr("Сбросить"); destructive: true; onClicked: { popup.backend.clearRecommendationExclusions(); confirmation.close() } }
             }
         }
     }

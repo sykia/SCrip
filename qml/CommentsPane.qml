@@ -133,7 +133,7 @@ Pane {
             Item {
                 Layout.fillWidth: true
                 implicitHeight: titleLabel.implicitHeight
-                Txt { id: titleLabel; anchors.fill: parent; verticalAlignment: Text.AlignVCenter; text: "Комментарии"; font.pixelSize: comments.narrow ? 12 : comments.mobile ? 18 : 15; font.weight: Font.DemiBold }
+                Txt { id: titleLabel; anchors.fill: parent; verticalAlignment: Text.AlignVCenter; text: qsTr("Комментарии"); font.pixelSize: comments.narrow ? 12 : comments.mobile ? 18 : 15; font.weight: Font.DemiBold }
                 MouseArea {
                     anchors.fill: parent
                     enabled: comments.movable
@@ -149,21 +149,21 @@ Pane {
                 }
             }
             Txt { visible: !comments.narrow; text: comments.matches ? (comments.dataState.items || []).length : ""; color: host.muted; font.pixelSize: 11 }
-            Tool { visible: comments.movable; implicitWidth: comments.narrow ? 24 : 32; symbol: preferences.commentsLeft ? "arrow" : "back"; text: preferences.commentsLeft ? "Переместить вправо" : "Переместить влево"; onClicked: preferences.commentsLeft = !preferences.commentsLeft }
-            Tool { visible: comments.movable; implicitWidth: comments.narrow ? 24 : 32; symbol: "close"; text: "Скрыть комментарии"; onClicked: preferences.showComments = false }
+            Tool { visible: comments.movable; implicitWidth: comments.narrow ? 24 : 32; symbol: preferences.commentsLeft ? "arrow" : "back"; text: preferences.commentsLeft ? qsTr("Переместить вправо") : qsTr("Переместить влево"); onClicked: preferences.commentsLeft = !preferences.commentsLeft }
+            Tool { visible: comments.movable; implicitWidth: comments.narrow ? 24 : 32; symbol: "close"; text: qsTr("Скрыть комментарии"); onClicked: preferences.showComments = false }
         }
         RowLayout {
             Layout.fillWidth: true; spacing: 4
-            Tool { implicitHeight: comments.mobile ? 36 : 28; text: "Все"; implicitWidth: comments.narrow ? 42 : 56; active: !preferences.timedComments; onClicked: { preferences.timedComments = false; comments.following = true } }
-            Tool { implicitHeight: comments.mobile ? 36 : 28; text: comments.narrow ? "Таймкоды" : "По времени"; implicitWidth: comments.narrow ? 88 : 110; active: preferences.timedComments; onClicked: { preferences.timedComments = true; comments.following = true; Qt.callLater(function() { comments.centerActive(true) }) } }
+            Tool { implicitHeight: comments.mobile ? 36 : 28; text: qsTr("Все"); implicitWidth: comments.narrow ? 42 : 56; active: !preferences.timedComments; onClicked: { preferences.timedComments = false; comments.following = true } }
+            Tool { implicitHeight: comments.mobile ? 36 : 28; text: comments.narrow ? qsTr("Таймкоды") : qsTr("По времени"); implicitWidth: comments.narrow ? 88 : 110; active: preferences.timedComments; onClicked: { preferences.timedComments = true; comments.following = true; Qt.callLater(function() { comments.centerActive(true) }) } }
             Item { Layout.fillWidth: true }
-            Tool { implicitHeight: comments.mobile ? 36 : 28; visible: !comments.narrow; symbol: "repeat"; text: "Обновить комментарии"; enabled: !comments.dataState.busy && !comments.dataState.sending; onClicked: sc.loadComments(comments.track.urn, false, true) }
+            Tool { implicitHeight: comments.mobile ? 36 : 28; visible: !comments.narrow; symbol: "repeat"; text: qsTr("Обновить комментарии"); enabled: !comments.dataState.busy && !comments.dataState.sending; onClicked: sc.loadComments(comments.track.urn, false, true) }
         }
         RowLayout {
             visible: preferences.timedComments
             Layout.fillWidth: true
-            Txt { Layout.fillWidth: true; text: comments.currentTrack ? "Сейчас · " + host.time(sc.position) : "Таймкоды этого трека"; font.pixelSize: 10; color: host.muted }
-            Tool { visible: !comments.following; text: "Следить"; implicitWidth: 78; onClicked: { comments.following = true; comments.centerActive(true) } }
+            Txt { Layout.fillWidth: true; text: comments.currentTrack ? qsTr("Сейчас · ") + host.time(sc.position) : qsTr("Таймкоды этого трека"); font.pixelSize: 10; color: host.muted }
+            Tool { visible: !comments.following; text: qsTr("Следить"); implicitWidth: 78; onClicked: { comments.following = true; comments.centerActive(true) } }
         }
         Item {
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: comments.narrow ? 40 : 100
@@ -198,8 +198,8 @@ Pane {
                             Avatar { visible: !comments.narrow; width: 20; height: 20; source: commentRow.modelData.user?.avatar_url || "" }
                             AbstractButton {
                                 Layout.fillWidth: true; Layout.minimumWidth: 0; implicitHeight: 26
-                                Accessible.name: "Открыть профиль " + (commentRow.modelData.user?.username || "")
-                                contentItem: Txt { text: commentRow.modelData.user?.username || "Пользователь SoundCloud"; font.pixelSize: 11; font.weight: Font.Medium; color: host.muted }
+                                Accessible.name: qsTr("Открыть профиль ") + (commentRow.modelData.user?.username || "")
+                                contentItem: Txt { text: commentRow.modelData.user?.username || qsTr("Пользователь SoundCloud"); font.pixelSize: 11; font.weight: Font.Medium; color: host.muted }
                                 onClicked: { if (commentRow.modelData.user?.urn) { comments.profileRequested(commentRow.modelData.user) } }
                             }
                             Tool {
@@ -211,21 +211,21 @@ Pane {
                             Tool {
                                 id: commentActions
                                 text: "⋯"; implicitWidth: 28; implicitHeight: comments.mobile ? 36 : 24
-                                Accessible.name: "Действия с комментарием"
+                                Accessible.name: qsTr("Действия с комментарием")
                                 opacity: comments.mobile || hover.hovered || hovered || visualFocus || actionsMenu.opened ? 1 : 0
                                 Behavior on opacity { NumberAnimation { duration: host.motion / 2 } }
                                 onClicked: actionsMenu.open()
                                 Menu {
                                     id: actionsMenu
                                     MenuItem {
-                                        text: "Ответить"; enabled: comments.canPost && sc.signedIn
+                                        text: qsTr("Ответить"); enabled: comments.canPost && sc.signedIn
                                         onTriggered: {
                                             const mention = "@" + (commentRow.modelData.user?.permalink || commentRow.modelData.user?.username || "") + " "
                                             if (comments.narrow) comments.composeRequested(mention)
                                             else comments.setDraft(mention)
                                         }
                                     }
-                                    MenuItem { text: "Копировать текст"; onTriggered: sc.copyText(commentRow.modelData.body || "") }
+                                    MenuItem { text: qsTr("Копировать текст"); onTriggered: sc.copyText(commentRow.modelData.body || "") }
                                 }
                             }
                         }
@@ -243,7 +243,7 @@ Pane {
                     width: commentList.width
                     visible: comments.matches && !!comments.dataState.hasMore
                     height: visible ? 34 : 0
-                    text: comments.dataState.busy ? "Загружаем…" : "Ещё комментарии"
+                    text: comments.dataState.busy ? qsTr("Загружаем…") : qsTr("Ещё комментарии")
                     enabled: !comments.dataState.busy
                     onClicked: sc.loadComments(comments.track.urn, true)
                 }
@@ -253,9 +253,9 @@ Pane {
                 visible: comments.entries.length === 0
                 Txt {
                     width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; color: host.muted; font.pixelSize: 12
-                    text: comments.hiddenComments ? "Комментарии скрыты автором" : comments.dataState.busy ? "Загружаем комментарии…" : comments.dataState.error ? comments.dataState.error : preferences.timedComments ? "Здесь появятся комментарии\nс отметками времени" : (comments.canPost ? "Пока нет комментариев.\nМожно оставить первый." : "Пока нет комментариев")
+                    text: comments.hiddenComments ? qsTr("Комментарии скрыты автором") : comments.dataState.busy ? qsTr("Загружаем комментарии…") : comments.dataState.error ? comments.dataState.error : preferences.timedComments ? qsTr("Здесь появятся комментарии\nс отметками времени") : (comments.canPost ? qsTr("Пока нет комментариев.\nМожно оставить первый.") : qsTr("Пока нет комментариев"))
                 }
-                Tool { anchors.horizontalCenter: parent.horizontalCenter; visible: !!comments.dataState.error; text: "Повторить"; onClicked: sc.loadComments(comments.track.urn, false, true) }
+                Tool { anchors.horizontalCenter: parent.horizontalCenter; visible: !!comments.dataState.error; text: qsTr("Повторить"); onClicked: sc.loadComments(comments.track.urn, false, true) }
             }
         }
         Txt { Layout.fillWidth: true; visible: comments.entries.length > 0 && !!comments.dataState.error; text: comments.dataState.error || ""; color: host.muted; wrapMode: Text.Wrap; font.pixelSize: 11 }
@@ -277,7 +277,7 @@ Pane {
                     objectName: comments.compact ? "floatingCommentInput" : "trackCommentInput"
                     width: composerScroll.availableWidth
                     enabled: comments.canPost && sc.signedIn && !comments.dataState.sending
-                    placeholderText: !comments.canPost ? "Автор отключил комментирование" : sc.signedIn ? "Написать комментарий…" : "Войдите, чтобы написать"
+                    placeholderText: !comments.canPost ? qsTr("Автор отключил комментирование") : sc.signedIn ? qsTr("Написать комментарий…") : qsTr("Войдите, чтобы написать")
                     color: host.ink; placeholderTextColor: host.muted; font.pixelSize: 12
                     wrapMode: TextEdit.Wrap; selectByMouse: true
                     leftPadding: 10; rightPadding: 10
@@ -286,17 +286,17 @@ Pane {
                     background: Rectangle { radius: 10; color: host.surface; border.color: commentInput.activeFocus ? Qt.alpha(host.accent, 0.5) : "transparent" }
                 }
             }
-            Tool { Layout.alignment: Qt.AlignBottom; objectName: "postCommentButton"; symbol: "arrow"; text: comments.dataState.sending ? "Отправляем…" : "Отправить комментарий"; enabled: comments.canPost && sc.signedIn && comments.matches && !comments.dataState.sending && commentInput.text.trim().length > 0 && commentInput.text.length <= 1000 && comments.validPostTime; onClicked: sc.postComment(comments.track.urn, commentInput.text, comments.timedPost ? comments.postTime : -1) }
+            Tool { Layout.alignment: Qt.AlignBottom; objectName: "postCommentButton"; symbol: "arrow"; text: comments.dataState.sending ? qsTr("Отправляем…") : qsTr("Отправить комментарий"); enabled: comments.canPost && sc.signedIn && comments.matches && !comments.dataState.sending && commentInput.text.trim().length > 0 && commentInput.text.length <= 1000 && comments.validPostTime; onClicked: sc.postComment(comments.track.urn, commentInput.text, comments.timedPost ? comments.postTime : -1) }
         }
         Tool {
-            visible: comments.narrow; enabled: comments.canPost && sc.signedIn; Layout.fillWidth: true; text: "Написать"
+            visible: comments.narrow; enabled: comments.canPost && sc.signedIn; Layout.fillWidth: true; text: qsTr("Написать")
             onClicked: { comments.composeRequested("") }
         }
         RowLayout {
             visible: !comments.narrow
             Layout.fillWidth: true; spacing: 4
             Tool {
-                text: "Таймкод"; active: comments.timedPost; implicitWidth: 74; implicitHeight: 28
+                text: qsTr("Таймкод"); active: comments.timedPost; implicitWidth: 74; implicitHeight: 28
                 Accessible.checkable: true; Accessible.checked: comments.timedPost
                 onClicked: comments.timedPost = !comments.timedPost
             }
@@ -308,7 +308,7 @@ Pane {
                 color: host.ink; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter
                 placeholderText: host.time(comments.currentTrack ? sc.position : 0)
                 placeholderTextColor: host.muted
-                Accessible.name: "Таймкод комментария, минуты и секунды"
+                Accessible.name: qsTr("Таймкод комментария, минуты и секунды")
                 selectByMouse: true; inputMethodHints: Qt.ImhNoPredictiveText
                 maximumLength: 6
                 background: Rectangle { radius: 8; color: host.surface; border.color: !comments.validPostTime ? host.accent : timeInput.activeFocus ? Qt.alpha(host.accent, 0.5) : "transparent" }
@@ -316,6 +316,6 @@ Pane {
             Item { Layout.fillWidth: true }
 
         }
-        Txt { Layout.fillWidth: true; visible: !!comments.dataState.postError || commentInput.text.length > 1000; text: commentInput.text.length > 1000 ? "Не больше 1000 символов" : comments.dataState.postError || ""; color: host.muted; wrapMode: Text.Wrap; font.pixelSize: 11 }
+        Txt { Layout.fillWidth: true; visible: !!comments.dataState.postError || commentInput.text.length > 1000; text: commentInput.text.length > 1000 ? qsTr("Не больше 1000 символов") : comments.dataState.postError || ""; color: host.muted; wrapMode: Text.Wrap; font.pixelSize: 11 }
     }
 }

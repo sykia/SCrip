@@ -10,7 +10,7 @@ Item {
     visible: eligible
     focus: false
     Accessible.role: Accessible.CheckBox
-    Accessible.name: "Выбрать «" + (selection?.rows[rowIndex]?.title || "трек") + "»"
+    Accessible.name: qsTr("Выбрать «") + (selection?.rows[rowIndex]?.title || qsTr("трек")) + "»"
     Accessible.checked: !!selection && selection.contains(rowIndex)
     Accessible.onToggleAction: selection.choose(rowIndex)
     activeFocusOnTab: true

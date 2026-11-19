@@ -71,7 +71,7 @@ Popup {
         }
         ColumnLayout {
             Layout.fillWidth: true; spacing: 4
-            Copy { Layout.fillWidth: true; text: parent.parent.track.title || "Недоступный трек"; font.pixelSize: 13; font.weight: Font.Medium }
+            Copy { Layout.fillWidth: true; text: parent.parent.track.title || qsTr("Недоступный трек"); font.pixelSize: 13; font.weight: Font.Medium }
             Copy { Layout.fillWidth: true; text: sc.displayArtist(parent.parent.track) || "SoundCloud"; color: editor.host.muted; font.pixelSize: 11 }
         }
     }
@@ -81,20 +81,20 @@ Popup {
         spacing: 16
         RowLayout {
             Layout.fillWidth: true; spacing: 4
-            Copy { Layout.fillWidth: true; text: "Редактирование плейлиста"; color: editor.host.muted; font.pixelSize: 12 }
-            QuietButton { text: "⋯"; Accessible.name: "Действия с плейлистом"; enabled: editor.initialized && !editor.busy; onClicked: options.open() }
-            QuietButton { text: "×"; Accessible.name: "Закрыть редактор"; enabled: !editor.busy || !editor.initialized; onClicked: editor.dismiss() }
+            Copy { Layout.fillWidth: true; text: qsTr("Редактирование плейлиста"); color: editor.host.muted; font.pixelSize: 12 }
+            QuietButton { text: "⋯"; Accessible.name: qsTr("Действия с плейлистом"); enabled: editor.initialized && !editor.busy; onClicked: options.open() }
+            QuietButton { text: "×"; Accessible.name: qsTr("Закрыть редактор"); enabled: !editor.busy || !editor.initialized; onClicked: editor.dismiss() }
         }
         ColumnLayout {
             Layout.fillWidth: true; enabled: editor.initialized && !editor.busy; spacing: 6
             TextField {
                 id: titleField; objectName: "playlistTitleField"
                 Layout.fillWidth: true; implicitHeight: editor.mobile ? 48 : 52
-                maximumLength: 255; placeholderText: "Название плейлиста"
+                maximumLength: 255; placeholderText: qsTr("Название плейлиста")
                 color: editor.host.ink; selectionColor: editor.host.accent; placeholderTextColor: editor.host.muted
                 font.pixelSize: editor.mobile ? 24 : 28; font.weight: Font.DemiBold
                 leftPadding: 0; rightPadding: 0
-                Accessible.name: "Название плейлиста"
+                Accessible.name: qsTr("Название плейлиста")
                 background: Item {
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: editor.host.accent; opacity: titleField.activeFocus ? 0.6 : 0; Behavior on opacity { NumberAnimation { duration: editor.host.motion > 0 ? 120 : 0 } } }
                 }
@@ -103,10 +103,10 @@ Popup {
                 Layout.fillWidth: true; Layout.preferredHeight: editor.mobile ? 64 : 72
                 TextArea {
                     id: description; objectName: "playlistDescriptionField"
-                    placeholderText: "Добавьте описание"
+                    placeholderText: qsTr("Добавьте описание")
                     color: editor.host.muted; selectionColor: editor.host.accent; placeholderTextColor: Qt.alpha(editor.host.muted, 0.8)
                     font.pixelSize: 13; wrapMode: TextEdit.Wrap; leftPadding: 0; rightPadding: 0; topPadding: 8; bottomPadding: 8
-                    textFormat: TextEdit.PlainText; Accessible.name: "Описание плейлиста"
+                    textFormat: TextEdit.PlainText; Accessible.name: qsTr("Описание плейлиста")
                     background: Item {}
                 }
             }
@@ -114,8 +114,8 @@ Popup {
                 id: privacy
                 checkable: true; implicitHeight: 36; implicitWidth: privacyContent.implicitWidth + 20
                 hoverEnabled: true; leftPadding: 10; rightPadding: 10
-                Accessible.name: checked ? "Приватный плейлист. Изменить доступ" : "Публичный плейлист. Изменить доступ"
-                ToolTip.visible: hovered; ToolTip.text: checked ? "Доступен только вам и по секретной ссылке" : "Виден всем в SoundCloud"
+                Accessible.name: checked ? qsTr("Приватный плейлист. Изменить доступ") : qsTr("Публичный плейлист. Изменить доступ")
+                ToolTip.visible: hovered; ToolTip.text: checked ? qsTr("Доступен только вам и по секретной ссылке") : qsTr("Виден всем в SoundCloud")
                 background: Rectangle { radius: 18; color: Qt.alpha(editor.host.ink, privacy.down || privacy.hovered ? 0.09 : 0.045) }
                 contentItem: RowLayout {
                     id: privacyContent; spacing: 7
@@ -130,17 +130,17 @@ Popup {
                             c.rect(3,6,8,6); c.moveTo(4,6); c.lineTo(4,4); c.bezierCurveTo(4,0,10,0,10,4); if (locked) c.lineTo(10,6); c.stroke()
                         }
                     }
-                    Copy { text: privacy.checked ? "Приватный" : "Публичный"; color: editor.host.muted; font.pixelSize: 12 }
+                    Copy { text: privacy.checked ? qsTr("Приватный") : qsTr("Публичный"); color: editor.host.muted; font.pixelSize: 12 }
                 }
             }
         }
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Qt.alpha(editor.host.ink, 0.08) }
         RowLayout {
             Layout.fillWidth: true
-            Copy { text: "Треки"; font.pixelSize: 14; font.weight: Font.DemiBold }
+            Copy { text: qsTr("Треки"); font.pixelSize: 14; font.weight: Font.DemiBold }
             Copy { text: (editor.draft.tracks || []).length; color: editor.host.muted; font.pixelSize: 12 }
             Item { Layout.fillWidth: true }
-            Copy { text: "Потяните за ⠿"; color: editor.host.muted; font.pixelSize: 11 }
+            Copy { text: qsTr("Потяните за ⠿"); color: editor.host.muted; font.pixelSize: 11 }
         }
         ListView {
             id: list; objectName: "playlistEditorTracks"
@@ -217,11 +217,11 @@ Popup {
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: 6; spacing: 4
                     TrackContent { Layout.fillWidth: true; track: row.modelData; number: row.index + 1 }
-                    QuietButton { text: "⋯"; implicitWidth: 36; Accessible.name: "Действия с треком «" + (row.modelData.title || "") + "»"; onClicked: { editor.selectedTrackIndex = row.index; rowActions.open() } }
+                    QuietButton { text: "⋯"; implicitWidth: 36; Accessible.name: qsTr("Действия с треком «") + (row.modelData.title || "") + "»"; onClicked: { editor.selectedTrackIndex = row.index; rowActions.open() } }
                     AbstractButton {
                         objectName: "playlistDragHandle" + row.index
                         Layout.preferredWidth: 44; Layout.preferredHeight: list.rowHeight
-                        Accessible.name: "Переместить «" + (row.modelData.title || "трек") + "». Alt и клавиши вверх или вниз"
+                        Accessible.name: qsTr("Переместить «") + (row.modelData.title || qsTr("трек")) + qsTr("». Alt и клавиши вверх или вниз")
                         focusPolicy: Qt.TabFocus
                         Keys.onPressed: function(event) {
                             if (!(event.modifiers & Qt.AltModifier)) return
@@ -270,14 +270,14 @@ Popup {
                 Behavior on scale { NumberAnimation { duration: editor.host.motion > 0 ? 140 : 0; easing.type: Easing.OutCubic } }
                 TrackContent { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 76; track: list.draggedTrack; floating: true }
             }
-            Copy { anchors.centerIn: parent; text: editor.busy ? "Загрузка…" : "В плейлисте пока нет треков"; visible: !list.count; color: editor.host.muted }
+            Copy { anchors.centerIn: parent; text: editor.busy ? qsTr("Загрузка…") : qsTr("В плейлисте пока нет треков"); visible: !list.count; color: editor.host.muted }
         }
         Copy { Layout.fillWidth: true; text: editor.state.playlistEditError || ""; visible: !!text; wrapMode: Text.Wrap; elide: Text.ElideNone; color: editor.host.muted; font.pixelSize: 12 }
         RowLayout {
             Layout.fillWidth: true; spacing: 8
-            Copy { Layout.fillWidth: true; text: editor.dirty ? "Есть изменения" : "Всё сохранено"; color: editor.host.muted; font.pixelSize: 12 }
-            SurfaceButton { host: editor.host; mobile: editor.mobile; text: "Повторить"; visible: !editor.initialized && !editor.busy; onClicked: sc.editPlaylist(editor.playlist) }
-            SurfaceButton { host: editor.host; mobile: editor.mobile; primary: true; text: editor.busy ? "Подождите…" : "Сохранить"; enabled: editor.dirty && !editor.busy && list.dragFrom < 0 && !!titleField.text.trim(); onClicked: { Qt.inputMethod.hide(); sc.savePlaylist(titleField.text, description.text, privacy.checked) } }
+            Copy { Layout.fillWidth: true; text: editor.dirty ? qsTr("Есть изменения") : qsTr("Всё сохранено"); color: editor.host.muted; font.pixelSize: 12 }
+            SurfaceButton { host: editor.host; mobile: editor.mobile; text: qsTr("Повторить"); visible: !editor.initialized && !editor.busy; onClicked: sc.editPlaylist(editor.playlist) }
+            SurfaceButton { host: editor.host; mobile: editor.mobile; primary: true; text: editor.busy ? qsTr("Подождите…") : qsTr("Сохранить"); enabled: editor.dirty && !editor.busy && list.dragFrom < 0 && !!titleField.text.trim(); onClicked: { Qt.inputMethod.hide(); sc.savePlaylist(titleField.text, description.text, privacy.checked) } }
         }
     }
     component Confirmation: Popup {
@@ -293,30 +293,30 @@ Popup {
         id: options
         contentItem: ColumnLayout {
             spacing: 10
-            Copy { text: "Плейлист"; font.weight: Font.DemiBold; font.pixelSize: 18 }
-            SurfaceButton { host: editor.host; mobile: editor.mobile; quiet: true; Layout.fillWidth: true; text: "Удалить плейлист"; destructive: true; onClicked: { options.close(); confirmDelete.open() } }
-            SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: "Закрыть"; onClicked: options.close() }
+            Copy { text: qsTr("Плейлист"); font.weight: Font.DemiBold; font.pixelSize: 18 }
+            SurfaceButton { host: editor.host; mobile: editor.mobile; quiet: true; Layout.fillWidth: true; text: qsTr("Удалить плейлист"); destructive: true; onClicked: { options.close(); confirmDelete.open() } }
+            SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: qsTr("Закрыть"); onClicked: options.close() }
         }
     }
     Confirmation {
         id: rowActions
         contentItem: ColumnLayout {
             spacing: 14
-            Copy { Layout.fillWidth: true; text: (editor.draft.tracks || [])[editor.selectedTrackIndex]?.title || "Трек"; wrapMode: Text.Wrap; maximumLineCount: 2; font.weight: Font.DemiBold }
-            SurfaceButton { host: editor.host; mobile: editor.mobile; quiet: true; Layout.fillWidth: true; text: "Удалить из плейлиста"; destructive: true; enabled: !editor.busy; onClicked: { sc.removePlaylistTrack(editor.selectedTrackIndex); editor.tracksChanged = true; rowActions.close() } }
-            SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: "Отмена"; onClicked: rowActions.close() }
+            Copy { Layout.fillWidth: true; text: (editor.draft.tracks || [])[editor.selectedTrackIndex]?.title || qsTr("Трек"); wrapMode: Text.Wrap; maximumLineCount: 2; font.weight: Font.DemiBold }
+            SurfaceButton { host: editor.host; mobile: editor.mobile; quiet: true; Layout.fillWidth: true; text: qsTr("Удалить из плейлиста"); destructive: true; enabled: !editor.busy; onClicked: { sc.removePlaylistTrack(editor.selectedTrackIndex); editor.tracksChanged = true; rowActions.close() } }
+            SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: qsTr("Отмена"); onClicked: rowActions.close() }
         }
     }
     Confirmation {
         id: confirmDelete
         contentItem: ColumnLayout {
             spacing: 16
-            Copy { text: "Удалить плейлист?"; font.pixelSize: 21; font.weight: Font.DemiBold }
-            Copy { Layout.fillWidth: true; text: "«" + (editor.playlist.title || "Без названия") + "» будет удалён из SoundCloud. Отменить это действие нельзя."; wrapMode: Text.Wrap; elide: Text.ElideNone; color: editor.host.muted }
+            Copy { text: qsTr("Удалить плейлист?"); font.pixelSize: 21; font.weight: Font.DemiBold }
+            Copy { Layout.fillWidth: true; text: "«" + (editor.playlist.title || qsTr("Без названия")) + qsTr("» будет удалён из SoundCloud. Отменить это действие нельзя."); wrapMode: Text.Wrap; elide: Text.ElideNone; color: editor.host.muted }
             RowLayout {
                 Layout.fillWidth: true
-                SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: "Отмена"; onClicked: confirmDelete.close() }
-                SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: "Удалить"; destructive: true; onClicked: { confirmDelete.close(); sc.deletePlaylist() } }
+                SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: qsTr("Отмена"); onClicked: confirmDelete.close() }
+                SurfaceButton { host: editor.host; mobile: editor.mobile; Layout.fillWidth: true; text: qsTr("Удалить"); destructive: true; onClicked: { confirmDelete.close(); sc.deletePlaylist() } }
             }
         }
     }
@@ -324,11 +324,11 @@ Popup {
         id: discard
         contentItem: ColumnLayout {
             spacing: 16
-            Copy { text: "Отменить изменения?"; font.pixelSize: 21; font.weight: Font.DemiBold }
-            Copy { Layout.fillWidth: true; text: "Название, описание и состав плейлиста останутся прежними."; wrapMode: Text.Wrap; color: editor.host.muted; elide: Text.ElideNone }
+            Copy { text: qsTr("Отменить изменения?"); font.pixelSize: 21; font.weight: Font.DemiBold }
+            Copy { Layout.fillWidth: true; text: qsTr("Название, описание и состав плейлиста останутся прежними."); wrapMode: Text.Wrap; color: editor.host.muted; elide: Text.ElideNone }
             RowLayout {
-                SurfaceButton { host: editor.host; mobile: editor.mobile; text: "Продолжить"; onClicked: discard.close() }
-                SurfaceButton { host: editor.host; mobile: editor.mobile; text: "Отменить изменения"; onClicked: { discard.close(); editor.initialized = false; editor.close() } }
+                SurfaceButton { host: editor.host; mobile: editor.mobile; text: qsTr("Продолжить"); onClicked: discard.close() }
+                SurfaceButton { host: editor.host; mobile: editor.mobile; text: qsTr("Отменить изменения"); onClicked: { discard.close(); editor.initialized = false; editor.close() } }
             }
         }
     }

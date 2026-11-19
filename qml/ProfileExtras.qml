@@ -18,7 +18,7 @@ Column {
     Component.onCompleted: Qt.callLater(extras.loadLinks)
     Flow {
         width: parent.width; spacing: 8
-        SurfaceButton { host: extras.host; mobile: extras.mobile; quiet: true; text: "Похожие исполнители"; visible: !!extras.userUrn; onClicked: extras.relatedRequested() }
+        SurfaceButton { host: extras.host; mobile: extras.mobile; quiet: true; text: qsTr("Похожие исполнители"); visible: !!extras.userUrn; onClicked: extras.relatedRequested() }
         Repeater {
             model: extras.expanded ? extras.links : extras.links.slice(0, 3)
             SurfaceButton {
@@ -26,13 +26,13 @@ Column {
                 host: extras.host; mobile: extras.mobile; quiet: true
                 width: Math.min(implicitWidth, extras.width)
                 text: modelData.title || modelData.service || modelData.username || modelData.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]
-                Accessible.name: "Открыть " + text + ": " + modelData.url
+                Accessible.name: qsTr("Открыть ") + text + ": " + modelData.url
                 onClicked: sc.openProfileWebsite(modelData.url)
                 ToolTip.visible: hovered; ToolTip.text: modelData.url
             }
         }
-        SurfaceButton { host: extras.host; mobile: extras.mobile; quiet: true; visible: extras.links.length > 3; text: extras.expanded ? "Свернуть ссылки" : "Ещё " + (extras.links.length - 3); onClicked: extras.expanded = !extras.expanded }
-        SurfaceButton { host: extras.host; mobile: extras.mobile; visible: !!extras.api.profileLinksError; text: "Повторить загрузку ссылок"; onClicked: sc.loadProfileLinks(extras.user) }
-        SurfaceButton { host: extras.host; mobile: extras.mobile; visible: !!extras.api.profileLinksHasMore; text: "Ещё ссылки"; enabled: !extras.api.profileLinksBusy; onClicked: sc.loadProfileLinks(extras.user, true) }
+        SurfaceButton { host: extras.host; mobile: extras.mobile; quiet: true; visible: extras.links.length > 3; text: extras.expanded ? qsTr("Свернуть ссылки") : qsTr("Ещё ") + (extras.links.length - 3); onClicked: extras.expanded = !extras.expanded }
+        SurfaceButton { host: extras.host; mobile: extras.mobile; visible: !!extras.api.profileLinksError; text: qsTr("Повторить загрузку ссылок"); onClicked: sc.loadProfileLinks(extras.user) }
+        SurfaceButton { host: extras.host; mobile: extras.mobile; visible: !!extras.api.profileLinksHasMore; text: qsTr("Ещё ссылки"); enabled: !extras.api.profileLinksBusy; onClicked: sc.loadProfileLinks(extras.user, true) }
     }
 }

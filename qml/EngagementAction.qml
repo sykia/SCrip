@@ -26,7 +26,7 @@ SurfaceButton {
         const divisor = value >= 1e9 ? 1e9 : value >= 1e6 ? 1e6 : value >= 1e4 ? 1e3 : 1
         return divisor === 1 ? fullCountText : (Math.floor(value / divisor * 10) / 10).toLocaleString(Qt.locale(), "f", 1) + (divisor === 1e9 ? "B" : divisor === 1e6 ? "M" : "K")
     }
-    readonly property string description: (repost ? (selected ? "Отменить репост" : "Сделать репост") : (selected ? "Убрать из любимых" : "Добавить в любимые")) + "; " + (countKnown ? (repost ? "репостов: " : "лайков: ") + fullCountText : item.reveal_stats === false ? "счётчик скрыт автором" : "количество неизвестно") + "; " + (selected ? (repost ? "ваш репост установлен" : "ваш лайк установлен") : (repost ? "вашего репоста нет" : "вашего лайка нет"))
+    readonly property string description: (repost ? (selected ? qsTr("Отменить репост") : qsTr("Сделать репост")) : (selected ? qsTr("Убрать из любимых") : qsTr("Добавить в любимые"))) + "; " + (countKnown ? (repost ? qsTr("репостов: ") : qsTr("лайков: ")) + fullCountText : item.reveal_stats === false ? qsTr("счётчик скрыт автором") : qsTr("количество неизвестно")) + "; " + (selected ? (repost ? qsTr("ваш репост установлен") : qsTr("ваш лайк установлен")) : (repost ? qsTr("вашего репоста нет") : qsTr("вашего лайка нет")))
     property bool held: false
     property string pressedUrn: ""
     visible: track || itemUrn.startsWith("soundcloud:playlists:") || (!repost && itemUrn.startsWith("soundcloud:system-playlists:"))
@@ -35,7 +35,7 @@ SurfaceButton {
     leftPadding: 10; rightPadding: 10
     implicitWidth: Math.max(mobile ? 48 : 44, contents.implicitWidth + 20)
     Accessible.name: description
-    Accessible.description: hasPeople ? "Удерживайте или откройте контекстное меню для списка пользователей" : ""
+    Accessible.description: hasPeople ? qsTr("Удерживайте или откройте контекстное меню для списка пользователей") : ""
     Accessible.checkable: true
     Accessible.checked: selected
     ToolTip.visible: hovered
@@ -77,6 +77,6 @@ SurfaceButton {
     TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (control.hasPeople) menu.popup() }
     Menu {
         id: menu
-        MenuItem { text: control.repost ? "Кто сделал репост" : "Кто поставил лайк"; onTriggered: control.showPeople() }
+        MenuItem { text: control.repost ? qsTr("Кто сделал репост") : qsTr("Кто поставил лайк"); onTriggered: control.showPeople() }
     }
 }
