@@ -1,4 +1,4 @@
-# macOS builds (2.0.1)
+# macOS builds
 
 The macOS port uses the desktop Qt Quick interface with the Basic controls style, macOS Keychain for OAuth records and MediaPlayer for Now Playing and transport commands. It does not require libsecret or D-Bus. Storage keeps the existing `Qsae/SCrip` identity. Closing the window keeps playback running; the menu bar provides Quit (Command-Q) and Open Sange. The desktop Discord IPC client also supports native macOS Discord sockets.
 
@@ -25,7 +25,7 @@ The updater selects the DMG matching the application architecture, verifies its 
 
 ## Interactive validation remaining
 
-The initial 2.0.1 release is published with the following interactive checks still outstanding. Automated native tests and standalone startup do not establish these behaviors. Test the downloaded DMG on a Mac without Qt installed:
+The macOS releases have the following interactive checks still outstanding. Automated native tests and standalone startup do not establish these behaviors. Test the downloaded DMG on a Mac without Qt installed:
 
 - Installation from the DMG to Applications and first launch through Finder; architecture and minimum OS compatibility.
 - Sign-in in the default browser, callback, restart with saved session, sign-out and Keychain-denied/locked behavior.

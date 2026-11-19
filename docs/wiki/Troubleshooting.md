@@ -13,7 +13,7 @@ If a callback attempt expires, begin a fresh attempt. Authorization has a ten-mi
 3. If present, compare its SHA-256 with `SHA256SUMS` from the same release; see [Installation](Installation#verify-a-download).
 4. If the hash differs, download again. If it matches, report the failure stage and Protection history event. On managed PCs, provide that information to your administrator.
 
-The public 2.0.0 installer has no publisher certificate signature. See [Windows installation notes](https://github.com/sykia/sange/blob/main/docs/windows-install.md).
+The public 2.1.0 installer has no publisher certificate signature. See [Windows installation notes](https://github.com/sykia/sange/blob/main/docs/windows-install.md).
 
 ## An older version cannot download updates
 

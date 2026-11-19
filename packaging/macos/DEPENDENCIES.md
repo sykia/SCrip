@@ -1,4 +1,4 @@
-# Sange 2.0.1 macOS dependency materials
+# Sange macOS macOS dependency materials
 
 Sange is GPL-3.0-only. This package dynamically links the official Qt 6.12.0
 clang_64 libraries and Qt's bundled FFmpeg 9.0.1 libraries. No downstream
@@ -21,7 +21,7 @@ libraries are OS dependencies and are not copied into the package.
 
 The release provides these corresponding-source assets beside the DMGs:
 
-- `Sange-2.0.1-source.tar.gz`: application sources, CMake files, packaging scripts,
+- `Sange-<version>-source.tar.gz`: application sources, CMake files, packaging scripts,
   native CI recipe and this document.
 - `qt-everywhere-src-6.12.0.tar.xz`: complete original Qt 6.12.0 source distribution,
   including bundled third-party code and qtmultimedia's FFmpeg attribution files. SHA-256:

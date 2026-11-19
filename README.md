@@ -35,7 +35,7 @@ Install the package for your platform and sign in through the official SoundClou
 
 **2.1.0** adds persistent English/Russian interface selection, playback recovery, media-session improvements and fixes for search, lyrics, recommendations and streaming. Packages are available for Windows, Debian 13, Arch Linux, Android and macOS. See the [release notes](release-notes/2.1.0.md). macOS requires 14.4+; disk images are not Apple-notarized.
 
-Upgrading from SCrip? Install over your existing application to keep your settings and music data. See the [upgrade notes](release-notes/2.0.0.md) if an older build cannot download updates.
+Install over your existing application to keep settings and music data. Windows, Linux and Android 2.0.0 and older builds require a one-time manual download because their updater allows only the former repository path. See the [upgrade notes](release-notes/2.1.0.md#updating).
 
 ## Your music, your rhythm
 
@@ -72,11 +72,11 @@ cmake --build --preset debug
 ctest --test-dir build/debug --output-on-failure
 ```
 
-Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. For platform-specific setup, see [macOS](https://github.com/sykia/sange/blob/v2.0.1/docs/macos.md) or the [Android build script](scripts/build_android.sh). macOS release builds use Qt 6.12.0.
+Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. For platform-specific setup, see [macOS](https://github.com/sykia/sange/blob/main/docs/macos.md) or the [Android build script](scripts/build_android.sh). macOS release builds use Qt 6.12.0.
 
 ## Documentation
 
-[Wiki](https://github.com/sykia/sange/wiki) · [Plugins](docs/plugins.md) · [Playback](docs/system-media-and-streaming.md) · [Diagnostics](https://github.com/sykia/sange/blob/v2.0.1/docs/diagnostics.md) · [Windows troubleshooting](docs/windows-install.md)
+[Wiki](https://github.com/sykia/sange/wiki) · [Plugins](docs/plugins.md) · [Playback](docs/system-media-and-streaming.md) · [Diagnostics](https://github.com/sykia/sange/blob/main/docs/diagnostics.md) · [Windows troubleshooting](docs/windows-install.md)
 
 ## License
 

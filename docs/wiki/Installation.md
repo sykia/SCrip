@@ -1,17 +1,19 @@
 [Home](Home) › Installation
 
-Download packages from [GitHub Releases](https://github.com/sykia/sange/releases/latest). The filenames below refer to **2.0.0**, whose published assets include `SHA256SUMS`. For another release, use its filenames and checksums.
+Download packages from [GitHub Releases](https://github.com/sykia/sange/releases/latest). The filenames below refer to **2.1.0**, whose published assets include `SHA256SUMS`. For another release, use its filenames and checksums.
 
 ## Choose a package
 
-| Platform | Package for 2.0.0 |
+| Platform | Package for 2.1.0 |
 | --- | --- |
-| Windows 10/11, x64 | `Sange-2.0.0-Windows-x64.exe` |
-| Debian 13, amd64 | `Sange-2.0.0-debian13-amd64.deb` |
-| Arch Linux, x86-64 | `scrip-2.0.0-1-x86_64.pkg.tar.zst` |
-| Android 9+, API 28+ | `Sange-2.0.0-Android-universal.apk` |
+| Windows 10/11, x64 | `Sange-2.1.0-Windows-x64.exe` |
+| Debian 13, amd64 | `Sange-2.1.0-debian13-amd64.deb` |
+| Arch Linux, x86-64 | `scrip-2.1.0-1-x86_64.pkg.tar.zst` |
+| Android 9+, API 28+ | `Sange-2.1.0-Android-universal.apk` |
+| macOS 14.4+, Apple Silicon | `Sange-2.1.0-macOS-arm64.dmg` |
+| macOS 14.4+, Intel | `Sange-2.1.0-macOS-x86_64.dmg` |
 
-macOS is not supported. Other Linux distributions may require a [source build](Building-from-Source); the Debian package is not a universal Linux package.
+macOS packages use ad-hoc signing without Apple notarization. Other Linux distributions may require a [source build](Building-from-Source); the Debian package is not a universal Linux package.
 
 ## Windows
 
@@ -19,14 +21,18 @@ macOS is not supported. Other Linux distributions may require a [source build](B
 2. Follow the installer and open Sange.
 3. [Sign in](SoundCloud-Authentication) through the browser.
 
-The public 2.0.0 installer has no publisher certificate signature. If Windows denies access, follow [installer troubleshooting](Troubleshooting#windows-installer-is-blocked-or-disappears).
+The public 2.1.0 installer has no publisher certificate signature. If Windows denies access, follow [installer troubleshooting](Troubleshooting#windows-installer-is-blocked-or-disappears).
+
+## macOS
+
+Download the DMG for your Mac architecture, open it and copy Sange to Applications. See the [macOS guide](https://github.com/sykia/sange/blob/main/docs/macos.md) for requirements, installation and validation limits.
 
 ## Debian 13
 
 In the download directory:
 
 ```sh
-sudo apt install ./Sange-2.0.0-debian13-amd64.deb
+sudo apt install ./Sange-2.1.0-debian13-amd64.deb
 ```
 
 APT resolves the dependencies declared by the package. Start **Sange** from the application menu or run `scrip`. Sign-in needs a running, unlocked Secret Service such as GNOME Keyring or a compatible KWallet configuration.
@@ -36,7 +42,7 @@ APT resolves the dependencies declared by the package. Start **Sange** from the 
 In the download directory:
 
 ```sh
-sudo pacman -U ./scrip-2.0.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./scrip-2.1.0-1-x86_64.pkg.tar.zst
 ```
 
 Start **Sange** from the application menu or run `scrip`. A running, unlocked Secret Service is needed for sign-in. The package remains named `scrip` for upgrade compatibility.
@@ -56,13 +62,13 @@ Download `SHA256SUMS` from the **same release** and compare the matching file en
 Windows PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath '.\Sange-2.0.0-Windows-x64.exe'
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\Sange-2.1.0-Windows-x64.exe'
 ```
 
 Linux, for example:
 
 ```sh
-sha256sum Sange-2.0.0-debian13-amd64.deb
+sha256sum Sange-2.1.0-debian13-amd64.deb
 ```
 
 If the hash differs, download the file again before installing.
@@ -71,9 +77,9 @@ If the hash differs, download the file again before installing.
 
 Install the new package over the existing installation. Do not uninstall or clear application data first. Sange retains SCrip's settings and storage identities; Android keeps `org.scrip.app` and requires the installed release's signing certificate.
 
-If an old build cannot download an update after the repository rename, download the package manually from Releases. Plugins whose host version range excludes 2.0.0 need an updated manifest from their author. An expired or revoked SoundCloud session still requires sign-in.
+Windows, Linux and Android 2.0.0 and older builds allow only the former repository download path. Download 2.1.0 manually from Releases for this first upgrade. Plugins whose host version range excludes 2.1.0 need an updated manifest from their author. An expired or revoked SoundCloud session still requires sign-in.
 
-See [2.0.0 release notes](https://github.com/sykia/sange/blob/main/release-notes/2.0.0.md).
+See [2.1.0 release notes](https://github.com/sykia/sange/blob/main/release-notes/2.1.0.md).
 
 ### Updating from Settings
 
@@ -88,6 +94,7 @@ The updater checks the expected package size and SHA-256 from GitHub release met
 | Windows | Opens the installer wizard; the result is checked on the next launch |
 | Debian / Arch Linux | Runs the package manager through `pkexec`; a working authorization agent and administrative approval are needed |
 | Android | Opens the system APK installer; if asked, allow installation from Sange and press **Install now** again |
+| macOS | Opens the verified DMG in Finder; replace Sange in Applications |
 
 Other Linux distributions are not supported by this updater. Finish installation and restart Sange to use the installed version. If the handoff fails, use the [manual package instructions](Installation#choose-a-package). Older binaries may still need the manual fallback after the repository rename.
 

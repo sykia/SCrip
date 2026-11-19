@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import os
+import plistlib
+import re
 from pathlib import Path
 import subprocess
 import tarfile
@@ -74,7 +76,11 @@ def create(bundle, image, architecture, assets, output):
     qt = assets / 'qt-everywhere-src-6.12.0.tar.xz'
     ffmpeg = assets / 'ffmpeg-9.0.1.tar.xz'
     recipes = assets / 'qt5-v6.12.0.tar.gz'
-    app = assets / 'Sange-2.0.1-source.tar.gz'
+    with (bundle / 'Contents/Info.plist').open('rb') as stream:
+        version = plistlib.load(stream).get('CFBundleShortVersionString')
+    if not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('Invalid application bundle version')
+    app = assets / f'Sange-{version}-source.tar.gz'
     sources = {p.name: {'name': p.name, 'sha256': digest(p)} for p in (qt, app, ffmpeg, recipes)}
     notice_root = 'Contents/Resources/legal/'
     components = {

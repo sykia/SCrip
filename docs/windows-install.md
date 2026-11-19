@@ -5,10 +5,10 @@ Open **Downloads** in File Explorer and check whether the downloaded EXE is stil
 If the file is present, open PowerShell in its folder and check SHA-256:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath '.\Sange-2.0.0-Windows-x64.exe'
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\Sange-2.1.0-Windows-x64.exe'
 ```
 
-Compare the result with the installer's entry in `SHA256SUMS` from [release 2.0.0](https://github.com/sykia/sange/releases/tag/v2.0.0). Download the installer again if it differs. If the hash matches, report when the error appears and include the Protection history event. On a managed PC, an administrator can check execution policy using the filename and event time.
+Compare the result with the installer's entry in `SHA256SUMS` from [release 2.1.0](https://github.com/sykia/sange/releases/tag/v2.1.0). Download the installer again if it differs. If the hash matches, report when the error appears and include the Protection history event. On a managed PC, an administrator can check execution policy using the filename and event time.
 
 ## Building with a signature
 
@@ -18,4 +18,4 @@ On Windows, open a terminal with SignTool from Windows SDK and provide the thumb
 python packaging/windows/package.py payload build/Sange-Setup-x64.exe --sign-certificate $env:SCRIP_CERT_SHA1 --timestamp-url $env:SCRIP_TIMESTAMP_URL
 ```
 
-The packager signs an application copy before packaging, then signs the finished installer and verifies both signatures. The private key stays with the publisher. The public 2.0.0 installer is not signed with a publisher certificate.
+The packager signs an application copy before packaging, then signs the finished installer and verifies both signatures. The private key stays with the publisher. The public 2.1.0 installer is not signed with a publisher certificate.

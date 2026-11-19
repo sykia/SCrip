@@ -6,7 +6,7 @@ No. It is an independent player using the official SoundCloud API.
 
 ## Which platforms are supported?
 
-Windows, Linux and Android. Published 2.0.0 packages cover Windows x64, Debian 13 amd64, Arch Linux x86-64 and Android 9+. macOS is explicitly unsupported by the build. See [Installation](Installation).
+Windows, Linux, Android and macOS. Release 2.1.0 packages cover Windows x64, Debian 13 amd64, Arch Linux x86-64, Android 9+ and macOS 14.4+ on Apple Silicon and Intel. See [Installation](Installation).
 
 ## Do I need my own API keys?
 

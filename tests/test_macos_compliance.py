@@ -1,4 +1,8 @@
 import importlib.util
+import io
+import json
+import plistlib
+import tarfile
 from pathlib import Path
 import tempfile
 import unittest
@@ -16,6 +20,32 @@ class MacBundleInventoryTests(unittest.TestCase):
         executable = self.bundle / 'Contents/MacOS/Sange'
         executable.parent.mkdir(parents=True)
         executable.write_bytes(b'application')
+
+    def test_source_archive_matches_bundle_version(self):
+        assets = Path(self.temporary.name) / 'assets'
+        assets.mkdir()
+        for relative in ['Contents/Frameworks/QtCore', 'Contents/Frameworks/libavcodec.dylib',
+                         'Contents/Resources/legal/LICENSE', 'Contents/Resources/legal/DEPENDENCIES.md']:
+            path = self.bundle / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'fixture library or license')
+        for name in ['qt-everywhere-src-6.12.0.tar.xz', 'ffmpeg-9.0.1.tar.xz', 'qt5-v6.12.0.tar.gz',
+                     'Sange-2.1.0-source.tar.gz']:
+            with tarfile.open(assets / name, 'w') as archive:
+                for filename, content in [('src/main.cpp', b'int main() {}'), ('CMakeLists.txt', b'project(Fixture)')]:
+                    entry = tarfile.TarInfo(filename)
+                    entry.size = len(content)
+                    archive.addfile(entry, io.BytesIO(content))
+        (self.bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': '2.1.0'}))
+        image = assets / 'Sange-2.1.0-macOS-arm64.dmg'
+        image.write_bytes(b'fixture disk image')
+        manifest = assets / 'macOS-arm64-compliance.json'
+        module.create(self.bundle, image, 'arm64', assets, manifest)
+        data = json.loads(manifest.read_text())
+        self.assertEqual(data['components']['sange']['sources'][0]['name'], 'Sange-2.1.0-source.tar.gz')
+        (assets / 'Sange-2.1.0-source.tar.gz').unlink()
+        with self.assertRaises(FileNotFoundError):
+            module.create(self.bundle, image, 'arm64', assets, manifest)
 
     def test_framework_version_links_are_recorded(self):
         framework = self.bundle / 'Contents/Frameworks/Example.framework'
