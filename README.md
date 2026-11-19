@@ -4,9 +4,11 @@
 
 <h1 align="center">Sange</h1>
 
-<p align="center">Your SoundCloud music, in a dedicated player for Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
+<p align="center">Your SoundCloud music, in a dedicated player for macOS, Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
 
 <p align="center">
+  <a href="https://github.com/sykia/sange/releases/download/v2.0.1/Sange-2.0.1-macOS-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple_Silicon-414650?style=for-the-badge" alt="Download for macOS Apple Silicon"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.0.1/Sange-2.0.1-macOS-x86_64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-414650?style=for-the-badge" alt="Download for macOS Intel"></a>
   <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
   <a href="https://github.com/sykia/sange/releases/download/v2.0.0/Sange-2.0.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
   <a href="https://github.com/sykia/sange/releases/download/v2.0.0/scrip-2.0.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
@@ -15,8 +17,9 @@
 
 <p align="center">
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="https://github.com/sykia/sange/releases/tag/v2.0.0">Release files &amp; SHA-256</a> ·
-  <a href="docs/plugins.md">Plugins</a>
+  <a href="https://github.com/sykia/sange/releases/latest">Release files &amp; SHA-256</a> ·
+  <a href="docs/plugins.md">Plugins</a> ·
+  <a href="https://github.com/sykia/sange/wiki">Wiki</a>
 </p>
 
 <p align="center">
@@ -30,18 +33,16 @@
 
 Install the package for your platform and sign in through the official SoundCloud page in your browser. Sange uses the official SoundCloud API.
 
-Version **2.0.0** renames SCrip to **Sange**. Install over the existing application to preserve sign-in, settings, plugins and playback data. The package and storage identities remain compatible with SCrip. Android updates require the same signing certificate as the installed release.
+**2.0.1 — Hello, Apple!** brings Sange to Apple Silicon and Intel Macs running macOS 14.4+. Download the matching DMG and copy Sange to Applications. These builds are not Apple-notarized; see the [macOS guide](https://github.com/sykia/sange/blob/v2.0.1/docs/macos.md) for installation and update details. Windows, Linux and Android downloads remain at **2.0.0**.
 
-The project now lives at [sykia/sange](https://github.com/sykia/sange). If an older build cannot download an update after the repository rename, download the package above and install it over your existing installation. Keep application data and do not uninstall first.
-
-See the [2.0.0 release notes](release-notes/2.0.0.md) for sign-in recovery and upgrade details.
+Upgrading from SCrip? Install over your existing application to keep your settings and music data. See the [upgrade notes](release-notes/2.0.0.md) if an older build cannot download updates.
 
 ## Your music, your rhythm
 
 - **Discover:** start a continuous personal wave, adjust the balance between familiar music and discoveries, explore mixes and artist stations.
 - **Explore:** search tracks, playlists and people; browse your feed, likes, recent tracks and profiles.
 - **Organize:** edit playlists, reorder the queue, choose **Play next**, remove duplicates or save the queue as a playlist.
-- **Keep listening:** use desktop tray controls, system media controls and Android background playback.
+- **Keep listening:** use system media controls, desktop shortcuts and Android background playback.
 - **Make it yours:** customize the appearance, add [plugins](docs/plugins.md) and enable optional [Discord Rich Presence](docs/discord-presence.md) on desktop.
 
 ## On desktop
@@ -71,21 +72,11 @@ cmake --build --preset debug
 ctest --test-dir build/debug --output-on-failure
 ```
 
-Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. Build output stays in `build/`. The desktop interface is in `qml/Main.qml`, the Android interface in `qml/android/Main.qml`, and the entry point in `src/main.cpp`.
+Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. For platform-specific setup, see [macOS](https://github.com/sykia/sange/blob/v2.0.1/docs/macos.md) or the [Android build script](scripts/build_android.sh). macOS release builds use Qt 6.12.0.
 
-For Android packaging, see [the build script](scripts/build_android.sh) and [playback diagnostics](docs/android-playback-diagnostics.md). Android builds also require the Android Qt kit, SDK/NDK, OpenSSL and the patched FFmpeg libraries configured by the build scripts.
+## Documentation
 
-## Guides and troubleshooting
-
-| Topic | Guide |
-| --- | --- |
-| Discovery and personal wave | [Recommendations](docs/recommendations.md) · [Wave](docs/wave.md) |
-| Search and library | [Track search](docs/track-search.md) · [Library tools](docs/library-tools.md) |
-| Playlists and queue | [Profiles and playlists](docs/social-and-playlists.md) · [Queue actions](docs/queue-actions.md) |
-| Playback and media controls | [System media and streaming](docs/system-media-and-streaming.md) |
-| Plugins | [User guide](docs/plugins.md) · [API reference](docs/plugin-api-v2-reference.md) · [QML SDK](docs/plugin-runtime.md) |
-| Sign-in and storage | [SoundCloud integration](docs/soundcloud-security.md) |
-| Installation | [Windows troubleshooting](docs/windows-install.md) |
+[Wiki](https://github.com/sykia/sange/wiki) · [Plugins](docs/plugins.md) · [Playback](docs/system-media-and-streaming.md) · [Diagnostics](https://github.com/sykia/sange/blob/v2.0.1/docs/diagnostics.md) · [Windows troubleshooting](docs/windows-install.md)
 
 ## License
 
