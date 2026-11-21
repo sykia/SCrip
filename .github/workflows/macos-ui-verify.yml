@@ -1,0 +1,52 @@
+name: Sange macOS UI verification
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact application source commit to verify
+        required: true
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QT_QUICK_CONTROLS_STYLE: Basic
+      # Deliver synthetic moves without waiting for an offscreen render frame.
+      QML_NO_TOUCH_COMPRESSION: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.12.0
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtmultimedia qtshadertools
+          cache: true
+      - name: Build only the affected regression executables
+        run: |
+          cmake -S . -B build/ui-verification -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4 -DBUILD_TESTING=ON
+          cmake --build build/ui-verification --target plugin_tests artwork_ui_tests --parallel 3
+      - name: Verify complete plugin and QML suites
+        run: ctest --test-dir build/ui-verification --verbose -R '^(plugins|artwork_ui)$' --timeout 600 > build/ui-verification/ui.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macOS-UI-${{ matrix.arch }}
+          path: |
+            build/ui-verification/ui.log
+            build/ui-verification/Testing/Temporary/LastTest.log
