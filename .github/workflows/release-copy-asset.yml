@@ -1,0 +1,42 @@
+name: Copy pinned release asset
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        description: Existing source release tag
+        required: true
+      to_tag:
+        description: Destination draft release tag
+        required: true
+      asset:
+        description: Exact asset filename
+        required: true
+      sha256:
+        description: Expected SHA-256
+        required: true
+permissions:
+  contents: write
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Copy and verify existing asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_TAG: ${{ inputs.from_tag }}
+          TO_TAG: ${{ inputs.to_tag }}
+          ASSET: ${{ inputs.asset }}
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ASSET" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          gh release view "$TO_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft | grep -qx true
+          mkdir -p build/transfer
+          gh release download "$FROM_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir build/transfer
+          printf '%s  %s\n' "$EXPECTED_SHA256" "build/transfer/$ASSET" | sha256sum -c -
+          gh release upload "$TO_TAG" "build/transfer/$ASSET" --repo "$GITHUB_REPOSITORY"
+          actual=$(gh release view "$TO_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == env.ASSET) | .digest')
+          test "$actual" = "sha256:$EXPECTED_SHA256"
