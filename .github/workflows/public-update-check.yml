@@ -1,0 +1,24 @@
+name: Verify public updater downloads
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Expected latest release tag
+        required: true
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify anonymous complete package downloads
+        env:
+          TAG: ${{ inputs.tag }}
+        run: python scripts/verify_public_updates.py --tag "$TAG"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-update-verification
+          path: build/public-update-check/*.json
