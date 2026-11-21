@@ -6,10 +6,10 @@ pkgdesc='Настольный плеер для SoundCloud'
 # Для каждого выпуска обновляйте версию и SHA-256 архива исходников.
 arch=('x86_64')
 url='https://github.com/sykia/sange'
-depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg')
+depends=('libsecret' 'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-multimedia-ffmpeg' 'kwindowsystem' 'libxcb')
 makedepends=('cmake' 'ninja')
 source=("$url/releases/download/v$pkgver/Sange-$pkgver-source.tar.gz")
-sha256sums=('79726359a367b402064308d553c2e9b9d5a1d2a9cc3166cb5b3a1113abf5e4a3')
+sha256sums=('d2b027917d7c2efa93d56cb1f3da2a63137d69ab1f1db42c24a54212f6ce5e47')
 build() {
     cmake -S "Sange-$pkgver" -B build -G Ninja -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     cmake --build build --parallel 2

@@ -29,7 +29,7 @@ Sange is an independent SoundCloud player built with C++20 and Qt Quick. Discove
 
 ## Upgrading from SCrip
 
-Version 2.0.0 renamed SCrip to Sange. Install over the existing application without uninstalling or clearing data. The `scrip` executable, Linux package name and Android package identity remain for compatibility. Android updates require the same signing certificate. See [Installation](Installation#upgrading).
+Version 2.0.0 renamed SCrip to Sange. Install over the existing application without uninstalling or clearing data. Version 2.2.0 uses `sange` / `sange.exe` on Linux and Windows. The Linux package name, installation directories, stored settings and Android package identity remain compatible. Android updates require the same signing certificate. See [Installation](Installation#upgrading).
 
 ## Project links
 

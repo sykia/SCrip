@@ -7,12 +7,12 @@
 <p align="center">Your SoundCloud music, in a dedicated player for macOS, Windows, Linux and Android.<br>Discover personal mixes, explore artist stations and keep your favorites close.</p>
 
 <p align="center">
-  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-macOS-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple_Silicon-414650?style=for-the-badge" alt="Download for macOS Apple Silicon"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-macOS-x86_64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-414650?style=for-the-badge" alt="Download for macOS Intel"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/scrip-2.1.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
-  <a href="https://github.com/sykia/sange/releases/download/v2.1.0/Sange-2.1.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.2.0/Sange-2.2.0-macOS-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple_Silicon-414650?style=for-the-badge" alt="Download for macOS Apple Silicon"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.2.0/Sange-2.2.0-macOS-x86_64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-414650?style=for-the-badge" alt="Download for macOS Intel"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.2.0/Sange-2.2.0-Windows-x64.exe"><img src="https://img.shields.io/badge/Windows_10%2F11-EXE-414650?style=for-the-badge" alt="Download for Windows 10 and 11 x64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.2.0/Sange-2.2.0-debian13-amd64.deb"><img src="https://img.shields.io/badge/Debian_13-DEB-95445F?style=for-the-badge" alt="Download for Debian 13 x86-64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.2.0/scrip-2.2.0-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/Arch_Linux-PKG-39738D?style=for-the-badge" alt="Download for Arch Linux x86-64"></a>
+  <a href="https://github.com/sykia/sange/releases/download/v2.2.0/Sange-2.2.0-Android-universal.apk"><img src="https://img.shields.io/badge/Android_9%2B-APK-3D8C68?style=for-the-badge" alt="Download for Android 9 and later"></a>
 </p>
 
 <p align="center">
@@ -33,9 +33,9 @@
 
 Install the package for your platform and sign in through the official SoundCloud page in your browser. Sange uses the official SoundCloud API.
 
-**2.1.0** adds persistent English/Russian interface selection, playback recovery, media-session improvements and fixes for search, lyrics, recommendations and streaming. Packages are available for Windows, Debian 13, Arch Linux, Android and macOS. See the [release notes](release-notes/2.1.0.md). macOS requires 14.4+; disk images are not Apple-notarized.
+**2.2.0** adds network diagnostics, playback proxy controls and a redesigned desktop mini-player. Android sheets follow touch directly, previews move as one surface, and playback recovery avoids UI hangs. Packages cover Windows, Debian 13, Arch Linux, Android and macOS. See the [release notes](release-notes/2.2.0.md). macOS requires 14.4+; disk images are not Apple-notarized.
 
-Install over your existing application to keep settings and music data. Windows, Linux and Android 2.0.0 and older builds require a one-time manual download because their updater allows only the former repository path. See the [upgrade notes](release-notes/2.1.0.md#updating).
+Install over your existing application to keep settings and music data. Windows, Linux and Android 2.0.0 and older builds require a one-time manual download because their updater allows only the former repository path. See the [upgrade notes](release-notes/2.2.0.md#updating).
 
 ## Your music, your rhythm
 
