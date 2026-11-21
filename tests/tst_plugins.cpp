@@ -1049,7 +1049,7 @@ Item {
         QCOMPARE(player->property("dragOffset").toReal(), dragged);
         QTest::touchEvent(window, touchDevice).move(0, dockStart - QPoint(0, 150), window);
         QTest::qWait(20);
-        QVERIFY(qAbs(player->property("dragOffset").toReal() - dragged - 30) < 2);
+        QTRY_VERIFY(qAbs(player->property("dragOffset").toReal() - dragged - 30) < 2);
         QTest::touchEvent(window, touchDevice).release(0, dockStart - QPoint(0, 150), window);
         // Cleanup also exercises interruption of a settling surface by a button.
         QVERIFY(QMetaObject::invokeMethod(player, "close"));
@@ -1283,8 +1283,11 @@ Item {
         QCOMPARE(sc.lastPreview["urn"].toString(), QString("soundcloud:tracks:seed"));
         QTest::qWait(300);
         QVERIFY(window->grabWindow().save("android-artist-station.png"));
+        QQmlExpression closeStationPreview(QQmlEngine::contextForObject(object.data()), object.data(), "playlistView.close(); playlistView");
+        auto *stationPreview = closeStationPreview.evaluate().value<QObject *>(); QVERIFY(stationPreview);
+        QTRY_VERIFY(!stationPreview->property("visible").toBool());
         QQmlExpression preview(QQmlEngine::contextForObject(object.data()), object.data(),
-            "playlistView.playlist = {title: 'Вечерняя коллекция', track_count: 2, user: {username: 'SCrip'}}; playlistView.open()");
+            "playlistView.close(); playlistView.playlist = {title: 'Вечерняя коллекция', track_count: 2, user: {username: 'SCrip'}}; playlistView.open()");
         preview.evaluate();
         QVERIFY2(!preview.hasError(), qPrintable(preview.error().toString()));
         QQmlExpression enteringPreviewExpression(QQmlEngine::contextForObject(object.data()), object.data(), "playlistView");

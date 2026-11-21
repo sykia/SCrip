@@ -30,10 +30,10 @@ InstallDirRegKey HKCU "${UNKEY}" "InstallLocation"
 BrandingText "Sange"
 SetCompressor /SOLID lzma
 Icon "app.ico"
-VIProductVersion "2.1.0.0"
+VIProductVersion "2.2.0.0"
 VIAddVersionKey /LANG=1049 "ProductName" "Sange"
 VIAddVersionKey /LANG=1049 "FileDescription" "Установка Sange"
-VIAddVersionKey /LANG=1049 "FileVersion" "2.1.0"
+VIAddVersionKey /LANG=1049 "FileVersion" "2.2.0"
 VIAddVersionKey /LANG=1049 "LegalCopyright" "Copyright (c) 2026 sykia"
 !define MUI_ICON "app.ico"
 !define MUI_UNICON "app.ico"
@@ -345,7 +345,7 @@ Section
   CreateShortcut "$DESKTOP\Sange.lnk" "$INSTDIR\${APP_EXE}"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "Sange"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "2.1.0"
+  WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "2.2.0"
   WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\${APP_EXE}"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1

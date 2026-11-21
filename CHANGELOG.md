@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.2.0 — November 21, 2026
 
 - Make Android sheets follow touch directly, settle from release velocity, support header swipe dismissal and present album/playlist previews as one animated surface.
 - Fade the home wave with player coverage, pause hidden shader work and normalize Android emoji metadata layout across player and menus.

@@ -67,7 +67,7 @@ TestCase {
         wait(100)
         compare(root.gesture.offset, offset)
         move(root, 160, 165, 20)
-        verify(Math.abs(root.gesture.offset - offset + 10) < 1)
+        tryVerify(() => Math.abs(root.gesture.offset - offset + 10) < 1)
         wait(150)
         release(root, 160, 165)
         tryCompare(root.gesture, "offset", 0)

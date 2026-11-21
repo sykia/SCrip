@@ -72,7 +72,7 @@ jobs:
           # CTest can succeed when Qt Test skips individual methods. Require
           # explicit passes only for these integration checks.
           for check in 'HlsSeekTest::seekKeepsDecodedAudio' 'StreamCacheTest::hlsSeekThroughCache' 'SoundCloudTest::mprisSessionBusProtocol' 'SoundCloudTest::equalizerLocalAudioPlayback'; do
-            if ! grep -Eq "PASS[[:space:]]*:[[:space:]]+$check\(\)" build/ci/ctest.log; then
+            if ! grep -Eq "PASS[[:space:]]*:[[:space:]]+$check\([^)]*\)" build/ci/ctest.log; then
               echo "Required integration check did not pass: $check"
               status=1
             fi
