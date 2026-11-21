@@ -244,3 +244,7 @@ commands/assets above retain their original executable names.
 - The Arch package now needs `kwindowsystem` and `libxcb` for the native mini-player effects. Debian's native build uses the available optional dependencies.
 - If a disposable Android emulator reports missing package/activity services after a long suspension, restart its disposable image before installation tests. Wait for `sys.boot_completed=1`. Preserve compiled APKs and instrumentation rather than rebuilding them.
 - On this Arch host, prepend `build/dpkg-local/usr/bin` to `PATH` for the release package audit.
+
+The published 2.2.0 combined audit (`44918241103`) passed all three jobs, including mounted-image checks for both DMGs. Published Windows verification (`44918241115`) also passed. The release is <https://github.com/sykia/sange/releases/tag/v2.2.0>.
+
+For large unchanged dependency sources, `release-copy-asset.yml` copies an existing release asset directly inside GitHub, verifies the pinned SHA-256 before upload and checks the destination digest. It requires a draft destination and does not replace assets. Run `44918118248` verified this for the unchanged Qt 6.12.0 source archive from 2.1.0; this avoids local reuploads. Keep `SHA256SUMS` synchronized with the exact final asset set and omit signing sidecars and installer helper scripts.
