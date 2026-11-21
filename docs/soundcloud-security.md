@@ -78,3 +78,15 @@ error handling, including quarantine of stored authentication where possible.
 ## Browser retry and upgrade identity
 
 Sange 2.0.0 retains the SCrip settings name and secure-storage identifiers. Renaming the display name does not move or export credentials. Failed or denied authorization offers a one-use, random retry capability on the loopback callback page. It redirects the current tab to a fresh PKCE authorization; invalid state cannot obtain a retry capability. Canceling or timing out closes the listener.
+
+## Optional regional relay
+
+After explicit consent, the application can route API requests and audio through
+its existing project Worker to address CloudFront country blocking. The Worker
+receives the access token for API requests and the user's IP. It does not store
+OAuth or media bodies in shared storage/cache or application logs. Audio fetches
+never forward OAuth/cookies. Signed, expiring capabilities restrict media to
+SoundCloud's `sndcdn.com` and `media-streaming.soundcloud.cloud` origins. Media
+redirects, HLS child/key/init references and ranges remain constrained to these
+origins. This does not remove per-track permissions, subscription requirements,
+rate limits or account restrictions. Free hosting has finite quotas.

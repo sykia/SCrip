@@ -5,6 +5,8 @@
   "workers_dev": true,
   "preview_urls": false,
   "ratelimits": [
+    {"name": "MEDIA_LIMIT", "namespace_id": "43823", "simple": {"limit": 1000, "period": 60}},
+    {"name": "API_LIMIT", "namespace_id": "43822", "simple": {"limit": 600, "period": 60}},
     {"name": "LOGIN_LIMIT", "namespace_id": "43821", "simple": {"limit": 30, "period": 60}}
   ]
 }

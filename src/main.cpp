@@ -6,8 +6,10 @@
 #include "discordpresence.h"
 #include "lyrics.h"
 #include "soundcloud.h"
+#include "dnsroute.h"
 #ifndef Q_OS_ANDROID
 #include "desktopmedia.h"
+#include "windoweffects.h"
 #endif
 #include "linkrouter.h"
 #include <QLocalServer>
@@ -79,6 +81,10 @@ int main(int argc, char *argv[])
     // Keep the storage identity for upgrades from SCrip.
     QCoreApplication::setApplicationName("SCrip");
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Sange"));
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    // Use the public name for the Wayland app ID; storage keeps its legacy ID.
+    QGuiApplication::setDesktopFileName(QStringLiteral("Sange"));
+#endif
     QCoreApplication::setApplicationVersion(SCRIP_VERSION);
     QString incomingLink;
     for (const auto &argument : app.arguments().mid(1)) {
@@ -113,6 +119,7 @@ int main(int argc, char *argv[])
     }
 #endif
     Diagnostics diagnostics;
+    DnsRoute dnsRoute;
     SoundCloud soundcloud;
     QObject::connect(&soundcloud, &SoundCloud::catalogChanged, &diagnostics, [&soundcloud, lastPlaybackState = QString{}]() mutable {
         const auto state = soundcloud.state();
@@ -162,13 +169,20 @@ int main(int argc, char *argv[])
 #endif
     LanguageController language;
     app.installTranslator(&language);
+#ifndef Q_OS_ANDROID
+    WindowEffects windowEffects;
+#endif
     QQmlApplicationEngine engine;
+#ifndef Q_OS_ANDROID
+    engine.rootContext()->setContextProperty("windowEffects", &windowEffects);
+#endif
     engine.rootContext()->setContextProperty("uiLanguage", &language);
     QObject::connect(&language, &LanguageController::languageChanged, &engine, &QQmlApplicationEngine::retranslate);
     engine.setNetworkAccessManagerFactory(&artwork);
     artwork.prepare(&app, [] {});
     engine.rootContext()->setContextProperty("diagnostics", &diagnostics);
     engine.rootContext()->setContextProperty("sc", &soundcloud);
+    engine.rootContext()->setContextProperty("dnsRoute", &dnsRoute);
     engine.rootContext()->setContextProperty("discordPresence", &discordPresence);
     engine.rootContext()->setContextProperty("lyricsBackend", &lyrics);
 #ifdef Q_OS_ANDROID
@@ -283,6 +297,9 @@ int main(int argc, char *argv[])
     });
 #endif
     menu.addAction(QCoreApplication::translate("NativeMenu", "Открыть Sange"), restore);
+    menu.addAction(QCoreApplication::translate("NativeMenu", "Мини-плеер"), [window] {
+        QMetaObject::invokeMethod(window, "toggleMiniPlayer");
+    });
     menu.addSeparator();
     auto *play = menu.addAction(QCoreApplication::translate("NativeMenu", "Воспроизвести"), &soundcloud, &SoundCloud::togglePlayback);
     auto *previous = menu.addAction(QCoreApplication::translate("NativeMenu", "Предыдущий трек"), &soundcloud, &SoundCloud::previous);

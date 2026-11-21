@@ -1,7 +1,13 @@
 # Track information and waveform navigation
 
 Track information reuses the desktop About track section and an Android menu
-sheet. The sheet snapshots the selected track (not the playing track), scrolls
+sheet. The Android track actions menu uses a bottom-edge Qt Quick Drawer: a
+downward swipe dismisses it from the header or an action row when its list is at
+the top, while a scrolled list keeps vertical scrolling. The track actions header stays
+fixed above the scrolling action list. Explicit per-edge Drawer padding keeps the
+cover and rows inside the rounded sheet on Qt Basic, including safe-area insets.
+Likes use an accent icon and count without a full-width selected background.
+The information sheet snapshots the selected track (not the playing track), scrolls
 independently, respects safe areas and closes before underlying screens on Back.
 Description is plain text and appears once. Artist credits remain separate from
 the uploader; the uploader still opens their profile. No field-level requests
@@ -22,7 +28,10 @@ defines the fields and tag quoting and illustrates waveform_url with an HTTPS
 PNG on wave.sndcdn.com. It does not document a sample-array schema, a JSON
 waveform endpoint, or waveform-to-audio timing offsets. Sange therefore requests
 only the supplied PNG URL, stretches the full image over the full track duration
-and colors its alpha silhouette. It never derives another endpoint, downloads
+and normalizes its alpha silhouette to a centered outward envelope. The resting
+wave is smoothed and kept compact; holding the progress control reveals the
+detailed envelope. Both waveform and fallback reserve the same 52-pixel control
+height, so missing or late images do not move the player controls. It never derives another endpoint, downloads
 audio for analysis, or synthesizes a decorative waveform. Other formats and
 unavailable images silently retain the working progress line. Opaque PNGs are
 unsupported because they cannot provide a usable alpha silhouette.

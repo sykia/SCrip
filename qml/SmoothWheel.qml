@@ -7,6 +7,8 @@ WheelHandler {
     property int duration: 180
     property real step: 176
     property real destination: 0
+    // Android uses Flickable for every input source, including external mice.
+    enabled: Qt.platform.os !== "android"
     acceptedDevices: PointerDevice.Mouse
     target: null
 
@@ -41,6 +43,10 @@ WheelHandler {
         velocity: -1
         duration: wheel.duration
         reversingMode: SmoothedAnimation.Immediate
+    }
+    property PointHandler interruption: PointHandler {
+        parent: wheel.flickable
+        onActiveChanged: if (active) motion.stop()
     }
     property Connections movementConnections: Connections {
         target: wheel.flickable

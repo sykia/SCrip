@@ -10,16 +10,18 @@
 #include <QTcpSocket>
 #include <QNetworkReply>
 #include <memory>
+#include <QThread>
 
 // Локальный HLS-прокси: запросы плеера обслуживаются сразу, фон — последовательно.
-class StreamCache : public QObject {
+class StreamCacheWorker : public QObject {
 public:
-    explicit StreamCache(QObject *parent = nullptr);
-    ~StreamCache() override;
+    explicit StreamCacheWorker(QObject *parent = nullptr);
+    ~StreamCacheWorker() override;
     QUrl source(const QUrl &remote);
     void suspend();
     void setBackgroundEnabled(bool enabled);
     void discard(const QUrl &local);
+    void interrupt(const QUrl &local);
     void warm(const QUrl &local);
 private:
     friend class StreamCacheTest;
@@ -29,7 +31,7 @@ private:
         ~Entry();
     };
     struct Resource { QUrl remote; QString root; };
-    QUrl map(const QUrl &remote, const QString &root);
+    QUrl map(const QUrl &remote, const QString &root, const QString &fallbackSuffix = {});
     QByteArray playlist(const QByteArray &body, const Resource &resource);
     void accept();
     void fetch(const QString &key, QPointer<QTcpSocket> socket = {}, QByteArray range = {}, bool head = false, int attempt = 0);
@@ -51,4 +53,21 @@ private:
     bool m_backgroundEnabled = true;
     int m_serial = 0;
     int m_foreground = 0;
+};
+
+// The HTTP proxy must keep running while Qt synchronously joins a decoder on
+// the GUI thread (including deferred deletion after a backend error).
+class StreamCache : public QObject {
+public:
+    explicit StreamCache(QObject *parent = nullptr);
+    ~StreamCache() override;
+    QUrl source(const QUrl &remote);
+    void suspend();
+    void setBackgroundEnabled(bool enabled);
+    void discard(const QUrl &local);
+    void interrupt(const QUrl &local);
+    void warm(const QUrl &local);
+private:
+    QThread m_thread;
+    StreamCacheWorker *m_worker = nullptr;
 };

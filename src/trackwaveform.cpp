@@ -4,11 +4,15 @@
 #include <QCache>
 #include <QImageReader>
 #include <QPainter>
+#include <QPainterPath>
+#include <cmath>
 #include <QTimer>
 #include <memory>
 
 namespace { constexpr int MaxBytes = 1024 * 1024; QCache<QUrl, QImage> cache(8 * 1024); }
 TrackWaveform::TrackWaveform(QQuickItem *parent) : QQuickPaintedItem(parent) {
+    setAntialiasing(true);
+    connect(this, &TrackWaveform::detailChanged, this, [this] { tint(); update(); });
     connect(this, &TrackWaveform::progressChanged, this, [this] { update(); });
     connect(this, &TrackWaveform::colorsChanged, this, [this] { tint(); update(); });
 }
@@ -100,15 +104,69 @@ void TrackWaveform::request(const QUrl &url, quint64 generation, int redirects) 
     });
 }
 void TrackWaveform::tint() {
-    auto colored = [this](QColor color) {
-        if (m_image.isNull()) return QImage();
-        QImage image = m_image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    QImage mask;
+    if (!m_image.isNull()) {
+        // SoundCloud PNGs may encode the area outside the waveform.
+        qint64 center = 0, edges = 0;
+        for (int x = 0; x < m_image.width(); ++x) {
+            center += m_image.pixelColor(x, m_image.height() / 2).alpha();
+            edges += m_image.pixelColor(x, 0).alpha();
+        }
+        const bool inverted = edges > center;
+        QVector<qreal> levels(m_image.width());
+        for (int x = 0; x < m_image.width(); ++x) {
+            qreal sum = 0;
+            for (int y = 0; y < m_image.height(); ++y) {
+                const qreal alpha = m_image.pixelColor(x, y).alphaF();
+                sum += inverted ? 1 - alpha : alpha;
+            }
+            levels[x] = sum / m_image.height();
+        }
+        mask = QImage(m_image.size(), QImage::Format_ARGB32_Premultiplied);
+        mask.fill(Qt::transparent);
+        const int radius = m_detailed ? 0 : qMax(2, m_image.width() / 32);
+        QVector<qreal> smoothed(levels.size());
+        qreal low = 1, high = 0;
+        for (int x = 0; x < levels.size(); ++x) {
+            qreal sum = 0, weight = 0;
+            for (int d = -radius; d <= radius; ++d) {
+                const qreal w = radius ? std::exp(-4.5 * d * d / (radius * radius)) : 1;
+                sum += levels[qBound(0, x + d, int(levels.size()) - 1)] * w;
+                weight += w;
+            }
+            smoothed[x] = sum / weight;
+            low = qMin(low, smoothed[x]);
+            high = qMax(high, smoothed[x]);
+        }
+        // A mastered track can stay near full scale for its entire duration.
+        // Keep the resting shape compact and reveal its dynamics instead of a slab.
+        const auto amplitude = [&](int x) {
+            const qreal level = smoothed[x];
+            const qreal normalized = high - low > 0.02
+                ? qBound(0.0, (level - low) / (high - low), 1.0) : level;
+            const qreal envelope = m_detailed ? level : 0.025 + 0.28 * std::pow(normalized, 1.6);
+            return qMax(0.015, envelope) * (mask.height() - 2) / 2;
+        };
+        QPainterPath path;
+        const qreal mid = mask.height() / 2.0;
+        path.moveTo(0, mid);
+        for (int x = 0; x < mask.width(); ++x) path.lineTo(x, mid - amplitude(x));
+        for (int x = mask.width() - 1; x >= 0; --x) path.lineTo(x, mid + amplitude(x));
+        path.closeSubpath();
+        QPainter painter(&mask);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.fillPath(path, Qt::white);
+    }
+    auto colored = [&mask](QColor color) {
+        if (mask.isNull()) return QImage();
+        QImage image = mask.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         QPainter p(&image); p.setCompositionMode(QPainter::CompositionMode_SourceIn); p.fillRect(image.rect(), color); return image;
     };
     m_remaining = colored(m_ink); m_played = colored(m_accent);
 }
 void TrackWaveform::paint(QPainter *p) {
     if (!ready()) return;
+    p->setRenderHint(QPainter::SmoothPixmapTransform);
     p->drawImage(boundingRect(), m_remaining);
     p->setClipRect(QRectF(0, 0, width() * qBound(0.0, m_progress, 1.0), height()));
     p->drawImage(boundingRect(), m_played);

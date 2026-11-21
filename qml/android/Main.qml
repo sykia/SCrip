@@ -4,6 +4,7 @@ import QtQuick.Controls.Basic
 import QtQuick.Effects
 import QtQuick.Layouts
 import QtCore
+import SCrip.Native 1.0
 import QtQuick.Dialogs as Dialogs
 
 ApplicationWindow {
@@ -309,25 +310,32 @@ ApplicationWindow {
         property bool unifiedSurface: false
         property real dragOffset: 0
         property bool dragging: false
+        property bool manualMotion: false
+        property bool swipeDismissEnabled: true
+        property real swipeHeaderHeight: topPadding + 48
+        SwipeDismiss {
+            targetPopup: sheet
+            enabled: sheet.swipeDismissEnabled
+            headerHeight: sheet.swipeHeaderHeight
+            entranceOffset: sheet.unifiedSurface ? 0 : (1 - sheet.reveal) * sheet.height + sheet.dragOffset
+        }
         opacity: 0
-        // Move background and content together, preserving each popup's anchors.
-        onContentItemChanged: if (contentItem) contentItem.transform = [sheetOffset]
-        onBackgroundChanged: if (background) background.transform = [sheetOffset]
-        Translate { id: sheetOffset; y: sheet.unifiedSurface ? 0 : (1 - sheet.reveal) * sheet.height + sheet.dragOffset }
         Behavior on dragOffset {
-            enabled: !sheet.dragging
-            NumberAnimation { duration: app.motion * 0.7; easing.type: Easing.OutCubic }
+            enabled: !sheet.dragging && !sheet.manualMotion
+            SpringAnimation { spring: 4; damping: 0.32; epsilon: 0.25 }
         }
         enter: Transition {
+            enabled: !sheet.manualMotion
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 1; duration: app.motion * 0.45; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "reveal"; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "opacity"; to: 1; duration: sheet.manualMotion || !app.motion ? 0 : 280; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "reveal"; to: 1; duration: sheet.manualMotion || !app.motion ? 0 : 320; easing.type: Easing.OutCubic }
             }
         }
         exit: Transition {
+            enabled: !sheet.manualMotion
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: app.motion * 0.8; easing.type: Easing.InQuad }
-                NumberAnimation { property: "reveal"; to: 0; duration: app.motion * 0.8; easing.type: Easing.InOutCubic }
+                NumberAnimation { property: "opacity"; to: 0; duration: sheet.manualMotion ? 0 : app.motion * 0.8; easing.type: Easing.InQuad }
+                NumberAnimation { property: "reveal"; to: 0; duration: sheet.manualMotion ? 0 : app.motion * 0.8; easing.type: Easing.InOutCubic }
             }
         }
     }
@@ -377,7 +385,10 @@ ApplicationWindow {
         }
         background: Rectangle { radius: height / 2; color: control.down ? (control.primary ? Qt.darker(app.accent, 1.12) : (app.dark ? "#393939" : "#e7e3e7")) : control.primary ? app.accent : (app.dark ? "#2b2b2b" : "#eeeeee"); opacity: control.enabled ? 1 : 0.45; Behavior on color { ColorAnimation { duration: app.motion / 2 } } }
     }
-    component Caption: Label { textFormat: Text.PlainText; color: app.ink; font.pixelSize: 15; elide: Text.ElideRight }
+    component Caption: MetadataLabel {
+        color: app.ink; font.pixelSize: 15; elide: Text.ElideRight
+        normalizeFallback: true
+    }
     TrackSelection { id: trackSelection; rows: collectionTools.rows; context: (collectionTools.transformed ? collectionTools.sourceRows.length : "") + ":" + collectionTools.sortKey + ":" + collectionTools.descending + ":" + collectionTools.query + ":" + app.scrollKey + ":" + (app.api.profile?.urn || "") + ":" + sc.signedIn }
     component Track: ItemDelegate {
         
@@ -481,12 +492,13 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
         Rectangle {
-            visible: !!app.api.error; Layout.fillWidth: true
+            visible: !!app.api.error && !app.api.countryBlockError; Layout.fillWidth: true
             implicitHeight: errorText.implicitHeight + 20
             color: "#ffe8ee"
-            Label { id: errorText; anchors.fill: parent; anchors.margins: 10; text: app.api.error || ""; wrapMode: Text.Wrap; color: "#97233b" }
+            MetadataLabel { id: errorText; anchors.fill: parent; anchors.margins: 10; text: app.api.error || ""; wrapMode: Text.Wrap; color: "#97233b" }
             TapHandler { onTapped: sc.clearError() }
         }
+        NetworkAccess { host: app; mobile: true; Layout.fillWidth: true; Layout.margins: 12; visible: !!app.api.connectionCountryBlocked || !!app.api.connectionIssue }
         Action {
             visible: sc.signedIn && !app.api.connected && !!app.api.error
             text: app.api.busy ? qsTr("Подключение…") : qsTr("Повторить подключение")
@@ -500,8 +512,8 @@ ApplicationWindow {
             Layout.margins: 28; spacing: 20
             Item { Layout.fillHeight: true }
             Image { source: "qrc:/qt/qml/SCrip/assets/blob.png"; Layout.preferredWidth: 120; Layout.preferredHeight: 120; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit; Rectangle { anchors.fill: parent; anchors.margins: -8; radius: 32; color: app.accent; z: -1 } }
-            Label { text: qsTr("Твоя музыка.\nВ твоём ритме."); font.pixelSize: 27; font.bold: true; color: app.ink; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
-            Label { text: app.api.authBusy ? qsTr("Заверши вход в браузере и вернись в Sange") : qsTr("Любимые треки, новые находки и миксы SoundCloud"); color: app.muted; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
+            MetadataLabel { text: qsTr("Твоя музыка.\nВ твоём ритме."); font.pixelSize: 27; font.bold: true; color: app.ink; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
+            MetadataLabel { text: app.api.authBusy ? qsTr("Заверши вход в браузере и вернись в Sange") : qsTr("Любимые треки, новые находки и миксы SoundCloud"); color: app.muted; Layout.fillWidth: true; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter }
             Action { visible: app.api.disconnectStatus === "unconfirmed"; text: qsTr("Настройки SoundCloud"); Layout.fillWidth: true; onClicked: sc.openExternal("https://soundcloud.com/settings") }
             Action { text: app.api.authBusy ? qsTr("Отменить вход") : qsTr("Войти в SoundCloud"); primary: true; Layout.fillWidth: true; onClicked: app.api.authBusy ? sc.cancelLogin() : sc.login() }
             Item { Layout.fillHeight: true }
@@ -526,6 +538,7 @@ ApplicationWindow {
             Layout.fillWidth: true; Layout.leftMargin: 20; Layout.rightMargin: 20
             Layout.preferredHeight: Math.min(contentHeight, app.height * 0.42)
             contentHeight: trackFilters.height; contentWidth: width; clip: true
+            flickableDirection: Flickable.VerticalFlick
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {}
             TrackSearchFilters {
@@ -556,7 +569,8 @@ ApplicationWindow {
         Flickable {
             visible: sc.signedIn && app.page === 3 && !["playlists", "history"].includes(app.library)
             Layout.fillWidth: true; Layout.preferredHeight: 44; Layout.bottomMargin: 12
-            contentWidth: libraryFilters.implicitWidth + 40; clip: true
+            contentWidth: libraryFilters.implicitWidth + 40; contentHeight: height; clip: true
+            flickableDirection: Flickable.HorizontalFlick
             boundsBehavior: Flickable.StopAtBounds
             Row {
                 id: libraryFilters
@@ -587,7 +601,9 @@ ApplicationWindow {
                     inkColor: app.ink
                     waveColor: app.accent
                     motion: prefs.motion
-                    foreground: app.visible && app.visibility !== Window.Minimized
+                    exposure: player.visible ? Math.max(0, Math.min(1, player.y / Math.max(1, player.height))) : 1
+                    foreground: app.visible && app.page === 0 && !queue.visible && !playlistView.visible
+                        && app.visibility !== Window.Minimized
                         && (Qt.platform.os !== "android" || Qt.application.state === Qt.ApplicationActive)
                 }
                 Repeater {
@@ -608,12 +624,13 @@ ApplicationWindow {
                         required property int index
                         readonly property var modelData: homeShelves.shelves[index] || ({tracks: []})
                         width: parent.width; spacing: 10
-                        Label { x: 18; width: parent.width - 36; text: parent.modelData.title; color: app.ink; font.pixelSize: 19; font.bold: true; wrapMode: Text.Wrap; TapHandler { enabled: !homeShelf.modelData.station; onTapped: playlistView.beginMix(homeShelf.modelData, shelf.songs) } }
+                        MetadataLabel { x: 18; width: parent.width - 36; text: parent.modelData.title; color: app.ink; font.pixelSize: 19; font.bold: true; wrapMode: Text.Wrap; TapHandler { enabled: !homeShelf.modelData.station; onTapped: playlistView.beginMix(homeShelf.modelData, shelf.songs) } }
                         Caption { x: 18; width: parent.width - 36; visible: !!homeShelf.modelData.subtitle; text: homeShelf.modelData.subtitle || ""; color: app.muted; font.pixelSize: 12 }
                         ListView {
                             id: shelf
                             property var songs: parent.modelData.tracks || []
                             width: parent.width; height: 218; orientation: ListView.Horizontal
+                            flickableDirection: Flickable.HorizontalFlick
                             leftMargin: 20; rightMargin: 20; spacing: 14; clip: true
                             model: songs.length
                             delegate: ItemDelegate {
@@ -641,7 +658,7 @@ ApplicationWindow {
                         }
                     }
                 }
-                Label { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy || (!app.homeAccount && !app.api.error) ? qsTr("Собираем твою музыку…") : app.api.homeError || app.api.error || qsTr("Добавь любимые треки, чтобы здесь появились подборки"); wrapMode: Text.Wrap; color: app.muted }
+                MetadataLabel { x: 18; width: parent.width - 36; visible: !(sc.homeShelves || []).length; text: app.api.homeBusy || (!app.homeAccount && !app.api.error) ? qsTr("Собираем твою музыку…") : app.api.homeError || app.api.error || qsTr("Добавь любимые треки, чтобы здесь появились подборки"); wrapMode: Text.Wrap; color: app.muted }
                 PluginPanels { dark: app.dark; ink: app.ink; muted: app.muted; x: 18; width: parent.width - 36; manager: pluginManager; slotName: "home"; onReport: error => app.message = error }
                 Item { width: 1; height: navigationFooter.height + 16 }
             }
@@ -655,6 +672,7 @@ ApplicationWindow {
                 width: settingsScroll.availableWidth
                 spacing: 18
                 Action { text: qsTr("Назад"); symbol: "back"; Layout.leftMargin: 20; onClicked: app.page = app.page === 6 ? 5 : 4 }
+                NetworkAccess { host: app; mobile: true; visible: app.page === 5; Layout.fillWidth: true; Layout.leftMargin: 18; Layout.rightMargin: 18 }
                 ColumnLayout {
                     visible: app.page === 5
                     Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.margins: 18; spacing: 14
@@ -711,7 +729,7 @@ ApplicationWindow {
                     Switch { text: qsTr("Всплывающие подсказки"); checked: prefs.showTooltips; onToggled: prefs.showTooltips = checked }
                     Switch {  text: qsTr("Анимации"); checked: prefs.motion; onToggled: prefs.motion = checked }
                     Switch { Layout.minimumWidth: 0; Layout.maximumWidth: parent.width; text: qsTr("Догружать при прокрутке"); checked: prefs.autoLoad; onToggled: prefs.autoLoad = checked }
-                    Label { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
+                    MetadataLabel { text: app.message; visible: !!text && app.page === 5; wrapMode: Text.Wrap; color: app.muted; Layout.fillWidth: true }
                     Caption { text: qsTr("Аккаунт"); font.bold: true; font.pixelSize: 19 }
                     Action { text: sc.signedIn ? qsTr("Выйти из SoundCloud") : qsTr("Войти в SoundCloud"); Layout.fillWidth: true; onClicked: sc.signedIn ? sc.logout() : sc.login() }
                     DiagnosticsPanel {
@@ -753,8 +771,6 @@ ApplicationWindow {
             reuseItems: true
             cacheBuffer: Math.max(320, height / 2)
             pixelAligned: false
-            flickDeceleration: 1500
-            maximumFlickVelocity: 3600
             function maybeLoad() {
                 if (visible && !collectionTools.query.trim() && prefs.autoLoad && app.api.hasMore && !app.api.busy && !app.api.error
                         && contentY + height >= originY + contentHeight + bottomMargin - 180) sc.more()
@@ -841,7 +857,7 @@ ApplicationWindow {
                     }
                 }
                 ProfileExtras { host: app; mobile: true; user: app.profile || ({}); x: 18; width: parent.width - 36; onRelatedRequested: peoplePopup.begin(app.profile, "related") }
-                Label { x: 18; width: parent.width - 36; text: app.profile?.description || ""; visible: !!text; wrapMode: Text.Wrap; color: app.muted; maximumLineCount: 4; elide: Text.ElideRight }
+                MetadataLabel { x: 18; width: parent.width - 36; text: app.profile?.description || ""; visible: !!text; wrapMode: Text.Wrap; color: app.muted; maximumLineCount: 4; elide: Text.ElideRight }
                 ProfileNavigation {
                     x: 18; width: parent.width - 36
                     host: app; mobile: true; section: app.profileTab; likes: app.profileLikes; reposts: app.repostLibrary
@@ -860,7 +876,7 @@ ApplicationWindow {
             footer: Column {
                 width: tracks.width
                 spacing: 16
-                Label {
+                MetadataLabel {
                     width: parent.width - 48; x: 24
                     topPadding: 24; bottomPadding: 24
                     horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
@@ -913,8 +929,37 @@ ApplicationWindow {
                 Behavior on color { ColorAnimation { duration: prefs.motion ? 120 : 0 } }
             }
             DragHandler {
+                id: miniSwipe
+                property real releaseSpeed: 0
+                property double lastMoveTime: 0
+                onActiveTranslationChanged: if (active) {
+                    releaseSpeed = centroid.velocity.y
+                    lastMoveTime = Date.now()
+                }
                 target: null
-                onActiveTranslationChanged: if (active && activeTranslation.y < -45 && Math.abs(activeTranslation.y) > Math.abs(activeTranslation.x)) player.open()
+                xAxis.enabled: false
+                property real startY: 0
+                onActiveChanged: {
+                    if (active) {
+                        if (centroid.scenePosition.y >= centroid.scenePressPosition.y) return
+                        startY = centroid.scenePressPosition.y
+                        player.manualMotion = true
+                        player.dragging = true
+                        playerMotion.stop()
+                        playerMotion.value = player.height
+                        player.open()
+                        player.opacity = 1
+                        player.reveal = 1
+                        player.dragOffset = playerMotion.value
+                    } else if (player.manualMotion) {
+                        player.dragging = false
+                        playerMotion.settle(Date.now() - lastMoveTime < 100 ? releaseSpeed : 0, player.height - Math.min(100, player.height * 0.25))
+                    }
+                }
+                onCentroidChanged: if (active && player.dragging && player.manualMotion) {
+                    playerMotion.value = Math.max(0, Math.min(player.height,
+                        player.height + centroid.scenePosition.y - startY))
+                }
             }
             RowLayout {
                 anchors.fill: parent; anchors.margins: 12; spacing: 10
@@ -1054,148 +1099,220 @@ ApplicationWindow {
 
     Sheet {
         id: player
+        swipeDismissEnabled: false
         objectName: "playerSheet"
+        // Move the popup itself: its surface, content and hit area share one
+        // position. Moving content alone leaves Qt's full-screen popup behind.
+        unifiedSurface: true
+        y: (1 - reveal) * height + dragOffset
+        dim: false
         parent: Overlay.overlay
         width: parent.width; height: parent.height
-        modal: true; focus: true; closePolicy: Popup.CloseOnEscape; padding: 26
+        modal: !miniSwipe.active; focus: true; closePolicy: Popup.CloseOnEscape; padding: 26
         topPadding: 12 + app.safeAreaTop(parent)
         bottomPadding: 16 + app.safeAreaBottom(parent)
         background: Rectangle {
-            color: app.surface
-            Rectangle {
-                anchors.fill: parent
-                gradient: Gradient {
-                    GradientStop { position: 0; color: app.panel }
-                    GradientStop { position: 0.65; color: app.surface }
+            gradient: Gradient {
+                GradientStop { position: 0; color: app.panel }
+                GradientStop { position: 0.65; color: app.surface }
+            }
+        }
+        SheetMotion {
+            id: playerMotion
+            extent: player.height
+            onValueChanged: if (player.manualMotion) player.dragOffset = value
+            onSettled: closed => {
+                if (closed) player.close()
+                else player.manualMotion = false
+            }
+        }
+        onAboutToHide: playerMotion.stop()
+        onClosed: {
+            playerMotion.stop()
+            dragOffset = 0
+            manualMotion = false
+        }
+        PointHandler {
+            enabled: !miniSwipe.active
+            acceptedButtons: Qt.LeftButton
+            onActiveChanged: {
+                if (active) {
+                    playerMotion.stop()
+                    playerMotion.value = player.dragOffset
+                } else if (!playerSwipe.active && player.manualMotion && !playerMotion.running) {
+                    playerMotion.settle(0)
                 }
             }
         }
         DragHandler {
             id: playerSwipe
+            grabPermissions: PointerHandler.CanTakeOverFromItems | PointerHandler.ApprovesTakeOverByAnything
+            property real releaseSpeed: 0
+            property double lastMoveTime: 0
+            onActiveTranslationChanged: if (active) {
+                releaseSpeed = centroid.velocity.y
+                lastMoveTime = Date.now()
+            }
             target: null
             xAxis.enabled: false
-            onActiveTranslationChanged: {
-                if (active) player.dragOffset = Math.max(0, activeTranslation.y)
-            }
+            property real startOffset: 0
+            property real startY: 0
             onActiveChanged: {
                 if (active) {
+                    playerMotion.stop()
+                    startOffset = player.dragOffset
+                    startY = centroid.scenePosition.y
+                    player.manualMotion = true
                     player.dragging = true
                 } else {
-                    const dismiss = player.dragOffset > Math.min(100, player.height * 0.15)
-                    if (dismiss) {
-                        // Transfer the gesture position into the closing animation without a jump.
-                        player.reveal = Math.max(0, 1 - player.dragOffset / Math.max(1, player.height))
-                        player.dragOffset = 0
-                        player.dragging = false
-                        player.close()
-                    } else {
-                        player.dragging = false
-                        player.dragOffset = 0
-                    }
+                    player.dragging = false
+                    playerMotion.settle(Date.now() - lastMoveTime < 100 ? releaseSpeed : 0)
                 }
             }
+            onCentroidChanged: if (active) playerMotion.value = Math.max(0,
+                Math.min(player.height, startOffset + centroid.scenePosition.y - startY))
         }
         contentItem: ColumnLayout {
             spacing: 10
             RowLayout {
+                id: playerHeader
                 Layout.fillWidth: true
                 Action { text: qsTr("Свернуть"); symbol: "back"; Layout.preferredWidth: 48; Accessible.name: qsTr("Свернуть плеер"); onClicked: player.close() }
                 Action { text: qsTr("Дополнения плеера"); symbol: "grid"; Layout.preferredWidth: 48; visible: pluginManager.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
                 Caption { text: qsTr("СЕЙЧАС ИГРАЕТ"); font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                 Action { text: qsTr("Действия"); symbol: "menu"; Layout.preferredWidth: 48; Accessible.name: qsTr("Действия с треком"); onClicked: { app.selectedTrack = app.api.current; app.selectedQueue = -1; trackMenu.open() } }
             }
-            Item { Layout.fillHeight: true }
+            NetworkAccess {
+                id: playerCountryAccess
+                host: app; mobile: true; Layout.fillWidth: true
+                visible: !!app.api.connectionCountryBlocked && !app.api.relayEnabled
+            }
             Rectangle {
                 Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: Math.max(80, Math.min(player.availableWidth, player.availableHeight - 380))
-                Layout.preferredHeight: width
+                id: playerCover
+                objectName: "playerCover"
+                Layout.preferredWidth: Math.max(48, Math.min(player.availableWidth,
+                    player.availableHeight - playerHeader.implicitHeight - playerDetails.implicitHeight
+                    - (playerCountryAccess.visible ? playerCountryAccess.implicitHeight + 10 : 0) - 20))
+                Layout.preferredHeight: Layout.preferredWidth
+                Layout.minimumWidth: 0; Layout.minimumHeight: 0
+                Layout.maximumWidth: Layout.preferredWidth
+                Layout.maximumHeight: Layout.preferredHeight
                 color: (app.dark ? "#2c2c2c" : "#e9e9e9"); radius: 24; clip: true
                 RoundedImage { anchors.fill: parent; source: app.cover(app.api.current); radius: 24; placeholderInk: app.muted; fadeDuration: prefs.motion ? 150 : 0 }
             }
-            AbstractButton {
-                id: commentPreview
-                objectName: "playingCommentPreview"
-                Layout.fillWidth: true; Layout.preferredHeight: 64
-                leftPadding: 14; rightPadding: 14; topPadding: 10; bottomPadding: 10
-                property var displayedComment: ({})
-                readonly property string desiredKey: String(app.api.current.urn || "") + ":" + (app.playingComment.urn || "")
-                onDesiredKeyChanged: { commentArrival.stop(); commentArrival.start() }
-                Accessible.name: displayedComment.body ? qsTr("Комментарий: ") + displayedComment.body + qsTr(". Открыть комментарии") : qsTr("Открыть комментарии к треку")
-                onClicked: { commentsSheet.followCurrent = true; commentsSheet.open() }
-                background: Rectangle {
-                    radius: 16
-                    color: Qt.alpha(app.ink, commentPreview.down ? 0.09 : 0.045)
-                    border.width: 1; border.color: Qt.alpha(app.ink, 0.035)
-                }
-                SequentialAnimation {
-                    id: commentArrival
-                    NumberAnimation { target: previewContent; property: "opacity"; to: 0; duration: app.motion * 0.3; easing.type: Easing.InQuad }
-                    ScriptAction { script: commentPreview.displayedComment = app.playingComment }
-                    ParallelAnimation {
-                        NumberAnimation { target: previewContent; property: "opacity"; to: 1; duration: app.motion * 0.65; easing.type: Easing.OutCubic }
-                        NumberAnimation { target: previewOffset; property: "y"; from: 4; to: 0; duration: app.motion * 0.65; easing.type: Easing.OutCubic }
+            ColumnLayout {
+                id: playerDetails
+                objectName: "playerDetails"
+                Layout.fillWidth: true
+                spacing: 10
+                AbstractButton {
+                    id: commentPreview
+                    objectName: "playingCommentPreview"
+                    Layout.fillWidth: true; Layout.preferredHeight: 64
+                    leftPadding: 14; rightPadding: 14; topPadding: 10; bottomPadding: 10
+                    property var displayedComment: ({})
+                    readonly property string desiredKey: String(app.api.current.urn || "") + ":" + (app.playingComment.urn || "")
+                    onDesiredKeyChanged: { commentArrival.stop(); commentArrival.start() }
+                    Accessible.name: displayedComment.body ? qsTr("Комментарий: ") + displayedComment.body + qsTr(". Открыть комментарии") : qsTr("Открыть комментарии к треку")
+                    onClicked: { commentsSheet.followCurrent = true; commentsSheet.open() }
+                    background: Rectangle {
+                        radius: 16
+                        color: Qt.alpha(app.ink, commentPreview.down ? 0.09 : 0.045)
+                        border.width: 1; border.color: Qt.alpha(app.ink, 0.035)
+                    }
+                    SequentialAnimation {
+                        id: commentArrival
+                        NumberAnimation { target: previewContent; property: "opacity"; to: 0; duration: app.motion * 0.3; easing.type: Easing.InQuad }
+                        ScriptAction { script: commentPreview.displayedComment = app.playingComment }
+                        ParallelAnimation {
+                            NumberAnimation { target: previewContent; property: "opacity"; to: 1; duration: app.motion * 0.65; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: previewOffset; property: "y"; from: 4; to: 0; duration: app.motion * 0.65; easing.type: Easing.OutCubic }
+                        }
+                    }
+                    contentItem: RowLayout {
+                        id: previewContent
+                        spacing: 12
+                        transform: Translate { id: previewOffset }
+                        Caption {
+                            Layout.preferredWidth: 38; Layout.alignment: Qt.AlignVCenter
+                            text: commentPreview.displayedComment.body ? app.time(commentPreview.displayedComment.timestamp) : "···"
+                            font.pixelSize: 11; font.features: { "tnum": 1 }; color: app.muted
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                        Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 28; color: Qt.alpha(app.ink, 0.1) }
+                        ColumnLayout {
+                            Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 2
+                            Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.user?.username || qsTr("Комментарии"); font.pixelSize: 11; color: app.muted }
+                            Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.body || qsTr("Обсудить этот трек"); textFormat: Text.PlainText; font.pixelSize: 12; maximumLineCount: 1 }
+                        }
+                        AndroidGlyph { name: "arrow"; Layout.preferredWidth: 16; Layout.preferredHeight: 16; Layout.alignment: Qt.AlignVCenter; ink: app.muted }
                     }
                 }
-                contentItem: RowLayout {
-                    id: previewContent
-                    spacing: 12
-                    transform: Translate { id: previewOffset }
-                    Caption {
-                        Layout.preferredWidth: 38; Layout.alignment: Qt.AlignVCenter
-                        text: commentPreview.displayedComment.body ? app.time(commentPreview.displayedComment.timestamp) : "···"
-                        font.pixelSize: 11; font.features: { "tnum": 1 }; color: app.muted
-                        horizontalAlignment: Text.AlignHCenter
+                Label {
+                    id: playerTrackTitle
+                    objectName: "playerTrackTitle"
+                    clip: true
+                    text: app.api.current?.title || ""
+                    textFormat: Text.PlainText
+                    color: app.ink; font.bold: true; font.pixelSize: 21
+                    wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+                    // Color-emoji fallback fonts can report enormous line metrics
+                    // on Android. Metadata must never displace transport controls.
+                    lineHeightMode: Text.ProportionalHeight
+                    lineHeight: 1
+                    property FontMetrics metrics: FontMetrics { font: playerTrackTitle.font }
+                    onLineLaidOut: line => {
+                        const ascent = TextGeometry.lineAscent(text, font, line.width, line.number, true)
+                        const step = Math.ceil(font.pixelSize * 1.35)
+                        line.height = step
+                        line.y = line.number * step + metrics.ascent - ascent
                     }
-                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 28; color: Qt.alpha(app.ink, 0.1) }
-                    ColumnLayout {
-                        Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 2
-                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.user?.username || qsTr("Комментарии"); font.pixelSize: 11; color: app.muted }
-                        Caption { Layout.fillWidth: true; text: commentPreview.displayedComment.body || qsTr("Обсудить этот трек"); textFormat: Text.PlainText; font.pixelSize: 12; maximumLineCount: 1 }
-                    }
-                    AndroidGlyph { name: "arrow"; Layout.preferredWidth: 16; Layout.preferredHeight: 16; Layout.alignment: Qt.AlignVCenter; ink: app.muted }
+                    Layout.fillWidth: true; Layout.minimumWidth: 0
+                    Layout.minimumHeight: 0
+                    Layout.preferredHeight: Math.min(implicitHeight, 58)
+                    Layout.maximumHeight: 58
                 }
-            }
-            Item { Layout.fillHeight: true }
-            Label { text: app.api.current?.title || ""; color: app.ink; font.bold: true; font.pixelSize: 21; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; Layout.fillWidth: true }
-            Caption { text: sc.displayArtist(app.api.current || {}) || ""; color: app.muted; Layout.fillWidth: true; TapHandler { enabled: !!app.api.current?.user?.urn && !sc.hasSeparateArtist(app.api.current || {}); onTapped: { player.close(); app.openProfile(app.api.current.user) } } }
-            Caption {
-                Layout.fillWidth: true; visible: sc.hasSeparateArtist(app.api.current || {})
-                text: qsTr("Загрузил: ") + (app.api.current?.user?.username || "SoundCloud"); color: app.muted; font.pixelSize: 12
-                TapHandler { enabled: !!app.api.current?.user?.urn; onTapped: { player.close(); app.openProfile(app.api.current.user) } }
-            }
-            TrackProgress {
-                id: progress
-                Layout.fillWidth: true
-                source: player.opened ? (app.api.current.waveform_url || "") : ""
-                selectionKey: String(app.api.current.urn || "")
-                duration: sc.duration > 0 ? sc.duration : (typeof app.api.current.duration === "number" ? app.api.current.duration : 0)
-                position: sc.position || 0
-                ink: Qt.alpha(app.muted, 0.4); accent: app.accent
-                onSeekRequested: milliseconds => sc.seek(milliseconds)
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                Caption { text: app.time(progress.value); color: app.muted; font.pixelSize: 12 }
-                Item { Layout.fillWidth: true }
-                Caption { text: app.time(sc.duration); color: app.muted; font.pixelSize: 12 }
-            }
-            RowLayout {
-                Layout.fillWidth: true; spacing: 0
-                PlayerButton { text: qsTr("Перемешать"); symbol: "shuffle"; active: !!app.api.shuffle; onClicked: sc.setShuffle(!app.api.shuffle) }
-                Item { Layout.fillWidth: true }
-                PlayerButton { text: qsTr("Предыдущий трек"); symbol: "previous"; onClicked: sc.previous() }
-                Item { Layout.fillWidth: true }
-                PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? qsTr("Пауза") : qsTr("Воспроизвести"); symbol: app.api.playing ? "pause" : "play"; main: true; onClicked: sc.togglePlayback() }
-                Item { Layout.fillWidth: true }
-                PlayerButton { text: qsTr("Следующий трек"); symbol: "next"; onClicked: sc.next() }
-                Item { Layout.fillWidth: true }
-                PlayerButton { ToolTip.visible: app.showTooltips && (down); ToolTip.delay: 500; ToolTip.text: Accessible.name; text: [qsTr("Повтор выкл."), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; Accessible.name: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                EngagementAction { host: app; mobile: true; item: app.api.current || ({}); Layout.fillWidth: true }
-                FollowButton { user: app.api.current?.user || ({}); Layout.fillWidth: true }
-                Action { text: qsTr("Очередь"); Layout.fillWidth: true; onClicked: queue.open() }
+                Caption { text: sc.displayArtist(app.api.current || {}) || ""; color: app.muted; Layout.fillWidth: true; TapHandler { enabled: !!app.api.current?.user?.urn && !sc.hasSeparateArtist(app.api.current || {}); onTapped: { player.close(); app.openProfile(app.api.current.user) } } }
+                Caption {
+                    Layout.fillWidth: true; visible: sc.hasSeparateArtist(app.api.current || {})
+                    text: qsTr("Загрузил: ") + (app.api.current?.user?.username || "SoundCloud"); color: app.muted; font.pixelSize: 12
+                    TapHandler { enabled: !!app.api.current?.user?.urn; onTapped: { player.close(); app.openProfile(app.api.current.user) } }
+                }
+                TrackProgress {
+                    id: progress
+                    Layout.fillWidth: true
+                    source: player.opened ? (app.api.current.waveform_url || "") : ""
+                    selectionKey: String(app.api.current.urn || "")
+                    duration: sc.duration > 0 ? sc.duration : (typeof app.api.current.duration === "number" ? app.api.current.duration : 0)
+                    position: sc.position || 0
+                    ink: Qt.alpha(app.muted, 0.4); accent: app.accent
+                    onSeekRequested: milliseconds => sc.seek(milliseconds)
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Caption { text: app.time(progress.value); color: app.muted; font.pixelSize: 12 }
+                    Item { Layout.fillWidth: true }
+                    Caption { text: app.time(sc.duration); color: app.muted; font.pixelSize: 12 }
+                }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 0
+                    PlayerButton { text: qsTr("Перемешать"); symbol: "shuffle"; active: !!app.api.shuffle; onClicked: sc.setShuffle(!app.api.shuffle) }
+                    Item { Layout.fillWidth: true }
+                    PlayerButton { text: qsTr("Предыдущий трек"); symbol: "previous"; onClicked: sc.previous() }
+                    Item { Layout.fillWidth: true }
+                    PlayerButton { loading: !!app.api.buffering; text: app.api.playing ? qsTr("Пауза") : qsTr("Воспроизвести"); symbol: app.api.playing ? "pause" : "play"; main: true; onClicked: sc.togglePlayback() }
+                    Item { Layout.fillWidth: true }
+                    PlayerButton { text: qsTr("Следующий трек"); symbol: "next"; onClicked: sc.next() }
+                    Item { Layout.fillWidth: true }
+                    PlayerButton { ToolTip.visible: app.showTooltips && (down); ToolTip.delay: 500; ToolTip.text: Accessible.name; text: [qsTr("Повтор выкл."), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; Accessible.name: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; objectName: "repeatModeButton"; symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; active: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    EngagementAction { host: app; mobile: true; item: app.api.current || ({}); Layout.fillWidth: true }
+                    FollowButton { user: app.api.current?.user || ({}); Layout.fillWidth: true }
+                    Action { text: qsTr("Очередь"); Layout.fillWidth: true; onClicked: queue.open() }
+                }
             }
         }
     }
@@ -1249,74 +1366,125 @@ ApplicationWindow {
         contentItem: RowLayout {
             spacing: 16
             AndroidGlyph { name: menuRow.glyph; ink: app.muted; Layout.preferredWidth: 22; Layout.preferredHeight: 22 }
-            Label { text: menuRow.text; color: app.ink; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: menuRow.multiline ? Text.Wrap : Text.NoWrap; elide: menuRow.multiline ? Text.ElideNone : Text.ElideRight }
+            MetadataLabel { text: menuRow.text; color: app.ink; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: menuRow.multiline ? Text.Wrap : Text.NoWrap; elide: menuRow.multiline ? Text.ElideNone : Text.ElideRight }
         }
     }
-    Sheet {
+    Drawer {
         id: trackMenu
-        // Move the popup itself so its background, clipping and contents share one surface.
-        unifiedSurface: true
-        enter: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "reveal"; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
-            }
-        }
-        exit: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: app.motion * 0.75; easing.type: Easing.InOutCubic }
-                NumberAnimation { property: "reveal"; to: 0; duration: app.motion * 0.75; easing.type: Easing.InOutCubic }
-            }
-        }
-        Overlay.modal: Rectangle {
-            color: "#99000000"
-            Behavior on opacity { NumberAnimation { duration: app.motion; easing.type: Easing.OutCubic } }
-        }
+        objectName: "trackActionsSheet"
+        edge: Qt.BottomEdge
+        dragMargin: 0
+        // Only the header owns dismissal; content gestures belong to Flickable.
+        interactive: false
+        enter: Transition { NumberAnimation { duration: app.motion; easing.type: Easing.OutCubic } }
+        exit: Transition { enabled: trackMenu.position > 0; NumberAnimation { duration: app.motion; easing.type: Easing.OutCubic } }
+        Overlay.modal: Rectangle { color: "#99000000" }
+        onAboutToHide: menuMotion.stop()
         onAboutToShow: {
+            menuMotion.stop()
+            menuScroll.cancelFlick()
+            menuScroll.contentY = 0
             app.lyricTrack = app.selectedTrack
             lyricsBackend.lookup(app.selectedTrack.title || "", sc.displayArtist(app.selectedTrack) || "", app.selectedTrack.duration || 0, String(app.selectedTrack.urn || app.selectedTrack.id || ""))
         }
         parent: Overlay.overlay
         width: parent.width
-        height: Math.min(parent.height - app.safeAreaTop(parent) - 16, menuContent.implicitHeight + topPadding + bottomPadding)
-        y: parent.height - height + (1 - reveal) * height
-        modal: true; padding: 16
-        bottomPadding: 16 + app.safeAreaBottom(parent)
-        background: Rectangle { color: app.panel; radius: 28 }
-        contentItem: Flickable {
-            clip: true; contentHeight: menuContent.implicitHeight
-            boundsBehavior: Flickable.StopAtBounds
+        height: Math.min(parent.height - Math.max(app.safeAreaTop(parent) + 24, parent.height * 0.1), menuHeader.implicitHeight + menuContent.implicitHeight + topPadding + bottomPadding)
+        modal: true
+        leftPadding: 16; rightPadding: 16; topPadding: 14
+        bottomPadding: 12 + app.safeAreaBottom(parent)
+        background: Rectangle { color: app.panel; radius: 24 }
+        contentItem: Item {
+            SheetMotion {
+                id: menuMotion
+                extent: trackMenu.height
+                onValueChanged: trackMenu.position = 1 - value / Math.max(1, extent)
+                onSettled: closed => { if (closed) trackMenu.close() }
+            }
             ColumnLayout {
-                id: menuContent
-                width: parent.width; spacing: 2
-                Rectangle { Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: 12; width: 36; height: 4; radius: 2; color: Qt.alpha(app.muted, 0.4) }
-                RowLayout {
-                    Layout.fillWidth: true; Layout.bottomMargin: 12; spacing: 12
-                    RoundedImage { source: app.cover(app.selectedTrack); radius: 12; Layout.preferredWidth: 54; Layout.preferredHeight: 54; placeholderInk: app.muted }
-                    ColumnLayout {
-                        Layout.fillWidth: true; spacing: 4
-                        Caption { text: app.selectedTrack.title || qsTr("Без названия"); font.bold: true; Layout.fillWidth: true }
-                        Caption { text: sc.displayArtist(app.selectedTrack) || "SoundCloud"; color: app.muted; font.pixelSize: 12; Layout.fillWidth: true }
+                id: menuHeader
+                PointHandler {
+                    onActiveChanged: {
+                        if (active) {
+                            menuMotion.stop()
+                            menuMotion.value = (1 - trackMenu.position) * trackMenu.height
+                        } else if (!menuDrag.active && !menuMotion.running && trackMenu.position < 1) {
+                            menuMotion.settle(0)
+                        }
                     }
-                    PlayerButton { symbol: "close"; text: qsTr("Закрыть меню"); onClicked: trackMenu.close() }
                 }
-                Rectangle { Layout.fillWidth: true; height: 1; color: Qt.alpha(app.muted, 0.15) }
-                    MenuRow { glyph: "list"; text: qsTr("Информация о треке"); onClicked: { trackInfoSheet.track = app.selectedTrack; trackMenu.close(); trackInfoSheet.open() } }
-                    MenuRow { glyph: "list"; text: qsTr("Комментарии"); onClicked: { commentsSheet.selectedTrack = app.selectedTrack; commentsSheet.followCurrent = app.selectedTrack.urn === app.api.current.urn; trackMenu.close(); commentsSheet.open() } }
+                DragHandler {
+                    id: menuDrag
+                    property real releaseSpeed: 0
+                    property double lastMoveTime: 0
+                    onActiveTranslationChanged: if (active) {
+                        releaseSpeed = centroid.velocity.y
+                        lastMoveTime = Date.now()
+                    }
+                    target: null
+                    enabled: !menuScroll.dragging
+                    xAxis.enabled: false
+                    property real pressY: 0
+                    property real startOffset: 0
+                    onActiveChanged: {
+                        if (active) {
+                            menuMotion.stop()
+                            menuScroll.cancelFlick()
+                            startOffset = (1 - trackMenu.position) * trackMenu.height
+                            pressY = centroid.scenePosition.y
+                        } else menuMotion.settle(Date.now() - lastMoveTime < 100 ? releaseSpeed : 0)
+                    }
+                    onCentroidChanged: if (active) menuMotion.value = Math.max(0,
+                        Math.min(trackMenu.height, startOffset + centroid.scenePosition.y - pressY))
+                }
+                objectName: "trackActionsHeader"
+                width: parent.width
+                spacing: 0
+                Rectangle { Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: 18; implicitWidth: 32; implicitHeight: 4; radius: 2; color: Qt.alpha(app.ink, 0.25) }
+                RowLayout {
+                    Layout.fillWidth: true; Layout.leftMargin: 6; Layout.rightMargin: 2; Layout.bottomMargin: 18
+                    spacing: 12
+                    RoundedImage { objectName: "trackActionsCover"; source: app.cover(app.selectedTrack); radius: 10; Layout.preferredWidth: 48; Layout.preferredHeight: 48; placeholderInk: app.muted }
+                    ColumnLayout {
+                        Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 5
+                        MetadataLabel { objectName: "trackActionsTitle"; text: app.selectedTrack.title || qsTr("Без названия"); textFormat: Text.PlainText; color: app.ink; font.pixelSize: 16; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                        MetadataLabel { objectName: "trackActionsArtist"; text: sc.displayArtist(app.selectedTrack) || "SoundCloud"; textFormat: Text.PlainText; color: app.muted; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                    }
+                    PlayerButton { symbol: "close"; text: qsTr("Закрыть меню"); Layout.preferredWidth: 40; Layout.preferredHeight: 44; onClicked: trackMenu.close() }
+                }
+                Rectangle { Layout.fillWidth: true; Layout.bottomMargin: 8; implicitHeight: 1; color: Qt.alpha(app.ink, 0.08) }
+            }
+            Flickable {
+                id: menuScroll
+                objectName: "trackActionsScroll"
+                anchors.top: menuHeader.bottom; anchors.bottom: parent.bottom
+                width: parent.width
+                clip: true; contentWidth: width; contentHeight: menuContent.implicitHeight
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollIndicator.vertical: ScrollIndicator { }
+                ColumnLayout {
+                    id: menuContent
+                    width: parent.width; spacing: 0
+                    MenuRow { glyph: "info"; text: qsTr("Информация о треке"); onClicked: { trackInfoSheet.track = app.selectedTrack; trackMenu.close(); trackInfoSheet.open() } }
+                    MenuRow { glyph: "comment"; text: qsTr("Комментарии"); onClicked: { commentsSheet.selectedTrack = app.selectedTrack; commentsSheet.followCurrent = app.selectedTrack.urn === app.api.current.urn; trackMenu.close(); commentsSheet.open() } }
                     MenuRow { glyph: "list"; text: qsTr("Текст песни"); visible: (app.lyricState.lines || []).length > 0; onClicked: { trackMenu.close(); lyricsSheet.open() } }
                     EngagementAction { host: app; mobile: true; menuPresentation: true; Layout.fillWidth: true; item: app.selectedTrack; repost: true }
                     EngagementAction { host: app; mobile: true; menuPresentation: true; item: app.selectedTrack; Layout.fillWidth: true }
-                MenuRow { glyph: "close"; text: qsTr("Не предлагать этот трек"); enabled: !!app.selectedTrack.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, false); trackMenu.close() } }
-                MenuRow { multiline: true; glyph: "close"; text: qsTr("Не предлагать треки этого аккаунта: ") + (app.selectedTrack.user?.username || app.selectedTrack.user?.urn || "SoundCloud"); enabled: !!app.selectedTrack.user?.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, true); trackMenu.close() } }
+                    Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; Layout.bottomMargin: 8; implicitHeight: 1; color: Qt.alpha(app.ink, 0.08) }
+                    MenuRow { glyph: "close"; text: qsTr("Не предлагать этот трек"); enabled: !!app.selectedTrack.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, false); trackMenu.close() } }
+                    MenuRow { multiline: true; glyph: "close"; text: qsTr("Не предлагать треки этого аккаунта: ") + (app.selectedTrack.user?.username || app.selectedTrack.user?.urn || "SoundCloud"); enabled: !!app.selectedTrack.user?.urn; onClicked: { sc.excludeRecommendation(app.selectedTrack, true); trackMenu.close() } }
                     MenuRow { glyph: "next"; visible: app.selectedQueue >= 0; text: qsTr("Играть следующим"); Layout.fillWidth: true; onClicked: { sc.queueNext(app.selectedQueue); trackMenu.close() } }
                     MenuRow { glyph: "close"; visible: app.selectedQueue >= 0; text: qsTr("Удалить из очереди"); Layout.fillWidth: true; onClicked: { sc.removeQueue(app.selectedQueue); trackMenu.close() } }
+                    Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; Layout.bottomMargin: 8; implicitHeight: 1; color: Qt.alpha(app.ink, 0.08) }
                     MenuRow { glyph: "plus"; text: qsTr("Добавить в очередь"); Layout.fillWidth: true; onClicked: { sc.enqueue(app.selectedTrack); trackMenu.close() } }
                     MenuRow { glyph: "music"; text: qsTr("Сохранить в плейлист"); Layout.fillWidth: true; onClicked: { sc.listDestinations(); destinations.open(); trackMenu.close() } }
                     MenuRow { glyph: "profile"; text: sc.hasSeparateArtist(app.selectedTrack) ? qsTr("Загрузил: ") + (app.selectedTrack.user?.username || "SoundCloud") : qsTr("Профиль исполнителя"); Layout.fillWidth: true; onClicked: { app.openProfile(app.selectedTrack.user); trackMenu.close(); playlistView.close(); player.close() } }
                     MenuRow { glyph: "play"; text: app.selectedTrack.station_urn ? qsTr("Станция по треку") : qsTr("Похожие треки"); Layout.fillWidth: true; onClicked: { trackMenu.close(); playlistView.beginStation(app.selectedTrack, false) } }
                     MenuRow { glyph: "cloud"; text: qsTr("Открыть в SoundCloud"); Layout.fillWidth: true; onClicked: { sc.openExternal(app.selectedTrack.permalink_url); trackMenu.close() } }
-                    MenuRow { glyph: "list"; text: qsTr("Копировать название и исполнителя"); Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || qsTr("Без названия")) + " — " + (sc.displayArtist(app.selectedTrack) || "SoundCloud")); trackMenu.close() } }
-                    MenuRow { glyph: "arrow"; text: qsTr("Копировать ссылку"); enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
+                    MenuRow { glyph: "copy"; text: qsTr("Копировать название и исполнителя"); Layout.fillWidth: true; onClicked: { sc.copyText((app.selectedTrack.title || qsTr("Без названия")) + " — " + (sc.displayArtist(app.selectedTrack) || "SoundCloud")); trackMenu.close() } }
+                    MenuRow { glyph: "link"; text: qsTr("Копировать ссылку"); enabled: /^https:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(app.selectedTrack.permalink_url || ""); Layout.fillWidth: true; onClicked: { sc.copyText(app.selectedTrack.permalink_url); trackMenu.close() } }
+                }
             }
         }
     }
@@ -1336,7 +1504,7 @@ ApplicationWindow {
             spacing: 16
             RowLayout {
                 Layout.fillWidth: true
-                Label { text: qsTr("Информация о треке"); color: app.ink; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                MetadataLabel { text: qsTr("Информация о треке"); color: app.ink; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
                 PlayerButton { symbol: "close"; text: qsTr("Закрыть сведения"); onClicked: trackInfoSheet.close() }
             }
             Flickable {
@@ -1347,7 +1515,7 @@ ApplicationWindow {
                 ScrollBar.vertical: ScrollBar { }
                 ColumnLayout {
                     id: infoBody; width: parent.width; spacing: 20
-                    Label { text: trackInfoSheet.track.title || ""; color: app.ink; font.pixelSize: 19; font.bold: true; textFormat: Text.PlainText; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    MetadataLabel { text: trackInfoSheet.track.title || ""; color: app.ink; font.pixelSize: 19; font.bold: true; textFormat: Text.PlainText; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     TrackInformation {
                         Layout.fillWidth: true; track: trackInfoSheet.track; host: app
                         onProfileRequested: user => { trackInfoSheet.close(); player.close(); app.openProfile(user) }
@@ -1417,13 +1585,8 @@ ApplicationWindow {
                 flickableDirection: Flickable.VerticalFlick
                 boundsBehavior: Flickable.DragOverBounds
                 boundsMovement: Flickable.FollowBoundsBehavior
-                flickDeceleration: 1800
-                maximumFlickVelocity: 3500
                 pressDelay: 0
                 pixelAligned: false
-                rebound: Transition {
-                    NumberAnimation { properties: "x,y"; duration: prefs.motion ? 320 : 0; easing.type: Easing.OutCubic }
-                }
                 Column {
                     id: lyricLines
                     x: 4; y: 16; width: Math.max(0, lyricScroll.width - 20)
@@ -1491,7 +1654,7 @@ ApplicationWindow {
         background: Rectangle { radius: 24; color: app.panel }
         contentItem: ColumnLayout {
             Caption { text: qsTr("Сохранить в плейлист"); font.bold: true; font.pixelSize: 22 }
-            Label { visible: !!app.api.loadingDestinations; text: qsTr("Загрузка…"); color: app.muted }
+            MetadataLabel { visible: !!app.api.loadingDestinations; text: qsTr("Загрузка…"); color: app.muted }
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 model: app.api.destinations || []
@@ -1512,7 +1675,7 @@ ApplicationWindow {
         background: Rectangle { color: app.panel; radius: 24 }
         contentItem: ColumnLayout {
             Caption { text: app.api.profile?.username || "Sange"; font.pixelSize: 19; font.bold: true; Layout.fillWidth: true }
-            Label { text: qsTr("SoundCloud для твоего ритма"); color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            MetadataLabel { text: qsTr("SoundCloud для твоего ритма"); color: app.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Action { text: sc.signedIn ? qsTr("Выйти из аккаунта") : qsTr("Войти в SoundCloud"); Layout.fillWidth: true; onClicked: { sc.signedIn ? sc.logout() : sc.login(); account.close() } }
             Action { text: qsTr("Закрыть"); Layout.fillWidth: true; onClicked: account.close() }
         }
@@ -1536,6 +1699,7 @@ ApplicationWindow {
     }
     Sheet {
         id: startup
+        swipeDismissEnabled: false
         parent: Overlay.overlay
         width: parent.width; height: parent.height
         modal: true; closePolicy: Popup.NoAutoClose; padding: 0

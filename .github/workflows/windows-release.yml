@@ -63,7 +63,9 @@ jobs:
           if ($env:PREVIOUS_TAG -and (Get-Content -LiteralPath $sentinel -Raw).Trim() -ne 'upgrade-preservation-fixture') { throw 'Application data was lost during upgrade' }
 
           if ($setup.ExitCode -ne 0) { throw "Установщик завершился с кодом $($setup.ExitCode)" }
-          $player = Start-Process "$env:LOCALAPPDATA\Programs\SCrip\SCrip.exe" -PassThru
+          $exe = "$env:LOCALAPPDATA\Programs\SCrip\sange.exe"
+          if (!(Test-Path $exe)) { $exe = "$env:LOCALAPPDATA\Programs\SCrip\SCrip.exe" }
+          $player = Start-Process $exe -PassThru
           try {
             for ($i = 0; $i -lt 30; $i++) {
               $player.Refresh()

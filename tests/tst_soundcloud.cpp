@@ -44,6 +44,24 @@
 #include <qt_windows.h>
 #endif
 
+// Native compositor effects are supplied by main.cpp in production.
+// Offscreen QML fixtures use a deterministic service with the same interface.
+static void provideTestWindowEffects(QQmlEngine &engine) {
+    QQmlComponent effects(&engine);
+    effects.setData(R"(import QtQml
+QtObject {
+    property bool blurAvailable: false
+    property bool topAvailable: false
+    property string status: ""
+    function configure(window, onTop, backdrop) {}
+    function showWindow(window) { window.show() }
+})", QUrl());
+    auto *service = effects.create();
+    Q_ASSERT(service);
+    service->setParent(&engine);
+    engine.rootContext()->setContextProperty("windowEffects", service);
+}
+
 static QString updateFixtureName(const QString &version) {
 #ifdef Q_OS_MACOS
     return "Sange-" + version + "-macOS-" + QSysInfo::buildCpuArchitecture() + ".dmg";
@@ -190,11 +208,91 @@ private:
         file.write(QJsonDocument(QJsonObject{{"client_id", "test-client"}, {"client_secret", "test-secret"}, {"redirect_uri", QString("http://127.0.0.1:%1/callback").arg(callbackPort)}}).toJson());
     }
 private slots:
+    void apiRelayPreservesAuthAndCanonicalPagination() {
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        sc.set("configured", true); sc.m_access = "private-test-token";
+        sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
+        sc.setRelayEnabled(true);
+        net.responses = {{200, "{\"collection\":[]}"}};
+        bool done = false;
+        sc.request("/tracks?limit=2", [&](QJsonDocument) { done = true; });
+        QTRY_VERIFY(done);
+        const auto request = net.requests.last();
+        QCOMPARE(request.url().host(), "scrip-auth.scrip-desktop-aca3d9.workers.dev");
+        QCOMPARE(request.url().path(), "/api/tracks");
+        QCOMPARE(QUrlQuery(request.url()).queryItemValue("limit"), "2");
+        QCOMPARE(request.rawHeader("Authorization"), QByteArray("OAuth private-test-token"));
+        sc.setRelayEnabled(false);
+        net.responses = {{403, "<html>The Amazon CloudFront distribution is configured to block access from your country.</html>"}};
+        QString error;
+        sc.request("/tracks", [](QJsonDocument) {}, "GET", {}, false, [&](QString value) { error = value; });
+        QTRY_VERIFY(!error.isEmpty());
+        QVERIFY(sc.state().value("connectionCountryBlocked").toBool());
+        QVERIFY(sc.state().value("connectionIssue").toBool());
+        QVERIFY(error.contains("страны"));
+        QCOMPARE(net.requests.last().url().host(), "api.soundcloud.com");
+    }
+    void countryBlockIsDetectedForTokenAndStreamHosts_data() {
+        QTest::addColumn<QString>("host");
+        QTest::newRow("api") << QString("api.soundcloud.com");
+        QTest::newRow("oauth") << QString("secure.soundcloud.com");
+        QTest::newRow("project-worker") << QString("scrip-auth.scrip-desktop-aca3d9.workers.dev");
+    }
+    void countryBlockIsDetectedForTokenAndStreamHosts() {
+        QFETCH(QString, host);
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        net.responses = {{403, "<html>The Amazon CloudFront distribution is configured to block access from your country.</html>"}};
+        auto *reply = net.get(QNetworkRequest(QUrl("https://" + host + "/")));
+        QSignalSpy finished(reply, &QNetworkReply::finished);
+        QVERIFY(finished.wait());
+        QVERIFY(sc.state().value("connectionCountryBlocked").toBool());
+        QVERIFY(sc.state().value("connectionIssue").toBool());
+        sc.fail("SoundCloud недоступен из вашей страны. Попробуйте подключение через сервер Sange.");
+        QVERIFY(sc.state().value("countryBlockError").toBool());
+        sc.clearError();
+        QVERIFY(!sc.state().value("countryBlockError").toBool());
+        QVERIFY(sc.state().value("connectionCountryBlocked").toBool());
+        reply->deleteLater();
+        net.responses = {{200, "{}"}};
+        reply = net.get(QNetworkRequest(QUrl("https://api.soundcloud.com/me")));
+        QSignalSpy recovered(reply, &QNetworkReply::finished);
+        QVERIFY(recovered.wait());
+        QVERIFY(!sc.state().value("connectionCountryBlocked").toBool());
+        reply->deleteLater();
+    }
+    void connectionAssistanceDoesNotMislabelAuthOrRateLimits_data() {
+        QTest::addColumn<int>("status");
+        QTest::addColumn<int>("error");
+        QTest::addColumn<QString>("host");
+        QTest::addColumn<bool>("hint");
+        QTest::newRow("timeout") << 0 << int(QNetworkReply::TimeoutError) << QString("api.soundcloud.com") << true;
+        QTest::newRow("access-denied") << 403 << int(QNetworkReply::ContentAccessDenied) << QString("api.soundcloud.com") << true;
+        QTest::newRow("authentication") << 401 << int(QNetworkReply::ContentAccessDenied) << QString("api.soundcloud.com") << false;
+        QTest::newRow("rate-limit") << 429 << int(QNetworkReply::ContentAccessDenied) << QString("api.soundcloud.com") << false;
+        QTest::newRow("other-service") << 403 << int(QNetworkReply::ContentAccessDenied) << QString("api.github.com") << false;
+    }
+    void connectionAssistanceDoesNotMislabelAuthOrRateLimits() {
+        QFETCH(int, status); QFETCH(int, error); QFETCH(QString, host); QFETCH(bool, hint);
+        Network net; SoundCloud sc(nullptr, &net, secrets);
+        net.responses.append(Response{status, "{}", 0, QNetworkReply::NetworkError(error)});
+        auto *reply = net.get(QNetworkRequest(QUrl("https://" + host + "/")));
+        QSignalSpy finished(reply, &QNetworkReply::finished);
+        QVERIFY(finished.wait());
+        QCOMPARE(sc.state().value("connectionIssue").toBool(), hint);
+        QVERIFY(!sc.state().value("connectionCountryBlocked").toBool());
+        reply->deleteLater();
+        net.responses.append(Response{200, "{}"});
+        reply = net.get(QNetworkRequest(QUrl("https://api.soundcloud.com/")));
+        QSignalSpy recovered(reply, &QNetworkReply::finished);
+        QVERIFY(recovered.wait());
+        QVERIFY(!sc.state().value("connectionIssue").toBool());
+        reply->deleteLater();
+    }
     void playbackWatchdogRecoversStallsButHonorsPause() {
         Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false);
         sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:1"}});
         sc.set("position", 18000); sc.set("playbackActive", true);
-        for (int i = 0; i < 30; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
+        for (int i = 0; i < 10; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
         QVERIFY(sc.m_playbackRecovering); QCOMPARE(sc.m_recoveryPosition, 18000);
         sc.pausePlayback();
         for (int i = 0; i < 35; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
@@ -215,6 +313,49 @@ private slots:
         QVERIFY(net.requests.last().rawHeader("Authorization").isEmpty());
         sc.pausePlayback(); QVERIFY(!sc.m_playbackRecovering);
         QVERIFY(!sc.m_playbackRecoveryTimer.isActive()); QVERIFY(!sc.state()["buffering"].toBool());
+    }
+    void startupStallTriesAlternateStreamAndRejectsOldGeneration() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false); sc.setPreloadEnabled(false);
+        sc.set("current", QVariantMap{{"urn", "soundcloud:tracks:1"}}); sc.set("playbackActive", true);
+        sc.m_startupPending = true; sc.m_startupInitialPosition = 42000;
+        sc.m_streamCandidates = {{"aac", QUrl("https://api.soundcloud.com/a")},
+                                 {"mp3", QUrl("http://invalid.example/b")}};
+        sc.m_streamCandidateIndex = 0;
+        const auto generation = sc.m_playGeneration;
+        for (int i = 0; i < 10; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
+        QVERIFY(sc.m_playGeneration > generation);
+        QCOMPARE(sc.m_streamCandidateIndex, 2); // Invalid alternate exhausts candidates.
+        QVERIFY(sc.m_playbackRecovering);
+        QCOMPARE(sc.m_restorePosition, 42000);
+        const auto activeGeneration = sc.m_playGeneration;
+        sc.resolveStream(QUrl("https://api.soundcloud.com/a"), generation);
+        QCOMPARE(sc.m_playGeneration, activeGeneration);
+        QVERIFY(net.requests.isEmpty());
+    }
+    void stalledRetrySkipsWithoutConnectivityProbe() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false); sc.setPreloadEnabled(false);
+        const QVariantMap a{{"urn", "soundcloud:tracks:1"}}, b{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}};
+        sc.m_queue = {a,b}; sc.m_queueIndex = 0; sc.resetQueueOrder();
+        sc.set("current", a); sc.set("repeatMode", 1); sc.set("playbackActive", true);
+        sc.m_playbackRetries = 1;
+        for (int i = 0; i < 10; ++i) QMetaObject::invokeMethod(&sc.m_playbackWatchdog, "timeout", Qt::DirectConnection);
+        QCOMPARE(sc.m_queueIndex, 1);
+        QVERIFY(sc.m_failedPlaybackTracks.contains("soundcloud:tracks:1"));
+        QVERIFY(!sc.m_playbackRecoveryTimer.isActive());
+    }
+    void recoveryProbeCannotWaitForeverOffline() {
+        Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false); sc.setPreloadEnabled(false);
+        const QVariantMap a{{"urn", "soundcloud:tracks:1"}}, b{{"urn", "soundcloud:tracks:2"}, {"access", "blocked"}};
+        sc.m_queue = {a,b}; sc.m_queueIndex = 0; sc.resetQueueOrder();
+        sc.set("current", a); sc.set("playbackActive", true);
+        sc.recoverPlayback(); sc.m_playbackRecoveryTimer.stop();
+        for (int i = 0; i < 2; ++i) {
+            net.responses = {{0, "", 0, QNetworkReply::HostNotFoundError}};
+            sc.checkPlaybackConnection();
+            if (i == 0) { QTRY_VERIFY(sc.m_playbackRecoveryTimer.isActive()); sc.m_playbackRecoveryTimer.stop(); }
+        }
+        QTRY_COMPARE(sc.m_queueIndex, 1);
+        QVERIFY(!sc.m_playbackRecovering);
     }
     void exhaustedPlaybackSkipsDespiteRepeatOneAndStopsOnCycle() {
         Network net; SoundCloud sc(nullptr, &net, secrets); sc.set("configured", false); sc.setPreloadEnabled(false);
@@ -912,7 +1053,7 @@ private slots:
         config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/SCrip";
         QVERIFY(QDir().mkpath(config));
     }
-    void init() { QFile::remove(QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)).filePath("playback-progress.json")); QSettings().remove("player/playbackQuality"); QSettings().remove("player/preloadEnabled"); QSettings().remove("player/preloadWifiOnly"); qputenv("SCRIP_AUTH_MODE", "local"); QSettings().remove("player/repeatMode"); QSettings().remove("player/repeat"); QSettings().remove("player/shuffle"); prepare(); }
+    void init() { QFile::remove(QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)).filePath("playback-progress.json")); QSettings().remove("network/apiRelay"); QSettings().remove("player/playbackQuality"); QSettings().remove("player/preloadEnabled"); QSettings().remove("player/preloadWifiOnly"); qputenv("SCRIP_AUTH_MODE", "local"); QSettings().remove("player/repeatMode"); QSettings().remove("player/repeat"); QSettings().remove("player/shuffle"); prepare(); }
     void migratesSecretsAndRestoresSession() {
         const QJsonObject session{{"client_id", "test-client"}, {"access_token", "old-access"}, {"refresh_token", "old-refresh"},
             {"expires_at", QDateTime::currentSecsSinceEpoch() + 3600}, {"user_session", true}};
@@ -1610,6 +1751,28 @@ private slots:
         } else {
             QVERIFY(QMetaObject::invokeMethod(surface.get(), "begin", Q_ARG(QVariant, user), Q_ARG(QVariant, QString("followers"))));
             QTRY_COMPARE(sc.state()["people"].toList().size(), 12);
+            QTRY_COMPARE(surface->property("reveal").toReal(), 1.0);
+            auto *peopleList = surface->findChild<QQuickItem *>("peopleList");
+            QVERIFY(peopleList);
+            QVERIFY(peopleList->property("contentHeight").toReal() > peopleList->height());
+            const QPoint start = peopleList->mapToScene(QPointF(30, peopleList->height() - 45)).toPoint();
+            if (mobile) {
+                auto *device = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+                auto touch = QTest::touchEvent(window, device, false);
+                touch.press(0, start, window).commit();
+                for (int i = 1; i <= 10; ++i) {
+                    touch.move(0, start - QPoint(0, i * 16), window).commit();
+                    QTest::qWait(20);
+                }
+                touch.release(0, start - QPoint(0, 160), window).commit();
+            } else {
+                QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, start);
+                for (int i = 1; i <= 10; ++i)
+                    QTest::mouseMove(window, start - QPoint(0, i * 16), 20);
+                QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, start - QPoint(0, 160));
+            }
+            QTRY_VERIFY(peopleList->property("contentY").toReal() > 40);
+            QVERIFY(surface->property("visible").toBool());
         }
         QTest::qWait(100);
         const auto shot = window->grabWindow(); QVERIFY(!shot.isNull());
@@ -4605,7 +4768,7 @@ private slots:
 
         Network net; net.responses = {guest()}; SoundCloud sc(nullptr, &net, secrets);
         if (!worker) QTRY_VERIFY(sc.state()["connected"].toBool());
-        QQmlApplicationEngine engine;
+        QQmlApplicationEngine engine; provideTestWindowEffects(engine);
         engine.rootContext()->setContextProperty("sc", &sc);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty());
@@ -4843,7 +5006,7 @@ private slots:
         Network net;
         net.responses = {guest(), {200, "[]"}};
         SoundCloud sc(nullptr, &net, secrets);
-        QQmlApplicationEngine engine;
+        QQmlApplicationEngine engine; provideTestWindowEffects(engine);
         engine.rootContext()->setContextProperty("sc", &sc);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
         QVERIFY(!engine.rootObjects().isEmpty());
@@ -4890,7 +5053,7 @@ private slots:
     void desktopRepeatModesUseExistingControl() {
         Network net; SoundCloud sc(nullptr, &net, secrets);
         sc.set("signedIn", true);
-        QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        QQmlApplicationEngine engine; provideTestWindowEffects(engine); engine.rootContext()->setContextProperty("sc", &sc);
         auto *language = new LanguageController(&engine);
         engine.rootContext()->setContextProperty("uiLanguage", language);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
@@ -4927,7 +5090,7 @@ private slots:
         QTRY_VERIFY(sc.state()["signedIn"].toBool());
         for (int i = 0; i < 3; ++i)
             sc.enqueue({{"urn", QString("soundcloud:tracks:%1").arg(i + 1)}, {"title", QString("Трек %1").arg(i + 1)}});
-        QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        QQmlApplicationEngine engine; provideTestWindowEffects(engine); engine.rootContext()->setContextProperty("sc", &sc);
         auto *language = new LanguageController(&engine);
         engine.rootContext()->setContextProperty("uiLanguage", language);
         engine.load(QUrl::fromLocalFile(QString(SCRIP_SOURCE_DIR) + "/qml/Main.qml"));
@@ -4966,7 +5129,7 @@ private slots:
         sc.m_expires = QDateTime::currentSecsSinceEpoch() + 3600;
         sc.m_homeLoaded = true;
         sc.set("signedIn", true);
-        QQmlApplicationEngine engine;
+        QQmlApplicationEngine engine; provideTestWindowEffects(engine);
         engine.rootContext()->setContextProperty("sc", &sc);
         QStringList warnings;
         connect(&engine, &QQmlEngine::warnings, this, [&warnings](const QList<QQmlError> &errors) { for (const auto &error : errors) warnings.append(error.toString()); });
@@ -5027,7 +5190,7 @@ private slots:
         QTRY_VERIFY(sc.state()["connected"].toBool());
         QTRY_VERIFY(!sc.state()["busy"].toBool());
         QTRY_VERIFY(sc.m_reads.isEmpty());
-        QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("sc", &sc);
+        QQmlApplicationEngine engine; provideTestWindowEffects(engine); engine.rootContext()->setContextProperty("sc", &sc);
         auto *language = new LanguageController(&engine);
         engine.rootContext()->setContextProperty("uiLanguage", language);
         Network lyricsNet; lyricsNet.responseHosts = {"lrclib.net"};

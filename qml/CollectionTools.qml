@@ -79,7 +79,7 @@ ColumnLayout {
         presetApplied(preset.query, preset.filters || {}); savedDialog.close()
     }
     spacing: 6
-    component Copy: Text { color: tools.host.ink; font.pixelSize: 13; textFormat: Text.PlainText; elide: Text.ElideRight }
+    component Copy: MetadataLabel { color: tools.host.ink; font.pixelSize: 13; textFormat: Text.PlainText; elide: Text.ElideRight }
     component Action: SurfaceButton { host: tools.host; mobile: tools.mobile; quiet: true }
     component MenuAction: SurfaceButton {
         id: action
@@ -94,6 +94,8 @@ ColumnLayout {
         }
     }
     component Sheet: Popup {
+        id: collectionSheet
+        SwipeDismiss { targetPopup: collectionSheet; enabled: tools.mobile }
         parent: Overlay.overlay
         width: Math.min(440, parent.width - 32)
         height: Math.min(parent.height - 32, contentItem.implicitHeight + topPadding + bottomPadding)
@@ -155,6 +157,7 @@ ColumnLayout {
     }
     Popup {
         id: options
+        SwipeDismiss { targetPopup: options; enabled: tools.mobile; headerHeight: options.topPadding + 48 }
         parent: Overlay.overlay
         width: tools.mobile ? parent.width : Math.min(320, parent.width - 24)
         height: Math.min(parent.height - 32, optionRows.implicitHeight + topPadding + bottomPadding)

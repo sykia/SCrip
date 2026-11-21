@@ -2,8 +2,9 @@
 Type=Application
 Name=Sange
 Comment=Музыка из SoundCloud
-Exec=scrip %u
+Exec=sange %u
 Icon=scrip
 Terminal=false
 Categories=AudioVideo;Audio;Player;
 MimeType=x-scheme-handler/scrip;x-scheme-handler/soundcloud;
+StartupWMClass=Sange

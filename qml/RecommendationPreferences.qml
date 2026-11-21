@@ -4,6 +4,11 @@ import QtQuick.Layouts
 
 Popup {
     id: popup
+    SwipeDismiss { targetPopup: popup; enabled: popup.mobile;  }
+    readonly property int motionDuration: parent && parent.Window.window && parent.Window.window.motion !== undefined ? parent.Window.window.motion : 240
+    opacity: 0; scale: 0.985
+    enter: SurfaceTransition { duration: popup.motionDuration }
+    exit: SurfaceTransition { duration: popup.motionDuration; leaving: true }
     required property var backend
     property bool mobile: Qt.platform.os === "android"
     property color ink: "#eeeeee"
@@ -51,11 +56,13 @@ Popup {
         Keys.onReleased: event => { if (event.key === Qt.Key_Back) { popup.close(); event.accepted = true } }
         RowLayout {
             Layout.fillWidth: true
-            Label { text: qsTr("Исключения рекомендаций"); color: popup.ink; font.pixelSize: 18; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            MetadataLabel { text: qsTr("Исключения рекомендаций"); color: popup.ink; font.pixelSize: 18; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true }
             SurfaceButton {
                 host: appearance; mobile: true; quiet: true; implicitWidth: 44;
-                text: "⋯"; Accessible.name: qsTr("Дополнительные действия")
-                onClicked: more.open()
+                text: popup.mobile ? "↺" : "⋯"
+                Accessible.name: popup.mobile ? qsTr("Сбросить все исключения") : qsTr("Дополнительные действия")
+                enabled: !popup.mobile || (popup.api.recommendationExclusions || []).length > 0
+                onClicked: popup.mobile ? confirmation.open() : more.open()
                 Menu {
                     id: more
                     MenuItem { text: qsTr("Сбросить все исключения"); enabled: (popup.api.recommendationExclusions || []).length > 0; onTriggered: confirmation.open() }
@@ -70,8 +77,8 @@ Popup {
             color: popup.ink; placeholderTextColor: Qt.alpha(popup.ink, 0.6); selectionColor: popup.accent
             background: Rectangle { radius: 10; color: Qt.alpha(popup.ink, 0.07) }
         }
-        Label { visible: !(popup.api.recommendationExclusions || []).length; text: qsTr("Исключений пока нет"); color: popup.ink }
-        Label { visible: (popup.api.recommendationExclusions || []).length > 0 && !popup.entries.length; text: qsTr("Ничего не найдено"); color: popup.ink }
+        MetadataLabel { visible: !(popup.api.recommendationExclusions || []).length; text: qsTr("Исключений пока нет"); color: popup.ink }
+        MetadataLabel { visible: (popup.api.recommendationExclusions || []).length > 0 && !popup.entries.length; text: qsTr("Ничего не найдено"); color: popup.ink }
         ListView {
             visible: popup.entries.length > 0
             Layout.fillWidth: true
@@ -84,14 +91,14 @@ Popup {
                 required property int index
                 width: ListView.view.width
                 spacing: 0
-                Label {
+                MetadataLabel {
                     visible: index === 0 || popup.entries[index - 1].account !== modelData.account
                     text: modelData.account ? qsTr("Аккаунты") : qsTr("Треки")
                     color: popup.ink; font.bold: true
                     Layout.fillWidth: true; Layout.preferredHeight: visible ? 36 : 0
                     verticalAlignment: Text.AlignVCenter
                 }
-                Label { text: modelData.name || modelData.urn; textFormat: Text.PlainText; color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                MetadataLabel { text: modelData.name || modelData.urn; textFormat: Text.PlainText; color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
                 SurfaceButton {
                     host: appearance; mobile: true; quiet: true
                     text: qsTr("Вернуть в рекомендации")
@@ -105,6 +112,10 @@ Popup {
     }
     Popup {
         id: confirmation
+        opacity: 0; scale: 0.985
+        enter: SurfaceTransition { duration: popup.motionDuration }
+        exit: SurfaceTransition { duration: popup.motionDuration; leaving: true }
+        SwipeDismiss { targetPopup: confirmation; enabled: popup.mobile }
         parent: Overlay.overlay
         modal: true; focus: true
         width: Math.min(popup.width - 16, 360)
@@ -113,7 +124,7 @@ Popup {
         background: Rectangle { radius: 22; color: popup.surface }
         contentItem: ColumnLayout {
             spacing: 16
-            Label { text: qsTr("Сбросить все исключения?"); color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            MetadataLabel { text: qsTr("Сбросить все исключения?"); color: popup.ink; wrapMode: Text.Wrap; Layout.fillWidth: true }
             RowLayout {
                 SurfaceButton { host: appearance; mobile: true; text: qsTr("Отмена"); onClicked: confirmation.close() }
                 SurfaceButton { host: appearance; mobile: true; text: qsTr("Сбросить"); destructive: true; onClicked: { popup.backend.clearRecommendationExclusions(); confirmation.close() } }

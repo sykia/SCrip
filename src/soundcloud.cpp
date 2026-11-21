@@ -59,6 +59,11 @@ struct SoundCloudStorageCompletion {
 #endif
 
 namespace {
+const QString countryBlockMessage = QStringLiteral("SoundCloud недоступен из вашей страны. Попробуйте подключение через сервер Sange.");
+bool countryBlockedReply(QNetworkReply *reply) {
+    return reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 403
+        && reply->peek(4096).contains("configured to block access from your country");
+}
 // Frequent checkpoints stay separate from multi-megabyte queue snapshots.
 QString progressPath() {
     return QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)).filePath("playback-progress.json");
@@ -170,11 +175,30 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
     m_systemStore(!secrets),
     m_authStorage(secrets ? std::move(secrets) : systemSecretStore()),
     m_network(network ? network : new QNetworkAccessManager(this)) {
+    connect(m_network, &QNetworkAccessManager::finished, this, [this](QNetworkReply *reply) {
+        const auto host = reply->url().host();
+        if (host != "api.soundcloud.com" && host != "secure.soundcloud.com"
+            && host != "scrip-auth.scrip-desktop-aca3d9.workers.dev") return;
+        if (countryBlockedReply(reply)) {
+            set("connectionCountryBlocked", true); set("connectionIssue", true);
+            return;
+        }
+        const auto error = reply->error();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status >= 200 && status < 300) {
+            set("connectionIssue", false);
+            if (host == "api.soundcloud.com" || reply->url().path().startsWith("/api/")) set("connectionCountryBlocked", false);
+        }
+        else if (status == 403 || (!status && (error == QNetworkReply::HostNotFoundError || error == QNetworkReply::TimeoutError
+            || error == QNetworkReply::ConnectionRefusedError || error == QNetworkReply::RemoteHostClosedError
+            || error == QNetworkReply::ProxyConnectionRefusedError || error == QNetworkReply::ProxyTimeoutError)))
+            set("connectionIssue", true);
+    });
     auto dir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/SCrip";
     QDir().mkpath(dir);
     m_configPath = dir + "/soundcloud.json";
     m_sessionPath = dir + "/session.json";
-    m_state = {{"configured", false}, {"connected", false}, {"signedIn", false}, {"busy", false},
+    m_state = {{"relayEnabled", QSettings().value("network/apiRelay", false).toBool()}, {"configured", false}, {"connected", false}, {"signedIn", false}, {"busy", false},
         {"home", QVariantList{}}, {"homeBusy", false}, {"homeError", ""}, {"authBusy", false}, {"error", ""}, {"status", "Подключите SoundCloud"}, {"tracks", QVariantList{}},
         {"queue", QVariantList{}}, {"profile", QVariantMap{}}, {"current", QVariantMap{}}, {"restoreCleared", false},
         {"playing", false}, {"playbackActive", false}, {"position", 0}, {"duration", 0}, {"hasMore", false},
@@ -363,7 +387,8 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
         });
         connect(media, &QMediaPlayer::errorOccurred, this, [this, media](QMediaPlayer::Error e, const QString &) {
             if (media == m_activePlayer && e != QMediaPlayer::NoError) {
-                qWarning() << "Playback backend error; code=" << int(e);
+                qWarning() << "SangePlayback backend_error" << int(e) << "status" << int(media->mediaStatus())
+                    << "position_ms" << media->position() << "duration_ms" << media->duration();
                 if (m_startupPending && m_startupUsedPreload && !m_preloadedRetryUsed) {
                     m_preloadedRetryUsed = true;
                     startupStage("preloaded_url_refresh");
@@ -418,7 +443,22 @@ SoundCloud::SoundCloud(QObject *parent, QNetworkAccessManager *network, std::sha
             if (position > m_startupInitialPosition + 15000) {
                 m_playbackRetries = 0; m_failedPlaybackTracks.clear();
             }
-        } else if (++m_playbackIdleSeconds >= 30) recoverPlayback();
+        } else if (++m_playbackIdleSeconds >= 10) {
+            // Qt may stay Playing/Loading forever without reporting an error.
+            qWarning() << "SangePlayback stalled status" << int(player().mediaStatus())
+                << "position_ms" << position << "duration_ms" << player().duration()
+                << "retry" << m_playbackRetries << "candidate" << m_streamCandidateIndex;
+            m_playbackIdleSeconds = 0;
+            if (m_startupPending && m_streamCandidateIndex + 1 < m_streamCandidates.size()) {
+                m_streamCache.interrupt(player().source());
+                player().stop(); player().setSource(QUrl{});
+                // Invalidate a resolver that may still complete for the old candidate.
+                m_restoringPlayback = m_startupInitialPosition > 0;
+                m_restorePosition = m_startupInitialPosition;
+                nextStream(++m_playGeneration, "stall_fallback");
+            } else if (m_playbackRetries >= 1) skipFailedPlayback();
+            else recoverPlayback();
+        }
     });
     m_playbackWatchdog.start();
     connect(this, &SoundCloud::signedInChanged, this, &SoundCloud::tryRestoreAndroidTrack);
@@ -555,8 +595,8 @@ void SoundCloud::set(const QString &key, const QVariant &input) {
         QTimer::singleShot(0, this, [this, link] { openLink(link); });
     }
 }
-void SoundCloud::fail(const QString &message) { qWarning().noquote() << "SoundCloud operation failed:" << message; set("error", message); }
-void SoundCloud::clearError() { set("error", ""); }
+void SoundCloud::fail(const QString &message) { set("countryBlockError", message == countryBlockMessage); qWarning().noquote() << "SoundCloud operation failed:" << message; set("error", message); }
+void SoundCloud::clearError() { set("countryBlockError", false); set("error", ""); }
 bool SoundCloud::loadConfig() {
     if (!m_storageReady) { fail(AuthStorage::errorMessage()); return false; }
     m_useWorker = qEnvironmentVariable("SCRIP_AUTH_MODE") != "local";
@@ -621,13 +661,14 @@ void SoundCloud::token(const QUrlQuery &form, bool basic, TokenFlow flow, std::f
         reply->deleteLater(); if (epoch != m_epoch || (loginEpoch >= 0 && loginEpoch != m_loginEpoch)) return;
         if (std::exchange(*handled, true)) return;
         observeRate(reply, "oauth");
+        const bool countryDenied = countryBlockedReply(reply);
         QJsonParseError parseError;
         const auto document = QJsonDocument::fromJson(reply->readAll(), &parseError);
         const auto obj = document.object();
         if (reply->error() != QNetworkReply::NoError || parseError.error != QJsonParseError::NoError
             || !document.isObject() || obj.value("access_token").toString().isEmpty()) {
             const int code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            QString message = code == 0 ? "Плохое соединение с интернетом. Проверьте сеть и повторите подключение." : code == 429 ? "Лимит входов SoundCloud. Подождите перед повторной попыткой."
+            QString message = countryDenied ? countryBlockMessage : code == 0 ? "Плохое соединение с интернетом. Проверьте сеть и повторите подключение." : code == 429 ? "Лимит входов SoundCloud. Подождите перед повторной попыткой."
                 : QString("SoundCloud не выдал токен (HTTP %1). Проверьте ключи, адрес возврата и доступ к сети.").arg(code);
             m_refreshing = false;
             if (flow == TokenFlow::Refresh && (code == 400 || code == 401)) {
@@ -803,6 +844,13 @@ void SoundCloud::request(const QString &path, Callback done, const QByteArray &m
     };
     requestAttempt(path, success, method, body, retry, failure, started, redirects, 0, background);
 }
+QUrl SoundCloud::apiTransport(const QUrl &url) const {
+    if (!m_state.value("relayEnabled").toBool() || url.host() != "api.soundcloud.com") return url;
+    QUrl transport = url;
+    transport.setHost("scrip-auth.scrip-desktop-aca3d9.workers.dev");
+    transport.setPath("/api" + url.path());
+    return transport;
+}
 void SoundCloud::requestAttempt(const QString &path, Callback done, const QByteArray &method, const QJsonObject &body, bool retry, std::function<void(QString)> failed, std::function<void()> started, int redirects, int attempt, bool background) {
     QUrl url(path.startsWith('/') ? "https://api.soundcloud.com" + path : path);
     if (url.scheme() != "https" || url.host() != "api.soundcloud.com" || (url.port() != -1 && url.port() != 443) || !url.userInfo().isEmpty()) { if (failed) failed("API вернул недопустимый адрес."); else fail("API вернул недопустимый адрес."); return; }
@@ -828,7 +876,9 @@ void SoundCloud::requestAttempt(const QString &path, Callback done, const QByteA
             requestAttempt(path, done, method, body, retry, failed, started, redirects, attempt, background); return;
         }
         if (started) started();
-        QNetworkRequest req(url); req.setRawHeader("Authorization", "OAuth " + m_access.toUtf8());
+        QNetworkRequest req(apiTransport(url));
+        req.setHeader(QNetworkRequest::UserAgentHeader, "Sange/" + QCoreApplication::applicationVersion());
+        req.setRawHeader("Authorization", "OAuth " + m_access.toUtf8());
         req.setPriority(rateGroup(url) == "streams" && !background ? QNetworkRequest::HighPriority : background ? QNetworkRequest::LowPriority : QNetworkRequest::NormalPriority);
         req.setRawHeader("Accept", "application/json"); req.setTransferTimeout(25000);
         req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
@@ -844,6 +894,12 @@ void SoundCloud::requestAttempt(const QString &path, Callback done, const QByteA
             int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             if (reply->error() != QNetworkReply::NoError || status >= 400)
                 qWarning() << "SoundCloud request failed; HTTP=" << status << "network=" << int(reply->error()) << "attempt=" << attempt;
+            if (countryBlockedReply(reply)) {
+                set("connectionCountryBlocked", true); set("connectionIssue", true);
+                const QString message = countryBlockMessage;
+                if (failed) failed(message); else fail(message);
+                return;
+            }
             if (status == 401 && retry && !m_refresh.isEmpty()) { m_expires = 0; requestAttempt(path, done, method, body, false, failed, started, redirects, attempt, background); return; }
             if (status == 302 && method == "GET" && (path.startsWith("/resolve?") || path.startsWith("https://api.soundcloud.com/resolve?")) && redirects == 0) {
                 const auto location = reply->url().resolved(reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl());
@@ -970,6 +1026,12 @@ void SoundCloud::postComment(const QString &track, const QString &body, qint64 t
     });
 }
 
+void SoundCloud::setRelayEnabled(bool enabled) {
+    if (m_state.value("relayEnabled").toBool() == enabled) return;
+    QSettings().setValue("network/apiRelay", enabled);
+    m_network->clearConnectionCache();
+    set("relayEnabled", enabled);
+}
 void SoundCloud::connectCatalog() {
     if (m_refreshing || m_state.value("authBusy").toBool()) return;
     // A saved account remains signed in while its token is checked over the network.
@@ -2475,6 +2537,7 @@ void SoundCloud::stopPlayback() {
     m_streamCandidates.clear(); m_streamCandidateIndex = -1; m_previewStreamAvailable = false;
     set("playbackActive", false);
     m_crossfade.stop(); m_crossfadeStarted = false;
+    m_streamCache.interrupt(player().source());
     player().stop(); player().setSource(QUrl{});
     m_preloadPlayer->stop(); m_preloadPlayer->setSource(QUrl{});
     player().setAudioOutput(nullptr); m_preloadPlayer->setAudioOutput(nullptr);
@@ -2569,6 +2632,7 @@ void SoundCloud::cancelPreload() {
     ++m_preloadGeneration;
     if (m_preloadReply) { auto reply = m_preloadReply; m_preloadReply.clear(); reply->abort(); }
     const auto source = m_preloadPlayer->source();
+    m_streamCache.interrupt(source);
     m_preloadPlayer->stop(); m_preloadPlayer->setSource({});
     if (source != player().source()) m_streamCache.discard(source);
     m_preloadUrn.clear(); m_preloadIndex = -1; m_preloadCandidates.clear();
@@ -2650,6 +2714,7 @@ void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 posi
             ? "preloaded_ready_switch" : "preloaded_loading_switch");
     }
     ++m_preloadGeneration;
+    m_streamCache.interrupt(player().source());
     player().stop(); player().setSource(QUrl{});
     if (prepared) {
         startupStage("preloaded_source");
@@ -2701,7 +2766,7 @@ void SoundCloud::startTrack(const QVariantMap &track, bool autoplay, qint64 posi
     });
 }
 // Recovery probes never carry OAuth or signed media URLs. An HTTP response proves
-// connectivity; transport failures and service outages keep the current track.
+// connectivity; repeated transport failures and outages exhaust a bounded budget.
 void SoundCloud::recoverPlayback() {
     if (m_playbackRecovering) return;
     if (!m_state.value("playbackActive").toBool()) {
@@ -2711,8 +2776,11 @@ void SoundCloud::recoverPlayback() {
     m_recoveryPosition = m_pendingSeek >= 0 ? m_pendingSeek :
         qMax(m_state.value("position").toLongLong(), player().position());
     m_playbackRecovering = true;
+    m_connectionFailures = 0;
     ++m_playGeneration; // Ignore requests belonging to the broken source.
     m_startupPending = false;
+    cancelPreload();
+    m_streamCache.interrupt(player().source());
     player().stop();
     set("position", m_recoveryPosition);
     set("buffering", true);
@@ -2725,13 +2793,16 @@ void SoundCloud::checkPlaybackConnection() {
     request.setTransferTimeout(10000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     auto *reply = m_network->get(request);
+    // Transfer timeout measures inactivity, so also bound the whole probe.
+    QTimer::singleShot(10000, reply, [reply] { if (!reply->isFinished()) reply->abort(); });
     connect(reply, &QNetworkReply::finished, this, [this, reply, generation] {
         reply->deleteLater();
         if (generation != m_playGeneration || !m_playbackRecovering ||
             !m_state.value("playbackActive").toBool()) return;
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status == 0 || status == 429 || status >= 500) {
-            m_playbackRecoveryTimer.start(status == 429 ? 60000 : 10000);
+            if (++m_connectionFailures >= 2) { skipFailedPlayback(); return; }
+            m_playbackRecoveryTimer.start(status == 429 ? 60000 : 1500);
             return;
         }
         m_playbackRecovering = false;
@@ -2739,15 +2810,19 @@ void SoundCloud::checkPlaybackConnection() {
             startTrack(m_state.value("current").toMap(), true, m_recoveryPosition, true);
             return;
         }
-        const auto id = urn(m_state.value("current").toMap());
-        if (!m_failedPlaybackTracks.contains(id) && canGoNext()) {
-            m_failedPlaybackTracks.insert(id);
-            advancePlayback(false); // A broken track must not obey repeat-one.
-        } else {
-            pausePlayback();
-            fail("Не удалось восстановить воспроизведение. Попробуйте другой трек или повторите позже.");
-        }
+        skipFailedPlayback();
     });
+}
+void SoundCloud::skipFailedPlayback() {
+    m_playbackRecoveryTimer.stop(); m_playbackRecovering = false;
+    const auto id = urn(m_state.value("current").toMap());
+    if (!m_failedPlaybackTracks.contains(id) && canGoNext()) {
+        m_failedPlaybackTracks.insert(id);
+        advancePlayback(false); // A broken track must not obey repeat-one.
+    } else {
+        pausePlayback();
+        fail("Не удалось восстановить воспроизведение. Попробуйте другой трек или повторите позже.");
+    }
 }
 void SoundCloud::startupStage(const char *stage) {
     if (!m_startupClock.isValid()) return;
@@ -2778,7 +2853,8 @@ void SoundCloud::resolveStream(const QUrl &url, int generation, int redirects) {
         deferRequest(wait, [=, this] { resolveStream(url, generation, redirects); });
         return;
     }
-    QNetworkRequest req(url);
+    QNetworkRequest req(apiTransport(url));
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Sange/" + QCoreApplication::applicationVersion());
     req.setPriority(QNetworkRequest::HighPriority); req.setRawHeader("Authorization", "OAuth " + m_access.toUtf8()); req.setTransferTimeout(20000);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
     auto *reply = m_network->get(req);
@@ -3225,7 +3301,8 @@ void SoundCloud::prepareStream(const QUrl &url, int generation, int redirects) {
     if (m_startupPending && !m_startupSourceSet) return;
     const auto wait = rateDeadline("streams") - m_requestNow();
     if (wait > 0) return;
-    QNetworkRequest req(url);
+    QNetworkRequest req(apiTransport(url));
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Sange/" + QCoreApplication::applicationVersion());
     req.setPriority(QNetworkRequest::LowPriority);
     req.setRawHeader("Authorization", "OAuth " + m_access.toUtf8());
     req.setTransferTimeout(20000);

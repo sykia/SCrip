@@ -102,6 +102,41 @@ private slots:
         QVERIFY(TrackWaveform::decode(png(2,1025)).isNull());
         QCOMPARE(TrackWaveform::decode(png(4096,128)).width(), 2048);
     }
+    void outwardMask() {
+        TrackWaveform wave;
+        wave.m_image = QImage(160, 40, QImage::Format_ARGB32);
+        wave.m_image.fill(Qt::black);
+        for (int x = 0; x < 160; ++x)
+            for (int y = 12; y < 28; ++y) wave.m_image.setPixelColor(x, y, Qt::transparent);
+        wave.tint();
+        QVERIFY(wave.m_remaining.pixelColor(80, 20).alpha() > 0);
+        QCOMPARE(wave.m_remaining.pixelColor(80, 0).alpha(), 0);
+        wave.m_detailed = true;
+        wave.tint();
+        QVERIFY(wave.m_remaining.pixelColor(80, 20).alpha() > 0);
+        QCOMPARE(wave.m_remaining.pixelColor(80, 0).alpha(), 0);
+    }
+    void compactRestingWave() {
+        TrackWaveform wave;
+        wave.m_image = QImage(160, 80, QImage::Format_ARGB32);
+        wave.m_image.fill(Qt::transparent);
+        for (int x = 0; x < 160; ++x) {
+            const int half = 30 + (x / 20) % 8;
+            for (int y = 40 - half; y < 40 + half; ++y)
+                wave.m_image.setPixelColor(x, y, Qt::black);
+        }
+        const auto occupied = [](const QImage &image) {
+            int count = 0;
+            for (int y = 0; y < image.height(); ++y)
+                count += image.pixelColor(80, y).alpha() > 0;
+            return count;
+        };
+        wave.tint();
+        QVERIFY(occupied(wave.m_remaining) < 28);
+        wave.m_detailed = true;
+        wave.tint();
+        QVERIFY(occupied(wave.m_remaining) > 55);
+    }
     void addresses() {
         QVERIFY(TrackWaveform::allowed(QUrl("https://wave.sndcdn.com/a.png")));
         for (auto url : {"http://wave.sndcdn.com/a.png", "https://wave.sndcdn.com.evil.test/a.png", "https://127.0.0.1/a.png", "https://wave.sndcdn.com:444/a.png", "https://user:password@wave.sndcdn.com/a.png", "https://wave.sndcdn.com/a.png?oauth_token=secret", "https://wave.sndcdn.com/a.json", "file:///tmp/wave.png"}) QVERIFY(!TrackWaveform::allowed(QUrl(url)));

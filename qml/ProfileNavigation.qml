@@ -20,7 +20,10 @@ Item {
             let target = Math.max(0, Math.min(maximum, viewport.contentX))
             if (selected.x < target) target = selected.x
             else if (right > target + viewport.width) target = right - viewport.width
-            viewport.contentX = Math.max(0, Math.min(maximum, target))
+            if (viewport.dragging || viewport.flicking) return
+            tabScroll.stop()
+            tabScroll.to = Math.max(0, Math.min(maximum, target))
+            tabScroll.start()
         }
     }
     onSectionChanged: Qt.callLater(updateIndicator)
@@ -39,7 +42,10 @@ Item {
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
         interactive: contentWidth > width
-        Behavior on contentX { enabled: !viewport.dragging && !viewport.flicking; NumberAnimation { duration: host.motion * 0.65; easing.type: Easing.OutCubic } }
+        // Animate explicit navigation only, never writes made by Flickable.
+        NumberAnimation { id: tabScroll; target: viewport; property: "contentX"; duration: host.motion * 0.65; easing.type: Easing.OutCubic }
+        PointHandler { onActiveChanged: if (active) tabScroll.stop() }
+        onMovementStarted: tabScroll.stop()
         Row {
             id: tabs
             spacing: 24

@@ -18,6 +18,10 @@ Canvas {
             case "music": c.moveTo(9,17); c.lineTo(9,5); c.lineTo(20,3); c.lineTo(20,15); c.moveTo(9,8); c.lineTo(20,6); c.moveTo(9,17); c.ellipse(6,18,3,2,0,0,Math.PI*2); c.moveTo(20,15); c.ellipse(17,16,3,2,0,0,Math.PI*2); break
             case "grid": for(let y=4;y<20;y+=9) for(let x=4;x<20;x+=9) c.rect(x,y,6,6); break
             case "list": for(let y=6;y<21;y+=6) { c.moveTo(8,y); c.lineTo(21,y); c.moveTo(3,y); c.lineTo(3.2,y) } break
+            case "info": c.arc(12,12,9,0,Math.PI*2); c.moveTo(12,11); c.lineTo(12,17); c.moveTo(12,7); c.lineTo(12,7.2); break
+            case "comment": c.moveTo(5,4); c.lineTo(19,4); c.quadraticCurveTo(21,4,21,6); c.lineTo(21,15); c.quadraticCurveTo(21,17,19,17); c.lineTo(10,17); c.lineTo(5,21); c.lineTo(5,17); c.quadraticCurveTo(3,17,3,15); c.lineTo(3,6); c.quadraticCurveTo(3,4,5,4); break
+            case "copy": c.rect(8,8,12,13); c.moveTo(16,5); c.lineTo(16,3); c.lineTo(3,3); c.lineTo(3,16); c.lineTo(5,16); break
+            case "link": c.moveTo(10,14); c.lineTo(14,10); c.moveTo(8,16); c.lineTo(7,17); c.bezierCurveTo(2,22,-1,15,4,11); c.lineTo(7,8); c.quadraticCurveTo(10,5,13,8); c.moveTo(16,8); c.lineTo(17,7); c.bezierCurveTo(22,2,25,9,20,13); c.lineTo(17,16); c.quadraticCurveTo(14,19,11,16); break
             case "clock": c.arc(12,12,9,0,Math.PI*2); c.moveTo(12,6); c.lineTo(12,12); c.lineTo(16,14); break
             case "follow": case "following":
                 c.arc(9,7,3,0,Math.PI*2); c.moveTo(3,20); c.bezierCurveTo(3,12,15,12,15,20);

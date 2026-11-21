@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 Popup {
     id: editor
+    SwipeDismiss { targetPopup: editor; enabled: editor.mobile && !editor.busy && list.dragFrom < 0; dismissAction: function() { editor.dismiss() } }
     required property var host
     property bool mobile: false
     property var playlist: ({})
@@ -56,7 +57,7 @@ Popup {
         function onPlaylistDeleted(urn) { if (editor.visible) { editor.initialized = false; editor.close(); editor.deleted(urn) } }
         function onSignedInChanged() { if (!sc.signedIn && editor.visible) { editor.initialized = false; editor.close() } }
     }
-    component Copy: Label { color: editor.host.ink; textFormat: Text.PlainText; elide: Text.ElideRight }
+    component Copy: MetadataLabel { color: editor.host.ink; textFormat: Text.PlainText; elide: Text.ElideRight }
     component QuietButton: SurfaceButton { host: editor.host; mobile: editor.mobile; quiet: true; implicitWidth: 40; implicitHeight: 40; leftPadding: 8; rightPadding: 8 }
     // The lifted row and the stationary rows share the same geometry.
     component TrackContent: RowLayout {

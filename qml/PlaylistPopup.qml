@@ -6,16 +6,19 @@ Popup {
     id: popup
     required property var host
     property bool mobile: false
+    SwipeDismiss {
+        objectName: "playlistSwipeDismiss"
+        targetPopup: popup; enabled: popup.mobile
+        entranceOffset: (1 - popup.reveal) * (popup.mobile ? popup.height : 12)
+        // On compact layouts the header itself scrolls; reserve only its top row.
+        headerHeight: popup.topPadding + (previewHeader.parent.interactive ? 48 : Math.min(240, previewHeader.height))
+    }
     property real safeBottomPadding: 0
     property var playlist: ({})
     readonly property bool owned: (playlist.urn || "").startsWith("soundcloud:playlists:") && !!state.profile?.urn && (playlist.user?.urn || playlist.user_urn) === state.profile.urn
     property real reveal: 0
-    readonly property int transitionDuration: host.motion > 0 ? Math.max(280, host.motion) : 0
+    readonly property int transitionDuration: host.motion > 0 ? Math.max(mobile ? 320 : 280, host.motion) : 0
     opacity: 0
-    // Transform the surface as one piece without moving its layout or hit area.
-    onContentItemChanged: if (contentItem) contentItem.transform = [surfaceOffset]
-    onBackgroundChanged: if (background) background.transform = [surfaceOffset]
-    Translate { id: surfaceOffset; y: (1 - popup.reveal) * (popup.mobile ? 40 : 12) }
     Behavior on height {
         enabled: popup.visible && popup.transitionDuration > 0
         NumberAnimation { duration: popup.transitionDuration; easing.type: Easing.InOutCubic }
@@ -70,7 +73,7 @@ Popup {
     }
     enter: Transition {
         ParallelAnimation {
-            NumberAnimation { property: "opacity"; to: 1; duration: popup.transitionDuration; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "opacity"; to: 1; duration: popup.transitionDuration; easing.type: Easing.OutQuad }
             NumberAnimation { property: "reveal"; to: 1; duration: popup.transitionDuration; easing.type: Easing.OutCubic }
         }
     }
@@ -81,7 +84,7 @@ Popup {
         }
     }
 
-    component Copy: Text {
+    component Copy: MetadataLabel {
         color: host.ink
         font.pixelSize: 14
         textFormat: Text.PlainText
@@ -119,6 +122,10 @@ Popup {
     }
     Popup {
         id: playlistMenu
+        opacity: 0; scale: 0.985
+        enter: SurfaceTransition { duration: popup.transitionDuration }
+        exit: SurfaceTransition { duration: popup.transitionDuration; leaving: true }
+        SwipeDismiss { targetPopup: playlistMenu; enabled: popup.mobile; headerHeight: playlistMenu.height }
         parent: Overlay.overlay
         width: Math.min(350, parent.width - 32); x: (parent.width - width) / 2; y: (parent.height - height) / 2
         padding: 12; modal: true; focus: true

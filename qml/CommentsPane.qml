@@ -10,7 +10,7 @@ Pane {
     signal profileRequested(var user)
     signal composeRequested(string mention)
     signal panelMoveRequested(real dx, real dy)
-    component Txt: Text { color: comments.host.ink; font.pixelSize: 13; textFormat: Text.PlainText; elide: Text.ElideRight }
+    component Txt: MetadataLabel { color: comments.host.ink; font.pixelSize: 13; textFormat: Text.PlainText; elide: Text.ElideRight }
     component CommentIcon: Canvas {
         property string name: ""
         property color ink: comments.host.ink
@@ -175,6 +175,7 @@ Pane {
                 boundsBehavior: Flickable.StopAtBounds
                 topMargin: preferences.timedComments ? height / 2 - 36 : 0
                 bottomMargin: preferences.timedComments ? height / 2 - 36 : 0
+                PointHandler { onActiveChanged: if (active) { comments.following = false; commentScroll.stop() } }
                 onMovementStarted: { comments.following = false; commentScroll.stop() }
                 ScrollBar.vertical: ScrollBar {}
                 NumberAnimation { id: commentScroll; target: commentList; property: "contentY"; duration: host.motion; easing.type: Easing.InOutCubic }

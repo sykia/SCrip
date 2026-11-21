@@ -9,7 +9,7 @@ ColumnLayout {
     property var backend: sc
     signal profileRequested(var user)
     spacing: 14
-    Label {
+    MetadataLabel {
         Layout.fillWidth: true
         text: root.backend.trackDescription(root.track)
         visible: text.length > 0
@@ -21,7 +21,7 @@ ColumnLayout {
         delegate: ColumnLayout {
             required property var modelData
             Layout.fillWidth: true; spacing: 4
-            Label { text: modelData.label; color: root.host.muted; font.pixelSize: 11; textFormat: Text.PlainText }
+            MetadataLabel { text: modelData.label; color: root.host.muted; font.pixelSize: 11; textFormat: Text.PlainText }
             AbstractButton {
                 id: field
                 readonly property bool profileLink: modelData.label === qsTr("Загрузил") && !!root.track.user?.urn
@@ -30,7 +30,7 @@ ColumnLayout {
                 Accessible.name: modelData.value
                 Accessible.role: profileLink ? Accessible.Link : Accessible.StaticText
                 onClicked: if (profileLink) root.profileRequested(root.track.user)
-                contentItem: Label {
+                contentItem: MetadataLabel {
                     text: modelData.value; textFormat: Text.PlainText
                     color: root.host.ink; font.pixelSize: 13; wrapMode: Text.Wrap
                 }

@@ -45,7 +45,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Could not build locked EXE fixture ($LASTEXITCODE)." }
     Set-Content (Join-Path $payload1 'version.txt') 'version-one'
     Set-Content (Join-Path $payload1 'obsolete.dll') 'old-only application file'
-    Copy-Item (Join-Path $payload1 'SCrip.exe') (Join-Path $payload2 'SCrip.exe')
+    Copy-Item (Join-Path $payload1 'SCrip.exe') (Join-Path $payload2 'sange.exe')
     Set-Content (Join-Path $payload2 'version.txt') 'version-two'
     Build-Installer $payload1 $output1 'v1'
     Build-Installer $payload2 $output2 'v2' $true
@@ -110,6 +110,9 @@ try {
     Assert ((Get-Content $settings -Raw).Trim() -eq 'keep user settings') 'User settings were changed.'
     Assert (!(Test-Path $marker)) 'Recovery marker was not cleared after successful upgrade.'
 
+    Assert (Test-Path (Join-Path $install 'sange.exe')) 'The new executable was not installed.'
+    Assert (!(Test-Path (Join-Path $install 'SCrip.exe'))) 'The legacy executable survived migration.'
+
     # Reinstalling the same version must be safe and idempotent.
     Build-Installer $payload2 $output2 'v2-repeat'
     & $output2 '/S'
@@ -117,20 +120,20 @@ try {
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'Repeated installation removed a user file.'
 
     # Run the fixture executable: setup must wait and leave v2 intact.
-    $runningApp = Start-Process -FilePath (Join-Path $install 'SCrip.exe') -PassThru
+    $runningApp = Start-Process -FilePath (Join-Path $install 'sange.exe') -PassThru
     try {
         Start-Sleep -Seconds 2
         $runningApp.Refresh()
         Assert (!$runningApp.HasExited) 'The locked-EXE fixture process exited early.'
         $busyInstall = Start-Process -FilePath $output2 -ArgumentList '/S' -PassThru -Wait
         if (Test-Path "${install}.trace") { Write-Host 'Busy-check trace:'; Get-Content -LiteralPath "${install}.trace" -Raw | Write-Host }
-        Assert ($busyInstall.ExitCode -ne 0) 'Setup unexpectedly succeeded while SCrip.exe was locked.'
+        Assert ($busyInstall.ExitCode -ne 0) 'Setup unexpectedly succeeded while sange.exe was locked.'
     } finally { Stop-Process -Id $runningApp.Id -Force -ErrorAction SilentlyContinue }
     Assert ((Get-Content (Join-Path $install 'version.txt') -Raw).Trim() -eq 'version-two') 'Locked-executable failure damaged the installed version.'
 
     $uninstall = Start-Process -FilePath (Join-Path $install 'Uninstall.exe') -ArgumentList @('/S', "_?=$install") -PassThru -Wait
     Assert ($uninstall.ExitCode -eq 0) 'Uninstall failed.'
-    Assert (!(Test-Path (Join-Path $install 'SCrip.exe'))) 'Uninstall left the application executable behind.'
+    Assert (!(Test-Path (Join-Path $install 'sange.exe'))) 'Uninstall left the application executable behind.'
     Assert ((Get-Content (Join-Path $install 'user-notes.txt') -Raw).Trim() -eq 'keep this user file') 'Uninstall removed an unrelated user file.'
     Assert ((Get-Content $settings -Raw).Trim() -eq 'keep user settings') 'Uninstall removed user settings.'
     Write-Host 'Windows NSIS integration passed: install, interrupted upgrade recovery, stale files, user data, repeat install, locked EXE, uninstall.'

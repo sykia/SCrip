@@ -30,6 +30,7 @@ TestCase {
     function test_fallbackTapDragKeyboard() {
         const p = setup().progress
         verify(!p.waveformReady)
+        compare(p.implicitHeight, 52)
         mouseClick(p, p.width * 0.75, p.height/2)
         compare(p.requests, 1); verify(Math.abs(p.target - 75000) < 100)
         // Drag previews without sending a request on every pointer move.

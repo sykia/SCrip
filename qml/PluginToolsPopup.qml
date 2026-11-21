@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Popup {
     id: root
+    SwipeDismiss { targetPopup: root; enabled: Qt.platform.os === "android"; headerHeight: root.topPadding + 28 }
     readonly property int motionDuration: root.parent.Window.window && root.parent.Window.window.motion !== undefined ? root.parent.Window.window.motion : 0
     opacity: 0; scale: 0.985
         enter: SurfaceTransition { duration: root.motionDuration }

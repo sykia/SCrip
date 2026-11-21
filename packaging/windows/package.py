@@ -29,8 +29,8 @@ def sign(path):
 
 payload = args.payload.resolve()
 output = args.output.resolve()
-if not (payload / "SCrip.exe").is_file():
-    parser.error("В каталоге должен находиться SCrip.exe")
+if not (payload / "sange.exe").is_file():
+    parser.error("В каталоге должен находиться sange.exe")
 if not any(payload.rglob("ffmpegmediaplugin.dll")):
     parser.error("Для потоков SoundCloud добавьте в сборку медиаплагин Qt FFmpeg и его библиотеки")
 if output.is_relative_to(payload):
@@ -57,7 +57,7 @@ with TemporaryDirectory(dir=output.parent) as staging:
     staging = Path(staging)
     if args.sign_certificate:
         payload = Path(shutil.copytree(payload, staging / "payload"))
-        sign(payload / "SCrip.exe")
+        sign(payload / "sange.exe")
     installer = staging / output.name
     subprocess.run([args.makensis, f"-DPAYLOAD={payload}", f"-DOUTPUT={installer}",
                     f"-DFILELIST={filelist}", "installer.nsi"],

@@ -39,6 +39,7 @@ public:
     QVariantList home() const { return state().value("home").toList(); }
     QVariantList playlistTracks() const { return state().value("playlistTracks").toList(); }
     QVariantList queue() const { return {}; }
+    QVariantMap currentSnapshot{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}};
     int repeatMode = 0;
     Q_INVOKABLE void setRepeatMode(int mode) { repeatMode = mode; emit catalogChanged(); }
     QVariantMap commentsState() const { return {{"track", "soundcloud:tracks:1"}, {"items", QVariantList{QVariantMap{{"urn", "soundcloud:comments:1"}, {"body", "Этот момент хочется переслушивать"}, {"timestamp", 0}, {"user", QVariantMap{{"username", "anastasia"}}}}, QVariantMap{{"urn", "soundcloud:comments:2"}, {"body", "А здесь вступают ударные"}, {"timestamp", 10000}, {"user", QVariantMap{{"username", "slow motion"}}}}}}}; }
@@ -60,7 +61,7 @@ public:
         return {{"preloadEnabled", true}, {"wifiPolicyAvailable", true}, {"repeatMode", repeatMode}, {"home", QVariantList{QVariantMap{{"title", "Микс любимых"}, {"subtitle", "Похоже на «Длинное название исходного трека» · SoundCloud"},
             {"tracks", QVariantList{QVariantMap{{"title", "Проверка отступов"}, {"urn", "soundcloud:tracks:seed"}, {"user", QVariantMap{{"urn", "soundcloud:users:artist"}, {"username", "Исполнитель"}}}}}}}}},
             {"playlistTracks", QVariantList{QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Первый трек"}, {"user", QVariantMap{{"username", "Исполнитель"}}}}, QVariantMap{{"urn", "soundcloud:tracks:2"}, {"title", "Второй трек"}}}},
-            {"profile", profileSnapshot}, {"current", QVariantMap{{"urn", "soundcloud:tracks:1"}, {"title", "Тест"}}}};
+            {"profile", profileSnapshot}, {"current", currentSnapshot}};
     }
     Q_INVOKABLE bool queueHasDuplicates() const { return false; }
     Q_INVOKABLE void setWaveVisualActive(bool) {}
@@ -912,7 +913,7 @@ Item {
         QFile mainFile(fixture + "/Main.qml");
         QVERIFY(mainFile.open(QIODevice::WriteOnly));
         mainFile.write(source.readAll()); mainFile.close();
-        for (auto name : {"DiagnosticsPanel.qml", "RecommendationPreferences.qml", "RecommendationNotice.qml", "TrackInformation.qml", "TrackProgress.qml", "PlaybackQuality.qml", "SelectionInput.qml", "SelectionBar.qml", "TrackSelection.qml", "QueueActions.qml", "CollectionTools.qml", "TrackSearchFilters.qml", "PeoplePopup.qml", "SurfaceButton.qml", "ProfileExtras.qml", "ProfileStat.qml", "ProfileNavigation.qml", "EngagementAction.qml", "PlaylistEditor.qml", "CommentsPane.qml", "PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
+        for (auto name : {"NetworkAccess.qml", "DiagnosticsPanel.qml", "RecommendationPreferences.qml", "RecommendationNotice.qml", "TrackInformation.qml", "TrackProgress.qml", "PlaybackQuality.qml", "SelectionInput.qml", "SelectionBar.qml", "TrackSelection.qml", "QueueActions.qml", "CollectionTools.qml", "TrackSearchFilters.qml", "PeoplePopup.qml", "SmoothWheel.qml", "SheetMotion.qml", "SwipeDismiss.qml", "MetadataLabel.qml", "SurfaceButton.qml", "ProfileExtras.qml", "ProfileStat.qml", "ProfileNavigation.qml", "EngagementAction.qml", "PlaylistEditor.qml", "CommentsPane.qml", "PlaylistPopup.qml", "Artwork.qml", "InteractionFeedback.qml", "SurfaceTransition.qml", "WavePanel.qml", "PluginAction.qml", "PluginPanels.qml", "PluginManagerView.qml", "PluginToolsPopup.qml", "RoundedImage.qml", "AndroidGlyph.qml"}) {
             const auto sourcePath = QString(SCRIP_SOURCE_DIR) + (QString(name) == "RoundedImage.qml" || QString(name) == "AndroidGlyph.qml" ? "/qml/android/" : "/qml/") + name;
             QFile::remove(fixture + "/" + name);
             QVERIFY(QFile::copy(sourcePath, fixture + "/" + name));
@@ -1015,6 +1016,168 @@ Item {
             closeMenu.evaluate(); QVERIFY(!closeMenu.hasError());
         }
         QTest::qWait(400);
+        // Exercise the actual Android menu, including touches starting on a button.
+        window->resize(412, 860);
+        auto *touchDevice = QTest::createTouchDevice();
+        // A mini-player swipe must reveal the surface while the finger is held,
+        // including reversal, rather than triggering an opening animation.
+        auto *dock = object->findChild<QQuickItem *>("playbackDock"); QVERIFY(dock);
+        auto *player = object->findChild<QObject *>("playerSheet"); QVERIFY(player);
+        const QPoint dockStart = dock->mapToScene(QPointF(40, 30)).toPoint();
+        QTest::touchEvent(window, touchDevice).press(0, dockStart, window);
+        for (int dy : {25, 60, 120, 180}) {
+            QTest::touchEvent(window, touchDevice).move(0, dockStart - QPoint(0, dy), window);
+            QTest::qWait(20);
+        }
+        QVERIFY(player->property("visible").toBool());
+        const qreal dragged = player->property("dragOffset").toReal();
+        QVERIFY(dragged > 0 && dragged < player->property("height").toReal());
+        auto *playerBackground = player->property("background").value<QQuickItem *>();
+        auto *playerContent = player->property("contentItem").value<QQuickItem *>();
+        QVERIFY(playerBackground); QVERIFY(playerContent);
+        // A partially raised player must leave the original page visible above
+        // the surface, not a stationary full-screen background or dimmer.
+        QVERIFY(playerBackground->mapToScene(QPointF()).y() > 100);
+        QVERIFY2(qAbs(playerBackground->mapToScene(QPointF()).y() - dragged) < 2,
+            qPrintable(QString("background=%1 offset=%2 popupY=%3 reveal=%4")
+                .arg(playerBackground->mapToScene(QPointF()).y()).arg(dragged)
+                .arg(player->property("y").toReal()).arg(player->property("reveal").toReal())));
+        QVERIFY(qAbs(playerContent->mapToScene(QPointF()).y()
+            - playerBackground->mapToScene(QPointF()).y() - player->property("topPadding").toReal()) < 1);
+        QVERIFY(!player->property("dim").toBool());
+        QTest::qWait(100);
+        QCOMPARE(player->property("dragOffset").toReal(), dragged);
+        QTest::touchEvent(window, touchDevice).move(0, dockStart - QPoint(0, 150), window);
+        QTest::qWait(20);
+        QVERIFY(qAbs(player->property("dragOffset").toReal() - dragged - 30) < 2);
+        QTest::touchEvent(window, touchDevice).release(0, dockStart - QPoint(0, 150), window);
+        // Cleanup also exercises interruption of a settling surface by a button.
+        QVERIFY(QMetaObject::invokeMethod(player, "close"));
+        QTRY_VERIFY(!player->property("visible").toBool());
+        const auto openTrackMenu = [&] {
+            QQmlExpression menu(QQmlEngine::contextForObject(object.data()), object.data(),
+                "app.selectedTrack = {urn: 'soundcloud:tracks:swipe', title: 'бамжыха иуу (prod kurane🥩❤️🙏🏻🤙🏻, kayoshi)', user_favorite: true, favoritings_count: 336, reposts_count: 11, station_urn: 'soundcloud:system-playlists:fixture', permalink_url: 'https://soundcloud.com/artist/track', user: {urn: 'soundcloud:users:fixture', username: 'hinizaza (og shiba🐶)#mæjilgang'}}; trackMenu.open(); trackMenu");
+            auto *popup = menu.evaluate().value<QObject *>();
+            if (menu.hasError()) return static_cast<QObject *>(nullptr);
+            return popup;
+        };
+        for (const auto size : {QSize(320, 640), QSize(412, 860), QSize(860, 412)}) {
+            window->resize(size);
+            auto *menu = openTrackMenu(); QVERIFY(menu);
+            QTRY_VERIFY(menu->property("opened").toBool());
+            QCOMPARE(menu->property("leftPadding").toReal(), 16.0);
+            QCOMPARE(menu->property("rightPadding").toReal(), 16.0);
+            auto *cover = object->findChild<QQuickItem *>("trackActionsCover"); QVERIFY(cover);
+            auto *scroll = object->findChild<QQuickItem *>("trackActionsScroll"); QVERIFY(scroll);
+            const QPointF coverPosition = cover->mapToScene(QPointF());
+            scroll->setProperty("contentY", qMin(100.0, qMax(0.0, scroll->property("contentHeight").toReal() - scroll->height())));
+            QTest::qWait(30);
+            QCOMPARE(cover->mapToScene(QPointF()), coverPosition);
+            scroll->setProperty("contentY", 0);
+            QVERIFY(window->grabWindow().save(QString("android-track-menu-dark-%1.png").arg(size.width())));
+            QQmlExpression light(QQmlEngine::contextForObject(object.data()), object.data(), "prefs.darkMode = false");
+            light.evaluate(); QVERIFY(!light.hasError()); QTest::qWait(250);
+            QVERIFY(window->grabWindow().save(QString("android-track-menu-light-%1.png").arg(size.width())));
+            QQmlExpression dark(QQmlEngine::contextForObject(object.data()), object.data(), "prefs.darkMode = true");
+            dark.evaluate(); QTest::qWait(250);
+            QVERIFY(QMetaObject::invokeMethod(menu, "close"));
+            QTRY_VERIFY(!menu->property("visible").toBool());
+        }
+        window->resize(412, 860);
+        for (const int startOffset : {28, 70}) {
+            auto *menu = openTrackMenu(); QVERIFY(menu);
+            QTRY_VERIFY(menu->property("opened").toBool());
+            auto *cover = object->findChild<QQuickItem *>("trackActionsCover"); QVERIFY(cover);
+            auto *menuTitle = object->findChild<QQuickItem *>("trackActionsTitle"); QVERIFY(menuTitle);
+            auto *menuArtist = object->findChild<QQuickItem *>("trackActionsArtist"); QVERIFY(menuArtist);
+            QVERIFY(menuTitle->height() < 40);
+            QVERIFY(menuArtist->height() < 35);
+            const auto coverRect = cover->mapRectToScene(cover->boundingRect());
+            QVERIFY(coverRect.left() >= 20);
+            QVERIFY(coverRect.right() < window->width() - 20);
+            QVERIFY(coverRect.top() >= menu->property("y").toReal() + 28);
+            QVERIFY(window->grabWindow().save("android-track-menu-polished.png"));
+            const int top = qRound(menu->property("y").toReal());
+            const QPoint start(200, top + startOffset);
+            QTest::touchEvent(window, touchDevice).press(0, start, window);
+            for (int dy = 20; dy <= 300; dy += 20) {
+                QTest::touchEvent(window, touchDevice).move(0, start + QPoint(0, dy), window);
+                QTest::qWait(16);
+            }
+            QVERIFY(menu->property("position").toReal() < 0.9);
+            QTest::touchEvent(window, touchDevice).release(0, start + QPoint(0, 300), window);
+            QTRY_VERIFY(!menu->property("visible").toBool());
+        }
+        auto *shortSwipeMenu = openTrackMenu(); QVERIFY(shortSwipeMenu);
+        QTRY_VERIFY(shortSwipeMenu->property("opened").toBool());
+        const QPoint shortStart(200, qRound(shortSwipeMenu->property("y").toReal()) + 30);
+        QTest::touchEvent(window, touchDevice).press(0, shortStart, window);
+        QTest::touchEvent(window, touchDevice).move(0, shortStart + QPoint(0, 25), window);
+        QTest::qWait(30);
+        QTest::touchEvent(window, touchDevice).move(0, shortStart + QPoint(0, 35), window);
+        QTest::qWait(150);
+        QTest::touchEvent(window, touchDevice).release(0, shortStart + QPoint(0, 35), window);
+        QTest::qWait(16);
+        const QPoint catchHeader(200, qRound(shortSwipeMenu->property("y").toReal()) + 20);
+        QTest::touchEvent(window, touchDevice).press(0, catchHeader, window);
+        const qreal caughtPosition = shortSwipeMenu->property("position").toReal();
+        QTest::qWait(100);
+        QVERIFY(qAbs(shortSwipeMenu->property("position").toReal() - caughtPosition) < 0.001);
+        QTest::touchEvent(window, touchDevice).release(0, catchHeader, window);
+        QTRY_COMPARE(shortSwipeMenu->property("position").toReal(), 1.0);
+        QTRY_VERIFY(shortSwipeMenu->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(shortSwipeMenu, "close"));
+        QTRY_VERIFY(!shortSwipeMenu->property("visible").toBool());
+        window->resize(320, 500);
+        auto *menu = openTrackMenu(); QVERIFY(menu);
+        QTRY_VERIFY(menu->property("opened").toBool());
+        auto *menuScroll = object->findChild<QQuickItem *>("trackActionsScroll"); QVERIFY(menuScroll);
+        QVERIFY(menuScroll->property("contentHeight").toReal() > menuScroll->height());
+        const QPoint scrollStart = menuScroll->mapToScene(QPointF(menuScroll->width() / 2, menuScroll->height() - 30)).toPoint();
+        QVERIFY(menuScroll->isVisible());
+        QVERIFY(menuScroll->property("interactive").toBool());
+        QTest::touchEvent(window, touchDevice).press(0, scrollStart, window);
+        for (int dy = 20; dy <= 220; dy += 20) {
+            QTest::touchEvent(window, touchDevice).move(0, scrollStart - QPoint(0, dy), window);
+            QTest::qWait(16);
+        }
+        QTest::touchEvent(window, touchDevice).release(0, scrollStart - QPoint(0, 220), window);
+        QTRY_VERIFY2(menuScroll->property("contentY").toReal() > 0,
+            qPrintable(QString("viewport %1x%2, content %3, start %4,%5, visible %6")
+                .arg(menuScroll->width()).arg(menuScroll->height()).arg(menuScroll->property("contentHeight").toReal())
+                .arg(scrollStart.x()).arg(scrollStart.y()).arg(menuScroll->isVisible())));
+        QVERIFY(menu->property("opened").toBool());
+        // Exercise the actual menu viewport, including its nested gesture ownership.
+        const auto startFlick = [&](qreal velocity) {
+            QMetaObject::invokeMethod(menuScroll, "cancelFlick");
+            menuScroll->setProperty("contentY", 0.0);
+            return QMetaObject::invokeMethod(menuScroll, "flick", Q_ARG(qreal, 0.0), Q_ARG(qreal, velocity));
+        };
+        QVERIFY(startFlick(-200));
+        QTRY_VERIFY(!menuScroll->property("flicking").toBool());
+        const qreal slowDistance = menuScroll->property("contentY").toReal();
+        QVERIFY(slowDistance > 0);
+        QVERIFY(startFlick(-800));
+        QTRY_VERIFY(!menuScroll->property("flicking").toBool());
+        QVERIFY(menuScroll->property("contentY").toReal() > slowDistance * 2);
+        QVERIFY(startFlick(-800));
+        QTest::qWait(40);
+        QVERIFY(menuScroll->property("flicking").toBool());
+        const QPoint hold = menuScroll->mapToScene(QPointF(menuScroll->width() / 2, menuScroll->height() / 2)).toPoint();
+        QTest::touchEvent(window, touchDevice).press(0, hold, window);
+        QTRY_VERIFY(!menuScroll->property("flicking").toBool());
+        const qreal heldPosition = menuScroll->property("contentY").toReal();
+        QTest::qWait(100);
+        QVERIFY(qAbs(menuScroll->property("contentY").toReal() - heldPosition) < 1);
+        for (int dy = 10; dy <= 60; dy += 10) {
+            QTest::touchEvent(window, touchDevice).move(0, hold + QPoint(0, dy), window);
+            QTest::qWait(16);
+        }
+        QVERIFY(menuScroll->property("contentY").toReal() < heldPosition);
+        QTest::touchEvent(window, touchDevice).release(0, hold + QPoint(0, 60), window);
+        QVERIFY(menu->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(menu, "close"));
+        QTRY_VERIFY(!menu->property("visible").toBool());
         QQmlExpression publicProfile(QQmlEngine::contextForObject(object.data()), object.data(),
             "app.openProfile({urn: 'soundcloud:users:public', username: 'North Records'}); app.profileTab = 2; app.refresh()");
         publicProfile.evaluate(); QVERIFY2(!publicProfile.hasError(), qPrintable(publicProfile.error().toString()));
@@ -1124,7 +1287,16 @@ Item {
             "playlistView.playlist = {title: 'Вечерняя коллекция', track_count: 2, user: {username: 'SCrip'}}; playlistView.open()");
         preview.evaluate();
         QVERIFY2(!preview.hasError(), qPrintable(preview.error().toString()));
-        QTest::qWait(300);
+        QQmlExpression enteringPreviewExpression(QQmlEngine::contextForObject(object.data()), object.data(), "playlistView");
+        auto *enteringPreview = enteringPreviewExpression.evaluate().value<QObject *>(); QVERIFY(enteringPreview);
+        QTRY_VERIFY(enteringPreview->property("opacity").toReal() > 0
+            && enteringPreview->property("opacity").toReal() < 1);
+        auto *enteringBackground = enteringPreview->property("background").value<QQuickItem *>(); QVERIFY(enteringBackground);
+        auto *enteringContent = enteringPreview->property("contentItem").value<QQuickItem *>(); QVERIFY(enteringContent);
+        QVERIFY(enteringBackground->mapToScene(QPointF()).y() > enteringPreview->property("y").toReal());
+        QVERIFY(qAbs(enteringContent->mapToScene(QPointF()).y()
+            - enteringBackground->mapToScene(QPointF()).y() - enteringPreview->property("topPadding").toReal()) < 1);
+        QTRY_VERIFY(enteringPreview->property("opened").toBool());
         QVERIFY(window->grabWindow().save("android-playlist.png"));
         std::function<QQuickItem *(QQuickItem *)> findTrackActions = [&](QQuickItem *item) -> QQuickItem * {
             if (item->objectName() == "previewTrackActions0") return item;
@@ -1132,6 +1304,28 @@ Item {
             return nullptr;
         };
         QTRY_VERIFY(findTrackActions(window->contentItem()));
+        QQmlExpression previewObject(QQmlEngine::contextForObject(object.data()), object.data(), "playlistView");
+        auto *previewPopup = previewObject.evaluate().value<QObject *>(); QVERIFY(previewPopup);
+        auto *previewBackground = previewPopup->property("background").value<QQuickItem *>(); QVERIFY(previewBackground);
+        const QPoint previewStart = previewBackground->mapToScene(QPointF(140, 35)).toPoint();
+        const qreal previewTop = previewBackground->mapToScene(QPointF()).y();
+        QTest::touchEvent(window, touchDevice).press(0, previewStart, window);
+        for (int dy : {25, 60, 120, 200}) {
+            QTest::touchEvent(window, touchDevice).move(0, previewStart + QPoint(0, dy), window);
+            QTest::qWait(20);
+        }
+        QVERIFY(previewBackground->mapToScene(QPointF()).y() > previewTop + 100);
+        const qreal heldPreviewTop = previewBackground->mapToScene(QPointF()).y();
+        QTest::qWait(100);
+        QVERIFY(qAbs(previewBackground->mapToScene(QPointF()).y() - heldPreviewTop) < 1);
+        QTest::touchEvent(window, touchDevice).move(0, previewStart + QPoint(0, 170), window);
+        QTest::qWait(20);
+        QVERIFY(qAbs(previewBackground->mapToScene(QPointF()).y() - heldPreviewTop + 30) < 2);
+        QTest::qWait(150);
+        QTest::touchEvent(window, touchDevice).release(0, previewStart + QPoint(0, 170), window);
+        QTRY_VERIFY(!previewPopup->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(previewPopup, "open"));
+        QTRY_VERIFY(previewPopup->property("opened").toBool());
         auto *actionsButton = findTrackActions(window->contentItem());
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
             actionsButton->mapToScene(QPointF(actionsButton->width() / 2, actionsButton->height() / 2)).toPoint());
@@ -1186,9 +1380,12 @@ Item {
         QQmlExpression playerVisible(QQmlEngine::contextForObject(object.data()), object.data(), "player.visible");
         const QPoint start = mini->mapToScene(QPointF(100, mini->height() / 2)).toPoint();
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, start);
-        for (int y = 10; y <= 100; y += 10) QTest::mouseMove(window, start - QPoint(0, y), 5);
-        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, start - QPoint(0, 100));
+        for (int y = 10; y <= 300; y += 10) QTest::mouseMove(window, start - QPoint(0, y), 10);
+        QTest::qWait(150);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, start - QPoint(0, 300));
         QTRY_VERIFY_WITH_TIMEOUT(playerVisible.evaluate().toBool(), 1500);
+        QTRY_COMPARE(player->property("dragOffset").toReal(), 0.0);
+        QTRY_VERIFY(!player->property("manualMotion").toBool());
         QTest::qWait(500);
         auto *commentPreview = window->findChild<QQuickItem *>("playingCommentPreview"); QVERIFY(commentPreview);
         QVERIFY(commentPreview->isVisible());
@@ -1218,15 +1415,36 @@ Item {
         QVERIFY(QMetaObject::invokeMethod(commentsSheet, "close"));
         QTRY_VERIFY(!commentsSheet->property("visible").toBool());
         window->resize(412,860); QTest::qWait(300);
+        sc.currentSnapshot["title"] = "бамжыха иуу (prod kurane🥩❤️🙏🏻🤙🏻, kayoshi) — Длинное название композиции, которое занимает две строки на экране телефона";
+        sc.currentSnapshot["user"] = QVariantMap{{"username", QStringLiteral("hinizaza (og shiba🐶)#mæjilgang")}};
+        emit sc.catalogChanged();
+        auto *details = object->findChild<QQuickItem *>("playerDetails"); QVERIFY(details);
+        auto *trackTitle = object->findChild<QQuickItem *>("playerTrackTitle"); QVERIFY(trackTitle);
+        auto *playerCover = object->findChild<QQuickItem *>("playerCover"); QVERIFY(playerCover);
+        for (const auto size : {QSize(320, 640), QSize(412, 860)}) {
+            window->resize(size);
+            QTest::qWait(100);
+            QVERIFY(trackTitle->height() <= 58);
+            QVERIFY(trackTitle->height() > 0);
+            QVERIFY(trackTitle->property("baselineOffset").toReal() > 0);
+            QVERIFY(trackTitle->property("baselineOffset").toReal() < 35);
+            const auto detailsRect = details->mapRectToScene(details->boundingRect());
+            QVERIFY2(detailsRect.bottom() <= window->height() - 15, "Player controls extend below the safe bottom padding");
+            const auto coverRect = playerCover->mapRectToScene(playerCover->boundingRect());
+            QVERIFY(coverRect.bottom() <= detailsRect.top());
+        }
+        window->resize(412, 860); QTest::qWait(100);
         const QPoint playerStart(200, 100);
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, playerStart);
         for (int y = 10; y <= 50; y += 10) QTest::mouseMove(window, playerStart + QPoint(0, y), 5);
+        QTest::qWait(150); // A held short pull must return, without stale inertia.
         QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, playerStart + QPoint(0, 50));
         QQmlExpression dragOffset(QQmlEngine::contextForObject(object.data()), object.data(), "player.dragOffset");
         QTRY_COMPARE(dragOffset.evaluate().toReal(), 0.0);
         QVERIFY(playerVisible.evaluate().toBool());
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, playerStart);
         for (int y = 10; y <= 130; y += 10) QTest::mouseMove(window, playerStart + QPoint(0, y), 5);
+        QTest::qWait(150); // Deliberately release slowly: distance alone closes the sheet.
         QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, playerStart + QPoint(0, 130));
         QTRY_VERIFY_WITH_TIMEOUT(!playerVisible.evaluate().toBool(), 1500);
         QQmlExpression navigate(QQmlEngine::contextForObject(object.data()), object.data(), "page = 1; page = 2; goBack(); page");

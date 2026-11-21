@@ -106,17 +106,20 @@ it or explicitly advance to the next track.
 ## Playback recovery
 
 A backend error, an unexpectedly early end (over five seconds before the track
-metadata duration), or 30 seconds without playback progress starts recovery.
-The player preserves the position and fetches fresh stream URLs, with at most
-two recovery attempts per track. Fifteen seconds of progress clears the failure
-budget. Existing startup stream-format fallbacks still run first.
+metadata duration), or ten seconds without playback progress starts recovery.
+A startup stall tries the remaining stream formats, invalidating late resolver
+responses. Once formats are exhausted, the player fetches fresh URLs and restores
+the position. A stalled retry skips directly to the next track; explicit backend
+errors allow at most two reloads. Fifteen seconds of progress clears the failure
+budget. Paused playback does not consume the watchdog budget.
 
-Before retrying, an unauthenticated HTTPS request to the SoundCloud API checks
-server reachability. Transport failures, HTTP 429, and server errors keep the
-current track buffering; checks repeat every ten seconds (sixty for 429).
-An HTTP response from the API cannot prove that every CDN is reachable: after
-two unsuccessful reloads, the player skips the track without applying repeat-one.
-A set of failed track IDs prevents repeat-all from cycling indefinitely until
+Before reloading, an unauthenticated HTTPS request checks SoundCloud API
+reachability. Each probe has a ten-second total deadline as well as an inactivity
+timeout. A second failed probe skips the track, so an unreachable probe endpoint
+cannot leave a playable queue buffering forever. Checks are separated by 1.5
+seconds (sixty seconds for HTTP 429 to respect rate limiting).
+An HTTP response cannot prove CDN reachability. Skipping bypasses repeat-one;
+a set of failed track IDs prevents repeat-all from cycling indefinitely until
 playback makes sustained progress. Pause, stop, and track selection cancel pending
 recovery; stale asynchronous responses cannot restart playback.
 

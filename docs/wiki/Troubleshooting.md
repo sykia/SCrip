@@ -74,7 +74,7 @@ After a quota error, disable and re-enable the plugin. **Clear log** only clears
 
 ### Sange hangs after enabling a QML extension
 
-Fully exit Sange, then launch `scrip --no-plugin-code` (or `build/debug/scrip --no-plugin-code` from a source build). Windows uses `scrip.exe`. Disable or remove the extension. If a hung process cannot exit normally, end it before launching recovery. Android currently has no in-app pre-start recovery gesture. See [Plugin System](Plugin-System).
+Fully exit Sange, then launch `sange --no-plugin-code` (or `build/debug/scrip --no-plugin-code` from a source build). Windows uses `sange.exe`. Disable or remove the extension. If a hung process cannot exit normally, end it before launching recovery. Android currently has no in-app pre-start recovery gesture. See [Plugin System](Plugin-System).
 
 ## Closing the desktop window keeps music playing
 

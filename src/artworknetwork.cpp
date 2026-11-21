@@ -1,5 +1,6 @@
 #include "artworknetwork.h"
 #include <QNetworkReply>
+#include <QNetworkProxyFactory>
 #include <QNetworkDiskCache>
 #include <QStandardPaths>
 #include <QJsonDocument>
@@ -7,6 +8,7 @@
 #include <QJsonArray>
 #include <QHostAddress>
 #include <QMutexLocker>
+#include <QSettings>
 
 namespace {
 class ArtworkManager : public QNetworkAccessManager {
@@ -21,7 +23,25 @@ protected:
     QNetworkReply *createRequest(Operation op, const QNetworkRequest &original, QIODevice *data) override {
         QNetworkRequest request(original);
         const QUrl url = original.url();
-        if (url.scheme() == "https" && url.port(443) == 443 && url.userInfo().isEmpty()) {
+        if (QSettings().value("network/apiRelay", false).toBool()
+            && url.scheme() == "https" && url.port(443) == 443 && url.userInfo().isEmpty()
+            && (url.host() == "i1.sndcdn.com" || url.host() == "i2.sndcdn.com"
+                || url.host() == "i3.sndcdn.com" || url.host() == "i4.sndcdn.com")) {
+            QUrl destination("https://scrip-auth.scrip-desktop-aca3d9.workers.dev");
+            destination.setPath("/artwork/" + url.host() + url.path());
+            request.setUrl(destination);
+            request.setRawHeader("Authorization", QByteArray());
+            request.setRawHeader("Cookie", QByteArray());
+            request.setRawHeader("User-Agent", "Sange artwork");
+            request.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
+            request.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
+            request.setTransferTimeout(15000);
+            return QNetworkAccessManager::createRequest(op, request, data);
+        }
+        const auto proxies = QNetworkProxyFactory::proxyForQuery(QNetworkProxyQuery(url));
+        const bool proxied = !proxies.isEmpty() && proxies.first().type() != QNetworkProxy::NoProxy
+            && proxies.first().type() != QNetworkProxy::DefaultProxy;
+        if (!proxied && url.scheme() == "https" && url.port(443) == 443 && url.userInfo().isEmpty()) {
             QMutexLocker lock(&routes->mutex);
             const QString address = routes->addresses.value(url.host());
             if (!address.isEmpty()) {

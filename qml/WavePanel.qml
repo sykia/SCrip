@@ -8,6 +8,17 @@ Rectangle {
     property bool motion: true
     property bool showTooltips: false
     property bool foreground: true
+    // Surface coverage follows the player's physical position, including reversal.
+    property real exposure: 1
+    property real foregroundOpacity: foreground ? 1 : 0
+    Behavior on foregroundOpacity { NumberAnimation { duration: root.motion ? 220 : 0; easing.type: Easing.InOutQuad } }
+    readonly property real visualOpacity: Math.max(0, Math.min(1, exposure)) * foregroundOpacity
+    property real phase: 0
+    NumberAnimation on phase {
+        from: 0; to: Math.PI * 40; duration: 180000; loops: Animation.Infinite
+        running: true
+        paused: !root.animating
+    }
     property bool dark: false
     property color panelColor: dark ? "#1a1a1a" : "#f7f7f8"
     property color inkColor: dark ? "#f1f1f1" : "#242426"
@@ -19,7 +30,7 @@ Rectangle {
     readonly property bool playing: selected && !!api.playbackActive
     readonly property bool loading: selected && !!api.waveBusy && !api.current?.urn
     readonly property bool failed: selected && !!api.waveError
-    readonly property bool animating: visible && foreground && motion
+    readonly property bool animating: visible && foreground && visualOpacity > 0 && motion
     readonly property bool analysisActive: animating && playing
     implicitHeight: width < 540 ? 330 : 350
     radius: 24
@@ -72,11 +83,12 @@ Rectangle {
                 anchors.centerIn: parent
                 width: Math.min(parent.width, parent.height * 1.7)
                 height: parent.height
-                active: root.visible && root.foreground && GraphicsInfo.api !== GraphicsInfo.Software
+                opacity: root.visualOpacity
+                active: root.visible && root.visualOpacity > 0 && GraphicsInfo.api !== GraphicsInfo.Software
                 sourceComponent: ShaderEffect {
                     id: visual
                     objectName: "waveShader"
-                    property real phase: 0
+                    property real phase: root.phase
                     property real level: root.animating && root.playing ? root.backend.waveLevel : 0
                     property real bass: root.animating && root.playing ? root.backend.waveBass : 0
                     property real beat: root.animating && root.playing ? root.backend.waveBeat : 0
@@ -85,15 +97,15 @@ Rectangle {
                     property color inkColor: root.waveColor
                     property real engaged: root.playing ? 1 : control.hovered ? 0.35 : 0
                     fragmentShader: "qrc:/shaders/wave.frag.qsb"
-                    NumberAnimation on phase { from: 0; to: Math.PI * 40; duration: 180000; loops: Animation.Infinite; running: root.animating }
                     Behavior on discovery { NumberAnimation { duration: root.motion ? 600 : 0; easing.type: Easing.InOutCubic } }
                     Behavior on engaged { NumberAnimation { duration: root.motion ? 350 : 0 } }
                 }
             }
             Repeater {
-                model: root.visible && root.foreground && GraphicsInfo.api === GraphicsInfo.Software ? 5 : 0
+                model: root.visible && root.visualOpacity > 0 && GraphicsInfo.api === GraphicsInfo.Software ? 5 : 0
                 Rectangle {
                     required property int index
+                    opacity: root.visualOpacity
                     anchors.centerIn: parent
                     width: Math.min(parent.width, parent.height) * (0.58 + index * 0.035)
                     height: width; radius: width / 2

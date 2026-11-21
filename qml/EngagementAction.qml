@@ -42,6 +42,12 @@ SurfaceButton {
     Accessible.checked: selected
     ToolTip.visible: control.host.showTooltips === true && (hovered)
     ToolTip.text: description
+    background: Rectangle {
+        radius: 10
+        color: control.down || control.hovered ? Qt.alpha(control.host.ink, 0.10)
+             : control.selected && !control.menuPresentation ? Qt.alpha(control.host.accent, 0.12) : "transparent"
+        Behavior on color { ColorAnimation { duration: control.host.motion > 0 ? 120 : 0 } }
+    }
     contentItem: RowLayout {
         id: contents
         spacing: control.menuPresentation ? 16 : 6
@@ -59,7 +65,7 @@ SurfaceButton {
             Layout.fillWidth: true; Layout.minimumWidth: 0
             text: control.repost ? (control.selected ? qsTr("Отменить репост") : qsTr("Сделать репост")) : (control.selected ? qsTr("Убрать из любимых") : qsTr("Добавить в любимые"))
             font.pixelSize: 14; elide: Text.ElideRight
-            color: control.selected ? control.host.accent : control.host.ink
+            color: control.menuPresentation ? control.host.ink : control.selected ? control.host.accent : control.host.ink
         }
         Label { objectName: "engagementCount"; text: control.countText; font.pixelSize: 12; color: control.selected ? control.host.accent : control.host.ink; elide: Text.ElideRight; Layout.fillWidth: !control.menuPresentation; horizontalAlignment: control.menuPresentation ? Text.AlignRight : Text.AlignHCenter }
     }

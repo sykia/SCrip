@@ -72,7 +72,7 @@ cmake --build --preset debug
 ctest --test-dir build/debug --output-on-failure
 ```
 
-Run `build/debug/scrip` on Linux or `build/debug/scrip.exe` on Windows. For platform-specific setup, see [macOS](https://github.com/sykia/sange/blob/main/docs/macos.md) or the [Android build script](scripts/build_android.sh). macOS release builds use Qt 6.12.0.
+Run `build/debug/sange` on Linux or `build/debug/sange.exe` on Windows. For platform-specific setup, see [macOS](https://github.com/sykia/sange/blob/main/docs/macos.md) or the [Android build script](scripts/build_android.sh). macOS release builds use Qt 6.12.0.
 
 ## Documentation
 

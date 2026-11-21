@@ -1,5 +1,8 @@
 #include "streamcache.h"
 #include <QFile>
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QDebug>
 #include <QFileInfo>
 #include <QNetworkReply>
 #include <QRegularExpression>
@@ -9,31 +12,32 @@
 namespace {
 constexpr qint64 maximumObject = 8 * 1024 * 1024;
 void respond(QTcpSocket *socket, int status, const QByteArray &body, const QByteArray &type = "application/octet-stream", const QByteArray &extra = {}, bool head = false) {
-    if (!socket) return;
+    if (!socket || socket->state() != QAbstractSocket::ConnectedState) return;
     socket->write("HTTP/1.1 " + QByteArray::number(status) + " OK\r\nConnection: close\r\nContent-Type: " + type + "\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n" + extra + "\r\n");
     if (!head) socket->write(body);
     socket->disconnectFromHost();
 }
 }
-StreamCache::Entry::~Entry() { QFile::remove(file); }
-StreamCache::StreamCache(QObject *parent) : QObject(parent) {
+StreamCacheWorker::Entry::~Entry() { QFile::remove(file); }
+StreamCacheWorker::StreamCacheWorker(QObject *parent) : QObject(parent) {
     m_timer.setSingleShot(true);
-    connect(&m_timer, &QTimer::timeout, this, &StreamCache::next);
-    connect(&m_server, &QTcpServer::newConnection, this, &StreamCache::accept);
+    connect(&m_timer, &QTimer::timeout, this, &StreamCacheWorker::next);
+    connect(&m_server, &QTcpServer::newConnection, this, &StreamCacheWorker::accept);
     m_server.listen(QHostAddress::LocalHost);
 }
-StreamCache::~StreamCache() {
+StreamCacheWorker::~StreamCacheWorker() {
     m_timer.stop();
     for (auto *reply : m_network.findChildren<QNetworkReply *>()) disconnect(reply, nullptr, this, nullptr);
     for (auto *socket : m_server.findChildren<QTcpSocket *>()) disconnect(socket, nullptr, this, nullptr);
 }
-QUrl StreamCache::map(const QUrl &remote, const QString &root) {
+QUrl StreamCacheWorker::map(const QUrl &remote, const QString &root, const QString &fallbackSuffix) {
     if ((remote.scheme() != "https" && !(remote.scheme() == "http" && remote.host() == "127.0.0.1")) || !remote.userInfo().isEmpty()) return remote;
     const QString identity = root + '\n' + remote.toString(QUrl::FullyEncoded);
     QString key = m_keys.value(identity);
     if (key.isEmpty()) {
         key = QUuid::createUuid().toString(QUuid::Id128);
-        const auto suffix = QFileInfo(remote.path()).suffix();
+        auto suffix = QFileInfo(remote.path()).suffix();
+        if (suffix.isEmpty()) suffix = fallbackSuffix;
         if (QRegularExpression(QStringLiteral("^[a-zA-Z0-9]{1,8}$")).match(suffix).hasMatch()) key += '.' + suffix;
         m_keys.insert(identity, key);
         m_resources.insert(key, {remote, root});
@@ -41,7 +45,7 @@ QUrl StreamCache::map(const QUrl &remote, const QString &root) {
     QUrl local(QStringLiteral("http://127.0.0.1:%1/%2").arg(m_server.serverPort()).arg(key));
     return local;
 }
-QUrl StreamCache::source(const QUrl &remote) {
+QUrl StreamCacheWorker::source(const QUrl &remote) {
     if (!m_server.isListening() || !m_directory.isValid()) return remote;
     const QString root = remote.toString(QUrl::FullyEncoded);
     m_roots.removeAll(root); m_roots.append(root);
@@ -57,20 +61,30 @@ QUrl StreamCache::source(const QUrl &remote) {
     }
     return map(remote, root);
 }
-void StreamCache::suspend() {
+void StreamCacheWorker::suspend() {
     m_timer.stop(); m_root.clear(); m_pending.clear();
     if (m_background) { auto reply = m_background; m_background.clear(); reply->abort(); }
 }
-void StreamCache::setBackgroundEnabled(bool enabled) {
+void StreamCacheWorker::setBackgroundEnabled(bool enabled) {
     m_backgroundEnabled = enabled;
     if (!enabled) suspend();
 }
-void StreamCache::discard(const QUrl &local) {
+// Release the decoder's loopback reads before a synchronous player stop/source
+// reset. Its worker may otherwise wait for this thread to service the proxy.
+// Keep resource mappings and completed cache entries available for resuming.
+void StreamCacheWorker::interrupt(const QUrl &local) {
     const auto root = m_resources.value(local.path().mid(1)).root;
     if (root.isEmpty()) return;
     if (m_root == root) suspend();
+    for (auto *socket : m_server.findChildren<QTcpSocket *>())
+        if (socket->property("sourceRoot").toString() == root) socket->abort();
     for (auto *reply : m_network.findChildren<QNetworkReply *>())
-        if (reply->property("sourceRoot").toString() == root) reply->abort();
+        if (reply->property("sourceRoot").toString() == root && !reply->isFinished()) reply->abort();
+}
+void StreamCacheWorker::discard(const QUrl &local) {
+    const auto root = m_resources.value(local.path().mid(1)).root;
+    if (root.isEmpty()) return;
+    interrupt(local);
     for (auto it = m_resources.begin(); it != m_resources.end();) {
         if (it->root != root) { ++it; continue; }
         m_keys.remove(root + '\n' + it->remote.toString(QUrl::FullyEncoded));
@@ -78,7 +92,7 @@ void StreamCache::discard(const QUrl &local) {
     }
     m_children.remove(root); m_roots.removeAll(root);
 }
-void StreamCache::warm(const QUrl &local) {
+void StreamCacheWorker::warm(const QUrl &local) {
     if (!m_backgroundEnabled) return;
     const auto resource = m_resources.value(local.path().mid(1));
     if (resource.root.isEmpty()) return;
@@ -87,14 +101,16 @@ void StreamCache::warm(const QUrl &local) {
     m_pending = m_children.value(m_root);
     m_timer.start(2000); // Запуск и подготовка следующего трека получают фору.
 }
-QByteArray StreamCache::playlist(const QByteArray &body, const Resource &resource) {
+QByteArray StreamCacheWorker::playlist(const QByteArray &body, const Resource &resource) {
     QByteArray result;
     QStringList children;
     const QRegularExpression uri(QStringLiteral("URI=\"([^\"]+)\""));
+    const bool fragmentedMp4 = body.contains("#EXT-X-MAP:");
     for (QByteArray line : body.split('\n')) {
         line = line.trimmed();
         if (!line.isEmpty() && !line.startsWith('#')) {
-            const QUrl local = map(resource.remote.resolved(QUrl(QString::fromUtf8(line))), resource.root);
+            const QUrl local = map(resource.remote.resolved(QUrl(QString::fromUtf8(line))), resource.root,
+                                   fragmentedMp4 ? QStringLiteral("m4s") : QString{});
             children.append(local.path().mid(1)); line = local.toEncoded();
         } else if (line.startsWith('#')) {
             QString text = QString::fromUtf8(line);
@@ -102,7 +118,8 @@ QByteArray StreamCache::playlist(const QByteArray &body, const Resource &resourc
             QList<QRegularExpressionMatch> found;
             while (matches.hasNext()) found.append(matches.next());
             for (auto it = found.crbegin(); it != found.crend(); ++it) {
-                const QUrl local = map(resource.remote.resolved(QUrl(it->captured(1))), resource.root);
+                const QUrl local = map(resource.remote.resolved(QUrl(it->captured(1))), resource.root,
+                                       line.startsWith("#EXT-X-MAP:") ? QStringLiteral("mp4") : QString{});
                 children.prepend(local.path().mid(1));
                 text.replace(it->capturedStart(1), it->capturedLength(1), local.toString());
             }
@@ -121,7 +138,7 @@ QByteArray StreamCache::playlist(const QByteArray &body, const Resource &resourc
     }
     return result;
 }
-void StreamCache::accept() {
+void StreamCacheWorker::accept() {
     while (auto *socket = m_server.nextPendingConnection()) {
         connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         auto input = std::make_shared<QByteArray>();
@@ -141,11 +158,12 @@ void StreamCache::accept() {
             if (!m_resources.contains(key)) { respond(socket, 404, {}); return; }
             QByteArray range;
             for (const auto &line : lines) if (line.toLower().startsWith("range:")) range = line.mid(6).trimmed();
+            socket->setProperty("sourceRoot", m_resources.value(key).root);
             fetch(key, socket, range, request[0] == "HEAD");
         });
     }
 }
-void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteArray range, bool head, int attempt) {
+void StreamCacheWorker::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteArray range, bool head, int attempt) {
     if (!m_resources.contains(key)) { respond(socket, 404, {}, {}, {}, head); return; }
     if (auto *entry = m_cache.object(key)) {
         QFile file(entry->file);
@@ -180,6 +198,8 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     }
     QNetworkRequest request(m_resources.value(key).remote);
     request.setRawHeader("Accept-Encoding", "identity");
+    if (request.url().host() == "scrip-auth.scrip-desktop-aca3d9.workers.dev")
+        request.setRawHeader("User-Agent", "Sange/" + QCoreApplication::applicationVersion().toUtf8());
     request.setTransferTimeout(background ? 5000 : 20000);
     request.setPriority(background ? QNetworkRequest::LowPriority : QNetworkRequest::HighPriority);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -191,18 +211,18 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
     // HLS demuxers may treat a truncated segment as EOF and never recover after
     // a seek. Keep small HLS objects atomic so a failed download can be retried
     // before any successful HTTP response reaches the player.
-    const auto suffix = QFileInfo(reply->url().path()).suffix().toLower();
+    // Playlist membership is authoritative: CDN segment URLs need not have an
+    // extension or a media MIME type. This also covers initialization/key URIs.
     const bool child = m_resources.value(key).remote.toString(QUrl::FullyEncoded) != m_resources.value(key).root;
-    const bool segment = child && !head && (suffix == "m4s" || suffix == "ts" || suffix == "mp4" || suffix == "aac" || suffix == "mp3");
-    struct Download { QByteArray body; qint64 received = 0; bool headers = false; bool manifest = false; bool atomic = false; bool tooLarge = false; };
+    struct Download { QByteArray body; qint64 received = 0; bool headers = false; bool manifest = false; bool atomic = false; bool tooLarge = false; QElapsedTimer clock; };
     auto state = std::make_shared<Download>();
+    state->clock.start();
     auto drain = [=] {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status < 200 || status >= 300) return;
         const QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         state->manifest = !head && (type.contains("mpegurl") || reply->url().path().endsWith(".m3u8"));
-        state->atomic = segment || (child && !head && (type.contains("audio/mp4") || type.contains("video/mp4") ||
-            type.contains("video/mp2t") || type.contains("audio/aac") || type.contains("audio/mpeg")));
+        state->atomic = child && !head;
         if (!state->manifest && !state->atomic && socket && !state->headers) {
             state->headers = true;
             QByteArray headers = "HTTP/1.0 " + QByteArray::number(status) + " OK\r\nConnection: close\r\nContent-Type: " + type + "\r\n";
@@ -230,6 +250,14 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
         }
         const bool currentResource = m_resources.contains(key);
         const bool ok = currentResource && lengthValid && reply->error() == QNetworkReply::NoError && status >= 200 && status < 300 && (!(state->atomic || state->manifest) || !state->tooLarge);
+        if ((!ok && reply->error() != QNetworkReply::OperationCanceledError) || state->clock.elapsed() >= 2000) {
+            // Local random object ID only; never log CDN URLs, headers or tokens.
+            qInfo().noquote() << "SangeMedia object" << key.left(8) << "background" << background
+                << "attempt" << attempt << "http" << status << "network_error" << int(reply->error())
+                << "bytes" << state->received << "length_valid" << lengthValid
+                << "atomic" << state->atomic << "headers_sent" << state->headers
+                << "too_large" << state->tooLarge << "elapsed_ms" << state->clock.elapsed();
+        }
         QByteArray type = reply->header(QNetworkRequest::ContentTypeHeader).toByteArray();
         // Only completed media playlists are immutable. Live/event playlists must
         // be fetched again so the player can discover newly published segments.
@@ -263,7 +291,7 @@ void StreamCache::fetch(const QString &key, QPointer<QTcpSocket> socket, QByteAr
         if (!m_root.isEmpty() && !m_timer.isActive()) m_timer.start(500);
     });
 }
-void StreamCache::next() {
+void StreamCacheWorker::next() {
     if (!m_backgroundEnabled || m_root.isEmpty() || m_background) return;
     if (m_foreground > 0) { m_timer.start(500); return; }
     while (!m_pending.isEmpty()) {
@@ -271,4 +299,40 @@ void StreamCache::next() {
         if (m_resources.value(key).root != m_root || m_cache.contains(key)) continue;
         fetch(key); return;
     }
+}
+
+StreamCache::StreamCache(QObject *parent) : QObject(parent) {
+    // Construct all network objects and timers in their owning thread.
+    auto *context = new QObject;
+    context->moveToThread(&m_thread);
+    connect(&m_thread, &QThread::finished, context, &QObject::deleteLater);
+    m_thread.setObjectName(QStringLiteral("SangeStreamCache"));
+    m_thread.start();
+    QMetaObject::invokeMethod(context, [this, context] {
+        m_worker = new StreamCacheWorker(context);
+    }, Qt::BlockingQueuedConnection);
+}
+StreamCache::~StreamCache() {
+    m_thread.quit();
+    m_thread.wait();
+}
+QUrl StreamCache::source(const QUrl &remote) {
+    QUrl result;
+    QMetaObject::invokeMethod(m_worker, [&] { result = m_worker->source(remote); }, Qt::BlockingQueuedConnection);
+    return result;
+}
+void StreamCache::suspend() {
+    QMetaObject::invokeMethod(m_worker, [this] { m_worker->suspend(); }, Qt::BlockingQueuedConnection);
+}
+void StreamCache::setBackgroundEnabled(bool enabled) {
+    QMetaObject::invokeMethod(m_worker, [this, enabled] { m_worker->setBackgroundEnabled(enabled); }, Qt::BlockingQueuedConnection);
+}
+void StreamCache::discard(const QUrl &local) {
+    QMetaObject::invokeMethod(m_worker, [this, local] { m_worker->discard(local); }, Qt::BlockingQueuedConnection);
+}
+void StreamCache::interrupt(const QUrl &local) {
+    QMetaObject::invokeMethod(m_worker, [this, local] { m_worker->interrupt(local); }, Qt::BlockingQueuedConnection);
+}
+void StreamCache::warm(const QUrl &local) {
+    QMetaObject::invokeMethod(m_worker, [this, local] { m_worker->warm(local); }, Qt::BlockingQueuedConnection);
 }

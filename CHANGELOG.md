@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Make Android sheets follow touch directly, settle from release velocity, support header swipe dismissal and present album/playlist previews as one animated surface.
+- Fade the home wave with player coverage, pause hidden shader work and normalize Android emoji metadata layout across player and menus.
+- Add network-access diagnostics, playback proxy controls and the redesigned desktop mini-player with platform window effects.
+- Rename Linux and Windows executables to Sange while preserving installation, storage and upgrade identities.
+
+- Run the local media proxy on a dedicated thread so decoder teardown after network errors cannot deadlock the UI, including Qt deferred destruction.
+- Use Sange for the Linux window application ID and desktop entry while preserving storage and package upgrade identities.
+
+- Close stalled loopback media requests before stopping or replacing the player, preventing UI hangs during network recovery; cancel preloading during recovery.
+
 ## 2.1.0 — November 19, 2026
 
 - Choose English or Russian in settings on desktop and Android; the choice persists between launches.

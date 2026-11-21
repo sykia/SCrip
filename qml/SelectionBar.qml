@@ -40,9 +40,8 @@ ColumnLayout {
         spacing: 4
         SurfaceButton {
             host: bar.host; mobile: bar.mobile; quiet: true
-            visible: bar.showEntry && !bar.selection.active; text: bar.mobile ? qsTr("Выбор треков ⋯") : qsTr("Выбрать треки")
-            onClicked: bar.mobile ? selectionMenu.open() : bar.selection.active = true
-            Menu { id: selectionMenu; MenuItem { text: qsTr("Выбрать треки"); onTriggered: bar.selection.active = true } }
+            visible: bar.showEntry && !bar.selection.active; text: qsTr("Выбрать треки")
+            onClicked: bar.selection.active = true
         }
         Label { visible: bar.selection.active; text: qsTr("Выбрано: ") + bar.selection.count; color: bar.host.muted; font.pixelSize: 12; height: bar.mobile ? 44 : 36; verticalAlignment: Text.AlignVCenter; padding: 6 }
         SurfaceButton { host: bar.host; mobile: true; quiet: true; visible: bar.selection.active && bar.mobile; text: "×"; Accessible.name: qsTr("Выйти из режима выбора"); enabled: !bar.selection.busy; onClicked: bar.selection.reset() }
@@ -55,6 +54,13 @@ ColumnLayout {
     Timer { interval: 2500; running: !bar.selection.active && !!bar.selection.message; onTriggered: bar.selection.message = "" }
     Popup {
         id: picker
+        opacity: 0; scale: 0.985
+        enter: SurfaceTransition { duration: bar.host.motion }
+        exit: SurfaceTransition { duration: bar.host.motion; leaving: true }
+        SwipeDismiss {
+            targetPopup: picker; enabled: bar.mobile && !bar.selection.busy && !bar.writeBusy
+            headerHeight: picker.topPadding + 28
+        }
         parent: Overlay.overlay
         width: Math.min(420, parent.width - 24); x: (parent.width - width) / 2; y: (parent.height - height) / 2
         padding: 16; modal: true; focus: true

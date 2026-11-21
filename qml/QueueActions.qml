@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 Popup {
     id: popup
+    SwipeDismiss { targetPopup: popup; enabled: popup.mobile && !popup.busy;  }
     required property var host
     property bool mobile: false
     readonly property var state: sc.uiState

@@ -13,6 +13,12 @@ ManifestDPIAware true
   !endif
 !macroend
 
+; Accept legacy payloads for old-version migration fixtures.
+!if /FileExists "${PAYLOAD}\sange.exe"
+!define APP_EXE "sange.exe"
+!else
+!define APP_EXE "SCrip.exe"
+!endif
 Name "Sange"
 OutFile "${OUTPUT}"
 !ifdef TEST_INSTALL_DIR
@@ -39,7 +45,7 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "Copyright (c) 2026 sykia"
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_TITLE "Sange установлен"
 !define MUI_FINISHPAGE_TEXT "Откройте приложение и войдите в свой аккаунт SoundCloud."
-!define MUI_FINISHPAGE_RUN "$INSTDIR\SCrip.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "Открыть Sange"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -62,7 +68,7 @@ FunctionEnd
 
 !macro CheckClosed
   check_closed_retry:
-  nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "if (Get-Process -Name SCrip -ErrorAction SilentlyContinue) { exit 42 } else { exit 0 }"'
+  nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "if (Get-Process -Name SCrip,sange -ErrorAction SilentlyContinue) { exit 42 } else { exit 0 }"'
   Pop $0
   !insertmacro TestTrace "process_check=$0"
   StrCmp $0 "0" check_closed_done check_closed_prompt
@@ -82,6 +88,13 @@ Var RecoveryReady
 Var HadPrevious
 Var PreviousName
 Var PreviousVersion
+Var PreviousExe
+
+Function FindPreviousExe
+  StrCpy $PreviousExe "SCrip.exe"
+  IfFileExists "$INSTDIR\sange.exe" 0 +2
+  StrCpy $PreviousExe "sange.exe"
+FunctionEnd
 
 Function RecoverInterruptedUpdate
   !insertmacro TestTrace "recover_fn"
@@ -117,23 +130,24 @@ Function RecoverInterruptedUpdate
   RMDir /r "$BackupDir"
   IfFileExists "$BackupDir\*.*" recovery_failed
   Delete "$Marker"
+  Call FindPreviousExe
   Delete "$SMPROGRAMS\SCrip.lnk"
   Delete "$SMPROGRAMS\Sange.lnk"
-  CreateShortcut "$SMPROGRAMS\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$SMPROGRAMS\$PreviousName.lnk" "$INSTDIR\$PreviousExe"
   Delete "$DESKTOP\SCrip.lnk"
   Delete "$DESKTOP\Sange.lnk"
-  CreateShortcut "$DESKTOP\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$DESKTOP\$PreviousName.lnk" "$INSTDIR\$PreviousExe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "$PreviousName"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "$PreviousVersion"
-  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\$PreviousExe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   WriteRegStr HKCU "Software\Classes\scrip" "" "URL:Sange"
   WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
-  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
-  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
+  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\$PreviousExe,0"
+  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\$PreviousExe$\" $\"%1$\"'
 
   Goto recovery_done
   recovery_failed:
@@ -162,23 +176,24 @@ Function RestorePrevious
   RMDir /r "$StageDir"
   StrCpy $RecoveryReady 0
   StrCmp $HadPrevious 1 0 restore_done
+  Call FindPreviousExe
   Delete "$SMPROGRAMS\SCrip.lnk"
   Delete "$SMPROGRAMS\Sange.lnk"
-  CreateShortcut "$SMPROGRAMS\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$SMPROGRAMS\$PreviousName.lnk" "$INSTDIR\$PreviousExe"
   Delete "$DESKTOP\SCrip.lnk"
   Delete "$DESKTOP\Sange.lnk"
-  CreateShortcut "$DESKTOP\$PreviousName.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$DESKTOP\$PreviousName.lnk" "$INSTDIR\$PreviousExe"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "$PreviousName"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "$PreviousVersion"
-  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\$PreviousExe"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   WriteRegStr HKCU "Software\Classes\scrip" "" "URL:Sange"
   WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
-  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
-  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
+  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\$PreviousExe,0"
+  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\$PreviousExe$\" $\"%1$\"'
 
   Goto restore_done
   restore_cleanup_pending:
@@ -251,6 +266,7 @@ Section
   StrCmp $0 0 uninstall_exit_ok old_uninstall_exit_failed
   uninstall_exit_ok:
   IfFileExists "$INSTDIR\SCrip.exe" old_uninstall_file_remains
+  IfFileExists "$INSTDIR\sange.exe" old_uninstall_file_remains
   Goto uninstall_ok
   old_uninstall_exit_failed:
   !ifdef TEST_INSTALL_DIR
@@ -324,20 +340,20 @@ Section
   install_shortcuts:
   SetOutPath "$INSTDIR"
   Delete "$SMPROGRAMS\SCrip.lnk"
-  CreateShortcut "$SMPROGRAMS\Sange.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$SMPROGRAMS\Sange.lnk" "$INSTDIR\${APP_EXE}"
   Delete "$DESKTOP\SCrip.lnk"
-  CreateShortcut "$DESKTOP\Sange.lnk" "$INSTDIR\SCrip.exe"
+  CreateShortcut "$DESKTOP\Sange.lnk" "$INSTDIR\${APP_EXE}"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "Sange"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "2.1.0"
-  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\SCrip.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\${APP_EXE}"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe" _?=$INSTDIR'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
   WriteRegStr HKCU "Software\Classes\scrip" "" "URL:Sange"
   WriteRegStr HKCU "Software\Classes\scrip" "URL Protocol" ""
-  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\SCrip.exe,0"
-  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\SCrip.exe$\" $\"%1$\"'
+  WriteRegStr HKCU "Software\Classes\scrip\DefaultIcon" "" "$INSTDIR\${APP_EXE},0"
+  WriteRegStr HKCU "Software\Classes\scrip\shell\open\command" "" '$\"$INSTDIR\${APP_EXE}$\" $\"%1$\"'
 
 SectionEnd
 
@@ -359,6 +375,6 @@ Function .onInstSuccess
   ClearErrors
   ${GetOptions} $0 "/AUTORESTART" $1
   IfErrors done_restart
-  Exec '"$INSTDIR\SCrip.exe"'
+  Exec '"$INSTDIR\${APP_EXE}"'
   done_restart:
 FunctionEnd

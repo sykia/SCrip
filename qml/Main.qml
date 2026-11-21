@@ -179,6 +179,237 @@ Window {
         parent: Overlay.overlay
         host: app
     }
+
+    Window {
+        id: miniPlayer
+        objectName: "miniPlayerWindow"
+        property bool placed: false
+        property bool options: false
+        property bool destinations: false
+        property var destinationTrack: ({})
+        readonly property bool hasTrack: !!app.api.current?.urn
+        readonly property bool artworkAnimating: visible && hasTrack && !!app.api.playing && prefs.motion && prefs.miniArtworkMotion && !options && !destinations
+        onArtworkAnimatingChanged: Qt.callLater(trackPage.updateSpectrumActivity)
+        property real artworkEnergy: {
+            if (!artworkAnimating) return 0
+            const bands = sc.spectrum || []
+            const n = Math.min(14, bands.length)
+            let energy = 0
+            for (let i = 0; i < n; ++i) energy += Number(bands[i]) || 0
+            return n ? Math.max(0, Math.min(1, energy / n)) : 0
+        }
+        Behavior on artworkEnergy { NumberAnimation { duration: prefs.motion ? 140 : 0; easing.type: Easing.OutCubic } }
+        function returnToApp() { hide(); if (app.visibility === Window.Minimized) app.showNormal(); else app.show(); app.raise(); app.requestActivate() }
+        readonly property bool controlsVisible: miniHover.hovered || miniPlayer.active
+        width: 272; height: 340
+        minimumWidth: 272; maximumWidth: 272
+        minimumHeight: 340; maximumHeight: 340
+        readonly property bool backdropActive: prefs.miniBackdrop > 0 && windowEffects.blurAvailable
+        readonly property color textInk: backdropActive ? "#ffffff" : app.ink
+        readonly property color textMuted: backdropActive ? "#dddddd" : app.muted
+        function updateEffects() { windowEffects.configure(miniPlayer, prefs.miniOnTop, prefs.miniBackdrop) }
+        Component.onCompleted: updateEffects()
+        Connections {
+            target: prefs
+            function onMiniOnTopChanged() { miniPlayer.updateEffects() }
+            function onMiniBackdropChanged() { miniPlayer.updateEffects() }
+        }
+        title: qsTr("Мини-плеер") + " · Sange"
+        palette: app.palette
+        color: "transparent"
+        flags: Qt.Window | Qt.FramelessWindowHint | (prefs.miniOnTop ? Qt.WindowStaysOnTopHint : 0)
+        transientParent: null
+        onClosing: event => { event.accepted = false; hide() }
+        onVisibleChanged: { if (visible) { miniEntrance.restart(); updateEffects() } else { options = false; destinations = false } }
+        Shortcut { sequence: "Escape"; onActivated: { if (miniPlayer.options || miniPlayer.destinations) { miniPlayer.options = false; miniPlayer.destinations = false } else miniPlayer.hide() } }
+        Shortcut { sequence: "Space"; enabled: miniPlayer.hasTrack; onActivated: sc.togglePlayback() }
+        NumberAnimation { id: miniEntrance; target: miniBody; property: "opacity"; from: 0; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
+        component MiniButton: Button {
+            id: button
+            property string symbol
+            property bool light: false
+            property bool selected: false
+            implicitWidth: 28; implicitHeight: 26
+            hoverEnabled: true
+            Accessible.name: text
+            ToolTip.visible: app.showTooltips && hovered
+            ToolTip.text: text
+            opacity: enabled ? 1 : 0.35
+            background: Rectangle { radius: 4; color: button.down ? Qt.alpha(button.light ? "white" : app.ink, 0.2) : button.hovered ? Qt.alpha(button.light ? "white" : app.ink, 0.1) : "transparent" }
+            contentItem: Glyph { name: button.symbol; ink: button.selected ? app.accent : button.light ? "white" : miniPlayer.textInk; implicitWidth: 16; implicitHeight: 16 }
+        }
+        Rectangle {
+            id: miniBody
+            anchors.fill: parent; radius: 20
+            color: miniPlayer.backdropActive ? (prefs.miniBackdrop === 2 ? "#99000000" : "#08000000") : app.panel
+            border.color: miniPlayer.backdropActive ? "#40ffffff" : app.line
+            HoverHandler { id: miniHover }
+            Item {
+                x: 7; y: 0; width: parent.width - 14; height: 28
+                Txt {
+                    id: miniTitle; anchors.left: parent.left; anchors.leftMargin: 5; anchors.verticalCenter: parent.verticalCenter
+                    text: "Sange"; font.pixelSize: 11; color: miniPlayer.textMuted
+                }
+                MouseArea {
+                    objectName: "miniPlayerDragHandle"
+                    anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                    width: parent.width - miniWindowButtons.width
+                    acceptedButtons: Qt.LeftButton; cursorShape: Qt.SizeAllCursor
+                    onPressed: miniPlayer.startSystemMove()
+                    onDoubleClicked: miniPlayer.returnToApp()
+                }
+                Row {
+                    id: miniWindowButtons
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    MiniButton { objectName: "miniPlayerPinButton"; symbol: "pin"; text: qsTr("Поверх окон"); selected: prefs.miniOnTop; onClicked: { prefs.miniOnTop = !prefs.miniOnTop; miniPlayer.raise() } }
+                    MiniButton { symbol: "settings"; text: qsTr("Настройки"); selected: miniPlayer.options; onClicked: { miniPlayer.options = !miniPlayer.options; miniPlayer.destinations = false } }
+                    MiniButton { objectName: "miniPlayerReturnButton"; symbol: "returnApp"; text: qsTr("Вернуться в Sange"); onClicked: miniPlayer.returnToApp() }
+                    MiniButton { symbol: "close"; text: qsTr("Закрыть"); onClicked: miniPlayer.hide() }
+                }
+            }
+            Item {
+                id: miniCover
+                width: Math.min(parent.width - 12, parent.height - 80); height: width
+                x: (parent.width - width) / 2; y: 28 + (parent.height - 80 - height) / 2
+                Rectangle { anchors.fill: parent; radius: 16; color: miniPlayer.backdropActive ? "transparent" : app.raised }
+                Glyph { anchors.centerIn: parent; width: 36; height: 36; name: "music"; ink: app.muted; visible: !miniArt.source }
+                Rectangle { id: miniCoverMask; anchors.fill: parent; radius: 16; color: "white"; layer.enabled: true; visible: false }
+                Item {
+                    anchors.fill: parent
+                    layer.enabled: true
+                    layer.effect: MultiEffect { maskEnabled: true; maskSource: miniCoverMask }
+                    Artwork {
+                        id: miniArt; objectName: "miniPlayerArtwork"; anchors.fill: parent; radius: 16
+                        source: app.cover(app.api.current); visible: !!source
+                        property real drift: 0
+                        rotation: Math.sin(drift) * miniPlayer.artworkEnergy * 0.65
+                        transform: Scale {
+                            origin.x: miniArt.width / 2; origin.y: miniArt.height / 2
+                            xScale: 1 + miniPlayer.artworkEnergy * 0.025
+                            yScale: 1 + miniPlayer.artworkEnergy * 0.045
+                        }
+                        NumberAnimation on drift {
+                            from: 0; to: Math.PI * 2; duration: 8400; loops: Animation.Infinite
+                            running: miniPlayer.artworkAnimating
+                        }
+                        onDisplayedSourceChanged: coverEntrance.restart()
+                        NumberAnimation { id: coverEntrance; target: miniArt; property: "opacity"; from: 0.35; to: 1; duration: app.motion; easing.type: Easing.OutCubic }
+                    }
+                }
+                Item {
+                    anchors.fill: parent; visible: opacity > 0
+                    opacity: miniPlayer.controlsVisible && !miniPlayer.options && !miniPlayer.destinations ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: app.motion * 0.65 } }
+                    Rectangle {
+                        anchors.fill: parent; radius: 16
+                        gradient: Gradient { GradientStop { position: 0; color: "#18000000" } GradientStop { position: 0.55; color: "#40000000" } GradientStop { position: 1; color: "#d9000000" } }
+                    }
+                    Row {
+                        anchors.centerIn: parent; spacing: 8
+                        MiniButton { anchors.verticalCenter: parent.verticalCenter; symbol: "shuffle"; light: true; selected: !!app.api.shuffle; text: qsTr("Перемешать"); onClicked: sc.setShuffle(!app.api.shuffle) }
+                        MiniButton { anchors.verticalCenter: parent.verticalCenter; symbol: "previous"; light: true; text: qsTr("Предыдущий трек"); enabled: miniPlayer.hasTrack; onClicked: sc.previous() }
+                        MiniButton {
+                            symbol: app.api.playing ? "pause" : "play"; text: app.api.playing ? qsTr("Пауза") : qsTr("Воспроизвести")
+                            implicitWidth: 40; implicitHeight: 40; enabled: miniPlayer.hasTrack
+                            background: Rectangle { radius: 20; color: parent.down ? "#d8d8d8" : "white" }
+                            contentItem: Item { Glyph { anchors.centerIn: parent; width: 20; height: 20; name: app.api.playing ? "pause" : "play"; ink: "#181818" } }
+                            onClicked: sc.togglePlayback()
+                        }
+                        MiniButton { anchors.verticalCenter: parent.verticalCenter; symbol: "next"; light: true; text: qsTr("Следующий трек"); enabled: !!sc.queueTracks?.length; onClicked: sc.next() }
+                        MiniButton { anchors.verticalCenter: parent.verticalCenter; symbol: "arrow"; light: true; text: qsTr("Копировать ссылку"); enabled: !!app.api.current.permalink_url; onClicked: { sc.copyText(app.api.current.permalink_url); miniNotice.text = qsTr("Ссылка скопирована"); noticeTimer.restart() } }
+                    }
+                    RowLayout {
+                        x: 10; y: parent.height - 47; width: parent.width - 20
+                        Txt { text: app.time(miniSeek.value); color: "#dddddd"; font.pixelSize: 10 }
+                        Item { Layout.fillWidth: true }
+                        Txt { text: "−" + app.time(sc.duration - miniSeek.value); color: "#dddddd"; font.pixelSize: 10 }
+                    }
+                    Slider {
+                        id: miniSeek; x: 10; y: parent.height - 31; width: parent.width - 20; height: 24; padding: 0
+                        from: 0; to: Math.max(1, sc.duration); enabled: miniPlayer.hasTrack && sc.duration > 0
+                        Binding { target: miniSeek; property: "value"; value: sc.position; when: !miniSeek.pressed }
+                        onMoved: sc.seek(value)
+                        Accessible.name: qsTr("Позиция трека")
+                        background: Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter; width: parent.width; height: 2; radius: 1; color: "#66ffffff"
+                            Rectangle { width: parent.width * miniSeek.visualPosition; height: 2; radius: 1; color: "white" }
+                        }
+                        handle: Rectangle { x: miniSeek.visualPosition * (miniSeek.width - width); y: (miniSeek.height - height) / 2; width: 6; height: 6; radius: 3; color: "white"; visible: miniSeek.hovered || miniSeek.pressed || miniSeek.visualFocus }
+                    }
+                }
+                Rectangle {
+                    anchors.fill: parent; radius: 16; visible: miniPlayer.options || miniPlayer.destinations
+                    color: miniPlayer.backdropActive ? Qt.alpha(app.surface, 0.86) : app.surface
+                    ColumnLayout {
+                        anchors.fill: parent; anchors.margins: 12; spacing: 4; visible: miniPlayer.options
+                        Txt { text: qsTr("Настройки"); font.weight: Font.DemiBold; font.pixelSize: 13 }
+                        CheckBox { implicitHeight: 30; font.pixelSize: 12; text: qsTr("Поверх окон"); checked: prefs.miniOnTop; onToggled: prefs.miniOnTop = checked }
+                        CheckBox {
+                            objectName: "miniPlayerAnimationToggle"
+                            implicitHeight: 30; font.pixelSize: 12
+                            text: qsTr("Обложка в ритм музыки"); checked: prefs.miniArtworkMotion
+                            enabled: prefs.motion
+                            onToggled: prefs.miniArtworkMotion = checked
+                        }
+                        ComboBox {
+                            Layout.fillWidth: true
+                            model: [qsTr("Тема приложения"), qsTr("Прозрачный blur"), qsTr("Затемнённый blur")]
+                            currentIndex: prefs.miniBackdrop
+                            onActivated: prefs.miniBackdrop = currentIndex
+                            Accessible.name: qsTr("Оформление мини-плеера")
+                        }
+                        Txt { visible: !!windowEffects.status; Layout.fillWidth: true; text: windowEffects.status; wrapMode: Text.WordWrap; font.pixelSize: 10; color: app.muted }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            MiniButton { symbol: app.api.repeatMode === 1 ? "repeatOne" : app.api.repeatMode === 2 ? "repeat" : "repeatOff"; text: [qsTr("Повтор выключен"), qsTr("Повтор трека"), qsTr("Повтор очереди")][app.api.repeatMode || 0]; selected: app.api.repeatMode > 0; onClicked: sc.setRepeatMode(((app.api.repeatMode || 0) + 1) % 3) }
+                            VolumeSlider { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 160 }
+                        }
+                        Item { Layout.fillHeight: true }
+                        Tool { Layout.fillWidth: true; text: qsTr("Готово"); onClicked: miniPlayer.options = false }
+                    }
+                    ColumnLayout {
+                        anchors.fill: parent; anchors.margins: 10; spacing: 4; visible: miniPlayer.destinations
+                        Txt { text: qsTr("Сохранить в плейлист"); font.weight: Font.DemiBold }
+                        Txt { Layout.fillWidth: true; text: miniPlayer.destinationTrack.title || ""; color: app.muted; font.pixelSize: 11 }
+                        ListView {
+                            Layout.fillWidth: true; Layout.fillHeight: true; clip: true; model: app.api.destinations || []
+                            delegate: Tool { required property var modelData; width: ListView.view.width; text: modelData.title; enabled: !app.api.savingTrack; onClicked: sc.saveToPlaylist(miniPlayer.destinationTrack.urn, modelData.urn, "") }
+                        }
+                        Txt { visible: !!app.api.error; Layout.fillWidth: true; text: app.api.error || ""; color: app.muted; font.pixelSize: 11 }
+                        Tool { text: qsTr("Создать плейлист / ещё"); onClicked: { miniPlayer.destinations = false; app.show(); app.raise(); app.requestActivate(); albumPicker.begin(miniPlayer.destinationTrack) } }
+                    }
+                }
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 12
+                    width: parent.width - 24; height: 32; radius: 4; color: "#e6222222"; visible: noticeTimer.running
+                    Txt { id: miniNotice; anchors.centerIn: parent; width: parent.width - 12; horizontalAlignment: Text.AlignHCenter; color: "white"; font.pixelSize: 11 }
+                    Timer { id: noticeTimer; interval: 1600 }
+                }
+            }
+            Item {
+                x: 10; y: parent.height - 47; width: parent.width - 20; height: 41
+                Column {
+                    width: parent.width - 58; spacing: 2
+                    Txt { width: parent.width; text: app.api.current.title || qsTr("Выберите трек"); font.pixelSize: 13; font.weight: Font.DemiBold; color: miniPlayer.textInk }
+                    Txt { width: parent.width; text: app.api.buffering ? qsTr("Загрузка…") : sc.displayArtist(app.api.current) || "Sange"; color: miniPlayer.textMuted; font.pixelSize: 11 }
+                }
+                Row {
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 0
+                    MiniButton { symbol: selected ? "liked" : "heart"; selected: app.api.engagementStates?.[app.api.current.urn]?.like ?? !!app.api.current.user_favorite; text: qsTr("Добавить в любимые"); enabled: miniPlayer.hasTrack && !app.api.likePending?.[app.api.current.urn]; onClicked: sc.like(app.api.current) }
+                    MiniButton { symbol: "plus"; selected: miniPlayer.destinations; text: qsTr("Сохранить в плейлист"); enabled: miniPlayer.hasTrack && sc.signedIn; onClicked: { miniPlayer.destinationTrack = app.api.current; miniPlayer.destinations = !miniPlayer.destinations; miniPlayer.options = false; if (miniPlayer.destinations) sc.listDestinations() } }
+                }
+            }
+        }
+        // Keep secondary clicks inside the Quick scene, including over buttons.
+        MouseArea {
+            objectName: "miniPlayerContextArea"
+            anchors.fill: parent; z: 100
+            acceptedButtons: Qt.RightButton
+            onClicked: { miniPlayer.options = !miniPlayer.options; miniPlayer.destinations = false }
+        }
+        Connections { target: sc; function onTrackSaved() { if (miniPlayer.destinations) { miniPlayer.destinations = false; miniNotice.text = qsTr("Сохранено"); noticeTimer.restart() } } }
+    }
+
     Settings { id: prefs; objectName: "uiPreferences"; category: "appleInterface"; property bool gridView: true; property real volume: 0.7; property bool motion: true
         property string hiddenMixTracks: "{}"
         property bool showComments: true
@@ -186,6 +417,9 @@ Window {
         property bool commentsLeft: false
         property bool timedComments: false
         property int spectrumStyle: 0
+        property bool miniArtworkMotion: true
+        property int miniBackdrop: 0
+        property bool miniOnTop: true
         property bool darkMode: true
         property string savedThemes: "[]"
         property string themeName: ""
@@ -220,6 +454,18 @@ Window {
         return url.replace("-large.", "-t300x300.")
     }
     function cover(item) { if (pluginTheme.covers === "artist" && item.user?.avatar_url) return imageUrl(item.user.avatar_url); return imageUrl(item.artwork_url || item.tracks?.[0]?.artwork_url || item.user?.avatar_url || "") }
+    function toggleMiniPlayer() {
+        if (miniPlayer.visible) miniPlayer.hide()
+        else {
+            if (!miniPlayer.placed) {
+                miniPlayer.x = Math.max(miniPlayer.screen.virtualX, miniPlayer.screen.virtualX + miniPlayer.screen.width - miniPlayer.width - 32)
+                miniPlayer.y = miniPlayer.screen.virtualY + 64
+                miniPlayer.placed = true
+            }
+            windowEffects.showWindow(miniPlayer); miniPlayer.raise(); miniPlayer.requestActivate()
+        }
+    }
+    Shortcut { sequence: "Ctrl+Shift+M"; context: Qt.ApplicationShortcut; onActivated: app.toggleMiniPlayer() }
     function maximize() { if (visibility === Window.Maximized) showNormal(); else showMaximized() }
     onSectionChanged: { trackPage.close(); refreshPage(); animatePage() }
     function animatePage() { if (prefs.motion && !pageTransition.running) pageTransition.start() }
@@ -258,6 +504,9 @@ Window {
             const c = getContext("2d"); c.reset(); c.scale(width / 24, height / 24)
             c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1.65; c.lineCap = "round"; c.lineJoin = "round"; c.beginPath()
             switch (name) {
+            case "returnApp": c.rect(3,4,18,16); c.moveTo(13,8); c.lineTo(9,12); c.lineTo(13,16); c.moveTo(9,12); c.lineTo(18,12); break
+            case "pin": c.moveTo(8,3); c.lineTo(16,3); c.moveTo(9,3); c.lineTo(9,10); c.lineTo(6,14); c.lineTo(18,14); c.lineTo(15,10); c.lineTo(15,3); c.moveTo(12,14); c.lineTo(12,22); break
+            case "mini": c.rect(3,4,18,16); c.rect(12,11,7,7); break
             case "search": c.arc(10,10,6,0,Math.PI*2); c.moveTo(15,15); c.lineTo(21,21); break
             case "home": c.moveTo(3,11); c.lineTo(12,3); c.lineTo(21,11); c.moveTo(5,10); c.lineTo(5,21); c.lineTo(10,21); c.lineTo(10,14); c.lineTo(14,14); c.lineTo(14,21); c.lineTo(19,21); c.lineTo(19,10); break
             case "liked": case "heart": c.moveTo(12,21); c.bezierCurveTo(-5,10,5,-2,12,7); c.bezierCurveTo(19,-2,29,10,12,21); if (name === "liked") c.fill(); break
@@ -658,10 +907,14 @@ Window {
                     }
                     Loader { width: parent.width; active: app.section === 3; visible: active; sourceComponent: profileHeader }
                     Rectangle {
-                        visible: !!app.api.error; width: parent.width; height: errorLabel.implicitHeight + 24
+                        visible: !!app.api.error && !app.api.countryBlockError; width: parent.width; height: errorLabel.implicitHeight + 24
                         radius: 8; color: "#fff1f2"
                         Txt { id: errorLabel; x: 12; y: 12; width: parent.width - 52; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: app.api.error || ""; color: "#b44150"; font.pixelSize: 12 }
                         Tool { anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; symbol: "close"; text: qsTr("Закрыть сообщение"); onClicked: sc.clearError() }
+                    }
+                    NetworkAccess {
+                        host: app; width: parent.width
+                        visible: !!app.api.connectionCountryBlocked || !!app.api.connectionIssue || app.section === 4
                     }
                     CapsuleSection {
                         width: parent.width
@@ -802,6 +1055,7 @@ Window {
                         Layout.maximumWidth: implicitWidth
                         spacing: 12
                         Tool { text: qsTr("Дополнения"); visible: !!app.extensions && app.extensions.panels.some(p => p.page === "player"); onClicked: pluginTools.open() }
+                        Tool { objectName: "miniPlayerButton"; symbol: "mini"; text: qsTr("Мини-плеер"); active: miniPlayer.visible; ToolTip.visible: app.showTooltips && hovered; ToolTip.text: text + " · Ctrl+Shift+M"; onClicked: app.toggleMiniPlayer() }
                         Tool { symbol: "comment"; text: qsTr("Комментарии к треку"); active: prefs.showComments; onClicked: prefs.showComments = !prefs.showComments }
                         Tool { symbol: "list"; text: qsTr("Очередь воспроизведения"); active: app.dockedInspector || queuePopup.opened; onClicked: app.toggleInspector() }
                         Glyph { visible: !player.narrow; name: "volume"; Layout.preferredWidth: 18; Layout.preferredHeight: 18; ink: app.muted }
@@ -832,7 +1086,8 @@ Window {
             }
             Txt { visible: app.api.authStep === "browser"; width: parent.width; text: qsTr("Завершите вход в отдельном окне.\nSange откроет медиатеку автоматически."); horizontalAlignment: Text.AlignHCenter; color: app.muted; wrapMode: Text.WordWrap; lineHeight: 1.4 }
             Tool { visible: app.api.disconnectStatus === "unconfirmed"; text: qsTr("Настройки SoundCloud"); anchors.horizontalCenter: parent.horizontalCenter; onClicked: sc.openExternal("https://soundcloud.com/settings") }
-            Txt { visible: !!app.api.error; width: parent.width; text: app.api.error || ""; color: "#bc3b4a"; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 12 }
+            NetworkAccess { host: app; width: parent.width; visible: !!app.api.connectionCountryBlocked || !!app.api.connectionIssue }
+            Txt { visible: !!app.api.error && !app.api.countryBlockError; width: parent.width; text: app.api.error || ""; color: "#bc3b4a"; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 12 }
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
                 Tool { visible: app.api.authStep === "browser" || app.api.authStep === "exchange"; text: qsTr("Отменить"); onClicked: sc.cancelLogin() }
@@ -891,7 +1146,7 @@ Window {
             followLyrics = true
             Qt.callLater(function() { lyricList.centerActive(true) })
         }
-        function updateSpectrumActivity() { sc.setTrackVisualActive(opened && isCurrent && app.visible && app.visibility !== Window.Minimized) }
+        function updateSpectrumActivity() { sc.setTrackVisualActive(miniPlayer.artworkAnimating || (opened && isCurrent && app.visible && app.visibility !== Window.Minimized)) }
         onOpened: { updateSpectrumActivity(); loadLyrics() }
         onClosed: { updateSpectrumActivity(); if (lyrics) lyrics.cancel() }
         onIsCurrentChanged: updateSpectrumActivity()
@@ -935,6 +1190,10 @@ Window {
                 Tool { objectName: "trackPageBack"; text: qsTr("Назад"); onClicked: trackPage.close() }
                 Txt { text: qsTr("МУЗЫКА В ДЕТАЛЯХ"); color: app.muted; font.pixelSize: 10; font.letterSpacing: 2; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
                 Tool { symbol: "close"; text: qsTr("Закрыть страницу"); onClicked: trackPage.close() }
+            }
+            NetworkAccess {
+                host: app; Layout.fillWidth: true
+                visible: !!app.api.connectionCountryBlocked && !app.api.relayEnabled
             }
             Flickable {
                 id: detailsScroll
@@ -1237,6 +1496,7 @@ Window {
                                 target: lyricList; property: "contentY"
                                 duration: app.motion; easing.type: Easing.InOutCubic
                             }
+                            PointHandler { onActiveChanged: if (active) { lyricScroll.stop(); trackPage.followLyrics = false } }
                             onMovementStarted: { lyricScroll.stop(); trackPage.followLyrics = false }
                             onCurrentIndexChanged: if (trackPage.followLyrics) centerActive(true)
                             onModelChanged: { lyricScroll.stop(); Qt.callLater(function() { if (trackPage.followLyrics) lyricList.centerActive(false) }) }
@@ -1444,6 +1704,7 @@ Window {
                             shelfMotion.to = end
                             shelfMotion.start()
                         }
+                        PointHandler { onActiveChanged: if (active) shelfMotion.stop() }
                         onMovementStarted: shelfMotion.stop()
                         NumberAnimation { id: shelfMotion; target: cards; property: "contentX"; duration: app.motion; easing.type: Easing.OutCubic }
                         readonly property real cardHeight: cardWidth + 52

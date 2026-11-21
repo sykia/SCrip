@@ -18,7 +18,7 @@ Control {
     readonly property real value: adjusting ? preview : position
     readonly property bool waveformReady: wave.ready
     signal seekRequested(real milliseconds)
-    implicitHeight: wave.ready ? 52 : 32
+    implicitHeight: 52
     implicitWidth: 160
     enabled: duration > 0
     focusPolicy: Qt.StrongFocus
@@ -41,6 +41,7 @@ Control {
         TrackWaveform {
             id: wave; anchors.fill: parent
             source: root.visible ? root.source : ""
+            detailed: pointer.pressed && pointer.validGesture
             ink: root.ink; accent: root.accent
             progress: root.duration > 0 ? root.value / root.duration : 0
         }

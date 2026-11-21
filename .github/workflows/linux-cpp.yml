@@ -108,5 +108,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Debian-native
-          path: build/debian/scrip
+          path: build/debian/sange
           if-no-files-found: error

@@ -11,6 +11,7 @@ class TrackWaveform : public QQuickPaintedItem {
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(bool ready READ ready NOTIFY readyChanged)
     Q_PROPERTY(qreal progress MEMBER m_progress NOTIFY progressChanged)
+    Q_PROPERTY(bool detailed MEMBER m_detailed NOTIFY detailChanged)
     Q_PROPERTY(QColor ink MEMBER m_ink NOTIFY colorsChanged)
     Q_PROPERTY(QColor accent MEMBER m_accent NOTIFY colorsChanged)
 public:
@@ -26,6 +27,7 @@ signals:
     void readyChanged();
     void progressChanged();
     void colorsChanged();
+    void detailChanged();
 private:
     friend class TrackDetailsTests;
     void request(const QUrl &url, quint64 generation, int redirects);
@@ -35,6 +37,7 @@ private:
     QPointer<QNetworkReply> m_reply;
     QUrl m_source;
     QImage m_image, m_remaining, m_played;
+    bool m_detailed = false;
     qreal m_progress = 0;
     QColor m_ink = Qt::gray, m_accent = Qt::white;
     quint64 m_generation = 0;

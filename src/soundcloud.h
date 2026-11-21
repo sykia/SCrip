@@ -112,6 +112,7 @@ public:
     Q_INVOKABLE void loadComments(const QString &track, bool append = false, bool force = false);
     Q_INVOKABLE void postComment(const QString &track, const QString &body, qint64 timestamp = -1);
     Q_INVOKABLE void connectCatalog();
+    Q_INVOKABLE void setRelayEnabled(bool enabled);
     Q_INVOKABLE void login();
     Q_INVOKABLE void cancelLogin();
     Q_INVOKABLE void browserFailed();
@@ -264,6 +265,7 @@ private:
     struct WaitingOperation { std::function<void()> continuation; TokenFailure failed; };
     void ensureToken(std::function<void()> continuation, TokenFailure failed = {});
     void token(const QUrlQuery &form, bool basic, TokenFlow flow, std::function<void()> done, TokenFailure failed = {}, int loginEpoch = -1);
+    QUrl apiTransport(const QUrl &url) const;
     void request(const QString &path, Callback done, const QByteArray &method = "GET", const QJsonObject &body = {}, bool retry = true, std::function<void(QString)> failed = {}, std::function<void()> started = {}, int redirects = 0, bool background = false);
     struct ReadWaiter { Callback done; TokenFailure failed; };
     QHash<QString, std::shared_ptr<QList<ReadWaiter>>> m_reads;
@@ -321,9 +323,10 @@ private:
     void startupStage(const char *stage);
     void recoverPlayback();
     void checkPlaybackConnection();
+    void skipFailedPlayback();
     QTimer m_playbackRecoveryTimer, m_playbackWatchdog;
     bool m_playbackRecovering = false;
-    int m_playbackRetries = 0, m_playbackIdleSeconds = 0;
+    int m_playbackRetries = 0, m_playbackIdleSeconds = 0, m_connectionFailures = 0;
     qint64 m_recoveryPosition = 0, m_watchdogPosition = -1;
     QSet<QString> m_failedPlaybackTracks;
     void prepareNext();
