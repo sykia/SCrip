@@ -1,0 +1,19 @@
+{
+  "version": "2.2.0",
+  "platforms": [
+    "Windows",
+    "Linux-DEB",
+    "Linux-Arch",
+    "Android"
+  ],
+  "application_code_commit": "67fc6168588f1e0e8d3300370c2355ad6ee08112",
+  "base_materials": {
+    "url": "https://github.com/sykia/sange/releases/download/v1.4.0/compliance.tar.gz",
+    "sha256": "3c0754508063c0215acc46cbabb78e4c8ba524d05af9937e807f61dd2eb12aeb"
+  },
+  "materials_overlay": {
+    "name": "compliance-update.tar.gz",
+    "sha256": "5ab23b38d60cac08756f388aaa64e8048f7c28b9f43bd35c3b279b37740431ee"
+  },
+  "source_archive_commit": "67fc6168588f1e0e8d3300370c2355ad6ee08112"
+}

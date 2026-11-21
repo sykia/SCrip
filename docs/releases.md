@@ -233,3 +233,14 @@ Linux launchers and packaging use the new filename. Windows setup detects both
 process names and restores shortcuts to the executable present after rollback;
 its migration fixture upgrades `SCrip.exe` to `sange.exe`. Historical 2.1.0
 commands/assets above retain their original executable names.
+
+## 2.2.0 verification notes
+
+- Application and canonical source archive commit: `67fc6168588f1e0e8d3300370c2355ad6ee08112`. Later changes adjust test environments and release documentation only.
+- Native Linux/Debian run: `44914436944`; all nine CTest suites passed. The live external TLS probe remains explicitly opt-in.
+- macOS packages: `44914436036`. Its original UI tests exposed synthetic touch moves coalescing between offscreen frames. Both complete affected suites passed on both architectures in `44916985103` using `QML_NO_TOUCH_COMPRESSION=1`, against the exact original source commit. CTest now sets this for plugin and QML tests; do not set it for production playback. The existing packages were retained.
+- Windows draft installer upgrade verification: `44917063662`, using 2.1.0 as the previous release.
+- Keep the patched Windows FFmpeg DLLs from the verified deployment: they intentionally differ from the unpatched kit DLLs. Verify them against the previous published file manifest and its pinned `ffmpeg-scrip` sources; all other runtime DLLs must match the active kit.
+- The Arch package now needs `kwindowsystem` and `libxcb` for the native mini-player effects. Debian's native build uses the available optional dependencies.
+- If a disposable Android emulator reports missing package/activity services after a long suspension, restart its disposable image before installation tests. Wait for `sys.boot_completed=1`. Preserve compiled APKs and instrumentation rather than rebuilding them.
+- On this Arch host, prepend `build/dpkg-local/usr/bin` to `PATH` for the release package audit.
